@@ -1,0 +1,36 @@
+{
+  "name": "01_intro-to-express",
+  "version": "1.0.0",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env --watch app.js",
+    "setup": "node --env-file=.env ./config/setup.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@openfga/sdk": "^0.9.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "google-auth-library": "^10.6.1",
+    "googleapis": "^171.4.0",
+    "helmet": "^8.2.0",
+    "ioredis": "^5.11.1",
+    "mime-types": "^2.1.35",
+    "mongoose": "^9.2.1",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^8.0.11",
+    "rate-limiter-flexible": "^11.2.0",
+    "sanitize-html": "^2.17.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4"
+  }
+}

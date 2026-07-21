@@ -1,0 +1,554 @@
+/* =====================================================
+   FileViewer — Google Drive-style overlay viewer
+   ===================================================== */
+
+/* ── Overlay ── */
+.fv-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fv-fade-in 0.15s ease;
+  backdrop-filter: blur(2px);
+}
+
+@keyframes fv-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Shell ── */
+.fv-shell {
+  background: #1e1e2e;
+  border-radius: 12px;
+  width: calc(100vw - 48px);
+  max-width: 1200px;
+  height: calc(100vh - 48px);
+  max-height: 900px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.5),
+    0 8px 16px rgba(0, 0, 0, 0.3);
+  animation: fv-slide-up 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fv-shell-full {
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+ 
+}
+@keyframes fv-slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1);    }
+}
+
+/* ── Top bar ── */
+.fv-topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 8px;
+  background: #1e1e2e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 8px;
+  flex-shrink: 0;
+}
+.fv-topbar-full {
+  background: #1c1c1c;
+  padding: 0 16px 0 16px
+}
+
+.fv-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fv-close-btn {
+  color: rgba(255, 255, 255, 0.7) !important;
+  flex-shrink: 0;
+}
+
+.fv-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.fv-ext-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: white;
+  flex-shrink: 0;
+  font-family: var(--font-main);
+}
+
+.fv-filename {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-main);
+}
+
+.fv-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.fv-action-btn {
+  color: rgba(255, 255, 255, 0.7) !important;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fv-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.fv-action-danger:hover {
+  background: rgba(234, 67, 53, 0.2) !important;
+  color: #f28b82 !important;
+}
+
+/* ── Viewer body ── */
+.fv-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #13131f;
+}
+.fv-body-full {
+  background: #343434;
+}
+/* ── Info bar ── */
+.fv-infobar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: #1e1e2e;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.fv-infobar-full {
+  background: #000;
+}
+
+.fv-info-item {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  font-family: var(--font-main);
+}
+
+/* ══════════════════════════════════════════════════
+   IMAGE VIEWER
+══════════════════════════════════════════════════ */
+.fv-image-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+.fv-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transform-origin: center;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+.fv-zoom-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 999px;
+  padding: 4px 12px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.fv-zoom-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+  font-family: monospace;
+}
+
+.fv-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.fv-zoom-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 40px;
+  text-align: center;
+  font-family: var(--font-main);
+}
+
+/* ══════════════════════════════════════════════════
+   VIDEO VIEWER
+══════════════════════════════════════════════════ */
+.fv-video-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.fv-video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 4px;
+  outline: none;
+}
+
+/* ══════════════════════════════════════════════════
+   AUDIO VIEWER
+══════════════════════════════════════════════════ */
+.fv-audio-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.fv-audio-art {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(26, 115, 232, 0.12);
+  border: 2px solid rgba(26, 115, 232, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fv-audio-name {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: var(--font-main);
+  max-width: 360px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fv-audio {
+  width: 360px;
+  max-width: 90%;
+  accent-color: #1a73e8;
+}
+
+/* ══════════════════════════════════════════════════
+   PDF VIEWER
+══════════════════════════════════════════════════ */
+.fv-pdf-stage,
+.fv-office-stage {
+  width: 100%;
+  height: 100%;
+}
+
+.fv-pdf-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+/* ══════════════════════════════════════════════════
+   TEXT / CODE VIEWER
+══════════════════════════════════════════════════ */
+.fv-text-stage {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 24px 32px;
+}
+
+.fv-text-content {
+  font-family: "Google Sans", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.fv-code-stage {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  position: relative;
+}
+
+.fv-code-lang {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(30, 30, 46, 0.95);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 8px 16px;
+  font-family: var(--font-main);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 1;
+}
+
+.fv-code-block {
+  padding: 12px 0 24px;
+}
+
+.fv-code-line {
+  display: flex;
+  align-items: baseline;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 0 16px;
+  min-height: 21px;
+}
+
+.fv-code-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fv-line-num {
+  min-width: 40px;
+  color: rgba(255, 255, 255, 0.2);
+  text-align: right;
+  margin-right: 20px;
+  user-select: none;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.fv-line-content {
+  flex: 1;
+  white-space: pre;
+}
+
+/* Token colours */
+.fv-tok-keyword  { color: #c792ea; font-weight: 500; }
+.fv-tok-string   { color: #a5d6a7; }
+.fv-tok-number   { color: #f78c6c; }
+.fv-tok-comment  { color: rgba(255,255,255,0.3); font-style: italic; }
+.fv-tok-ident    { color: rgba(255, 255, 255, 0.82); }
+.fv-tok-punct    { color: rgba(255, 255, 255, 0.45); }
+
+/* ══════════════════════════════════════════════════
+   CSV VIEWER
+══════════════════════════════════════════════════ */
+.fv-csv-stage {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 0;
+}
+
+.fv-csv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--font-main);
+}
+
+.fv-csv-table th {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  white-space: nowrap;
+}
+
+.fv-csv-table td {
+  padding: 8px 16px;
+  color: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fv-csv-table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ══════════════════════════════════════════════════
+   UNKNOWN / OFFICE FALLBACK
+══════════════════════════════════════════════════ */
+.fv-unknown-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px;
+}
+
+.fv-unknown-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.5px;
+  font-family: var(--font-main);
+}
+
+.fv-unknown-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-main);
+  max-width: 400px;
+  text-align: center;
+}
+
+.fv-unknown-hint {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  line-height: 1.6;
+  font-family: var(--font-main);
+}
+
+.fv-unknown-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #1a73e8;
+  color: white;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-main);
+  text-decoration: none;
+  transition: background 0.15s;
+  margin-top: 8px;
+}
+
+.fv-unknown-download-btn:hover {
+  background: #1765cc;
+}
+
+/* ── Loading / error states ── */
+.fv-text-loading,
+.fv-text-error {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  font-family: var(--font-main);
+}
+
+.fv-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #1a73e8;
+  border-radius: 50%;
+  animation: fv-spin 0.8s linear infinite;
+}
+
+@keyframes fv-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Navigation Arrows ── */
+.fv-nav-arrows {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fv-nav-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: center;
+}
+
+.fv-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .fv-shell {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+  .fv-overlay {
+    padding: 0;
+  }
+}
