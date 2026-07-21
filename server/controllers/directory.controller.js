@@ -18,8 +18,6 @@ import { deleteFile } from "../services/s3/delete.js";
 import { deleteFileArray } from "../services/s3/deleteArray.js";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const MAX_STORAGE_SIZE = 10 * 1024 * 1024;
 
 export const getDirectory = async (req, res, next) => {
   try {
@@ -110,7 +108,7 @@ export const getDirectory = async (req, res, next) => {
       return res.status(403).json({
         message: "Access denied",
         requiresAuth: true,
-        name: parentDir.name,
+        userId: req.user?._id,
       });
 
     // ✅ check if user can view this currentDirectory
@@ -676,6 +674,7 @@ export const restoreDirectory = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?._id;
+  const totalStorage = req.user.totalStorage;
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
@@ -689,7 +688,7 @@ export const restoreDirectory = async (req, res, next) => {
       userId,
     }).lean();
 
-    const totalStorageLeft = MAX_STORAGE_SIZE - rootDir.size;
+    const totalStorageLeft = totalStorage - rootDir.size;
     const needed = currentDirectory.size - totalStorageLeft;
     if (currentDirectory.size > totalStorageLeft) {
       return res.status(413).json({

@@ -66,18 +66,18 @@ export const generateSignedUploadUrl = async (req, res, next) => {
       });
     }
 
-const subscription = await Subscription.findOne({
-  userId,
-});
+    const subscription = await Subscription.findOne({
+      userId,
+    });
 
-if (!subscription || subscription.status !== "active") {
-  await updateUserPlan(userId, {
-     uploadLimit: 0,
-   });
-  return res.status(403).json({
-    message: "Your subscription is not active.",
-  });
-}
+    if (subscription && subscription.status !== "active") {
+      await updateUserPlan(userId, {
+        uploadLimit: 0,
+      });
+      return res.status(403).json({
+        message: "Your subscription is not active.",
+      });
+    }
 
     const rootDir = await Directory.findOne({
       userId,
@@ -115,8 +115,7 @@ if (!subscription || subscription.status !== "active") {
     });
   } catch (error) {
     if (uploadedFile) {
-    await File.deleteOne({ _id: uploadedFile._id }).catch(() => {});
-
+      await File.deleteOne({ _id: uploadedFile._id }).catch(() => {});
     }
     return next(error);
   }

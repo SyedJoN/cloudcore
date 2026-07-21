@@ -1,6 +1,5 @@
 import Directory from "../models/directory.model.js";
 import File from "../models/file.model.js";
-import Session from "../models/session.model.js";
 import User from "../models/user.model.js";
 import { fileURLToPath } from "url";
 import { rm } from "fs/promises";
@@ -27,7 +26,7 @@ export const getCurrentUser = async (req, res, next) => {
       plan: req.user.plan,
       uploadLimit: req.user.uploadLimit,
       totalStorage: req.user.totalStorage,
-      totalUsage: rootDir.size,
+      totalUsage: rootDir?.size ?? 0,
     });
   } catch (error) {
     next(error);

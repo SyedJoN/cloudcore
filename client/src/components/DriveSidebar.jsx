@@ -13,6 +13,7 @@ import {
   IconHome,
 } from "./Icons";
 import { formatSize } from "../../utils/formatHelpers";
+import { History, Home, House, Share } from "lucide-react";
 
 export default function DriveSidebar({
   dirId,
@@ -42,7 +43,7 @@ export default function DriveSidebar({
   );
   
   return (
-    <aside className="gd-sidebar">
+    <aside className="gd-sidebar bg-[#f8fafd] dark:bg-[#1b1b1b]">
       {/* New button */}
       <div style={{ position: "relative", margin: "0 8px 12px" }}>
         <button
@@ -50,7 +51,7 @@ export default function DriveSidebar({
           onClick={() => setShowNewMenu((v) => !v)}
         >
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <circle cx="18" cy="18" r="18" fill="white" />
+         
             <path d="M17 17V11h2v6h6v2h-6v6h-2v-6h-6v-2h6z" fill="#202124" />
           </svg>
           New
@@ -106,7 +107,8 @@ export default function DriveSidebar({
             navigate("/home");
           }}
         >
-          <IconHome size={20} /> Home
+          
+         {isHomeRoute ? <House fill="#c2e7ff" size={20}/> : <IconHome size={20} />} Home
         </button>
         <button
           className={`gd-nav-item ${isMyDriveActive ? "active" : ""}`}
@@ -127,11 +129,12 @@ export default function DriveSidebar({
             navigate("/shared");
           }}
         >
-          <IconShared size={20} /> Shared with me
+          <Share size={20}/>
+        Shared with me
         </button>
 
         <button className="gd-nav-item">
-          <IconRecent size={20} /> Recent
+          <History size={20}/> Recent
         </button>
 
         <button className="gd-nav-item">

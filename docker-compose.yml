@@ -42,6 +42,7 @@ services:
       - OPENFGA_DATASTORE_ENGINE=postgres
       - OPENFGA_DATASTORE_URI=postgres://postgres:password@postgres:5432/postgres?sslmode=disable
       - OPENFGA_LOG_FORMAT=json
+      - OPENFGA_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     command: run
     networks:
       - openfga

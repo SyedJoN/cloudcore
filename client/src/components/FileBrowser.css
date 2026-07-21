@@ -1,5 +1,4 @@
 .file-browser {
-  padding: 24px;
   background: #f6f7fb;
   min-height: 100vh;
   font-family: system-ui, sans-serif;
@@ -15,7 +14,6 @@
 
 .table-container {
   background: white;
-  border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0,0,0,0.06);
 }

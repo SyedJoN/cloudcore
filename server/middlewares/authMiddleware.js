@@ -1,7 +1,6 @@
 import { ObjectId } from "mongodb";
 import crypto from "node:crypto";
 import User from "../models/user.model.js";
-import Session from "../models/session.model.js";
 import redisClient from "../config/redis.js";
 
 export async function checkAuth(req, res, next) {

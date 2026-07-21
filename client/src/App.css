@@ -2,7 +2,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&family=Roboto:wght@300;400;500&display=swap");
 
 @import "tailwindcss";
-
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --font-main: "Google Sans", "Roboto", sans-serif;

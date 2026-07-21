@@ -114,7 +114,7 @@ export default function DirectoryView() {
           : "local");
   const navigate = useNavigate();
   const [needsAccess, setNeedsAccess] = useState(false);
-  const { user, setUser, loggedIn, setLoggedIn, refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   const [directoryName, setDirectoryName] = useState("My Drive");
   const [directoriesList, setDirectoriesList] = useState([]);
@@ -171,17 +171,9 @@ export default function DirectoryView() {
     checkGoogleDriveAccess();
   }, []);
 
-  const ran = useRef(false);
 
-  // useEffect(() => {
-  //   if (ran.current) return;
-  //   ran.current = true;
-  //   fetchUser({ setUser, setLoggedIn });
-  // }, []);
 
-  useEffect(() => {
-    console.log("crumbs", crumbs);
-  }, [crumbs]);
+
 
   async function getTrashItems(tab = "") {
     setIsLoading(true);
@@ -764,12 +756,8 @@ export default function DirectoryView() {
         />
       )}
       <DriveHeader
-        user={user}
-        setUser={setUser}
-        loggedIn={loggedIn}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        setLoggedIn={setLoggedIn}
         viewMode={viewMode}
         disabled={isUploading}
         onToggleView={() =>
@@ -778,7 +766,7 @@ export default function DirectoryView() {
         isGoogleDrive={isGoogleDrive}
       />
 
-      <div className="gd-body">
+      <div className="gd-body bg-[#f8fafd] dark:bg-[#1b1b1b]">
         {user.email && (
           <DriveSidebar
             dirId={dirId}
@@ -798,7 +786,6 @@ export default function DirectoryView() {
             crumbs={crumbs}
             setCrumbs={setCrumbs}
             dirContext={dirContext}
-            loggedIn={loggedIn}
             directoryName={directoryName}
             isSharedRoute={isSharedRoute}
             isTrashRoute={isTrashRoute}
@@ -815,7 +802,8 @@ export default function DirectoryView() {
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className="gd-main"
+            className="gd-main bg-[#ffffff] dark:bg-[#131314]
+            "
             onMouseDown={(e) => {
               if (
                 e.target.closest(
@@ -1258,7 +1246,6 @@ export default function DirectoryView() {
       {/* Context Menu */}
       {contextItem && (
         <ContextMenu
-          loggedIn={loggedIn}
           item={contextItem}
           position={contextPos}
           isGoogleDriveRoute={isGoogleDriveRoute}

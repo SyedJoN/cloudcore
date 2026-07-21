@@ -88,7 +88,7 @@ export default function UsersPage() {
           })),
       );
     } catch (err) {
-      navigate("/");
+console.log('err',err)
     } finally {
       setIsLoading(false);
     }

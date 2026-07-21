@@ -1,12 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { IconGrid, IconList, IconInfo } from "./Icons";
+import { useAuth } from "../Contexts/AuthContext";
 
 export default function DriveToolbar({
   dirId,
   dirContext,
   crumbs,
   setCrumbs,
-  loggedIn,
   isTrashRoute,
   breadcrumbs,
   setBreadcrumbs,
@@ -18,7 +18,7 @@ export default function DriveToolbar({
 }) {
   const navigate = useNavigate();
   console.log("dirContext", dirContext, "isTrashRoute", isTrashRoute);
-
+const {loggedIn} = useAuth();
   const rootLabel =
     dirContext === "trash"
       ? "Trash"
@@ -37,9 +37,9 @@ export default function DriveToolbar({
           : "/";
 
   return (
-    <div className="gd-toolbar">
+    <div className="gd-toolbar bg-[#ffffff] dark:bg-[#131314]">
       {dirContext !== "trash" && dirContext !== "shared" ? (
-        <div className="gd-breadcrumb">
+        <div className="gd-breadcrumb bg-[#ffffff] dark:bg-[#131314]">
           <button
             disabled={disabled}
             className={`${loggedIn ? "gd-breadcrumb-item" : "hide"}`}

@@ -12,10 +12,11 @@ import { useAuth } from "../Contexts/AuthContext";
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 function UserAccountBar() {
-    const {user, setUser, loggedIn, setLoggedIn} = useAuth();
+  const { user, setUser, loggedIn, setLoggedIn } = useAuth();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
-
+  const isMongoId = /\/[a-fA-F0-9]{24}$/.test(window.location.pathname);
+  const isMainPage = window.location.pathname.endsWith("/main");
   const [hasImgError, setHasImgError] = useState(false);
 
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -135,7 +136,9 @@ function UserAccountBar() {
           {loggedIn ? (
             <>
               {/* Profile info */}
-              <div className="gd-user-menu-profile">
+              <div
+                className={`gd-user-menu-profile ${isMongoId || isMainPage ? "not-empty" : ""}`}
+              >
                 {user.avatar && !hasImgError ? (
                   <img
                     src={user.avatar}
@@ -191,7 +194,7 @@ function UserAccountBar() {
                     <Users size={18} /> Manage users
                   </button>
                 )}
-                {window.location.pathname.endsWith("/main") && (
+                {(isMainPage || isMongoId) && (
                   <button
                     className="gd-user-menu-item"
                     onClick={() => {

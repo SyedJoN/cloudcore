@@ -12,10 +12,10 @@ import {
   IconRestore,
 } from "./Icons";
 import { useToast } from "../Contexts/ToastContext";
+import { useAuth } from "../Contexts/AuthContext";
 
 export default function ContextMenu({
   item,
-  loggedIn,
   position,
   isGoogleDriveRoute,
   isTrashRoute,
@@ -32,6 +32,7 @@ export default function ContextMenu({
 }) {
   if (!item) return null;
 const BASE_URL = "http://localhost:4000";
+  const {loggedIn} = useAuth();
   
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);

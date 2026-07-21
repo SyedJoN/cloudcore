@@ -1,6 +1,4 @@
 import redisClient from "../config/redis.js";
-import Session from "../models/session.model.js";
-import User from "../models/user.model.js";
 
 // optionalAuth.js
 export const optionalAuth = async (req, res, next) => {

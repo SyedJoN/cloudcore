@@ -1,18 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaUsersCog  } from "react-icons/fa";
-import { googleLogout } from "@react-oauth/google";
+import { FaUsersCog } from "react-icons/fa";
 import {
   FaFolderPlus,
   FaUpload,
-  FaUser,
   FaSignOutAlt,
   FaSignInAlt,
 } from "react-icons/fa";
 import { getColor } from "../../utils/getProfileColor.js";
 import GoogleDriveBtn from "./GoogleDrive.jsx";
-import { getCurrentUser } from "../../apis/userApi.js";
-import { logoutAll, logoutUser } from "../../apis/authApi.js";
+import { useAuth } from "../Contexts/AuthContext.jsx";
 
 function DirectoryHeader({
   isGoogleDrive,
@@ -23,92 +20,19 @@ function DirectoryHeader({
   handleFileSelect,
   disabled = false,
 }) {
+  const { user, refreshUser, loggedIn, logout, logoutAll } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("Guest User");
-  const [userEmail, setUserEmail] = useState("guest@example.com");
-  const [userRole, setUserRole] = useState("user");
-  const [userAvatar, setUserAvatar] = useState(null);
+
   const [hasError, setHasError] = useState(null);
 
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
 
   // -------------------------------------------
-  // 1. Fetch user info from /auth on mount
-  // -------------------------------------------
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-       const data = await getCurrentUser();
-        if (data) {
-          setUserName(data.name);
-          setUserEmail(data.email);
-          setUserAvatar(data.avatar);
-          setUserRole(data.role);
-          setLoggedIn(true);
-        } else if (data.response.status === 401) {
-          setUserName("Guest User");
-          setUserEmail("guest@example.com");
-          setUserRole("user");
-          setLoggedIn(false);
-        } else {
-          // Handle other error statuses if needed
-          console.error("Error fetching user info:", response.status);
-        }
-      } catch (err) {
-        console.error("Error fetching user info:", err.message || err);
-      }
-    }
-    fetchUser();
-  }, []);
-
-  // -------------------------------------------
   // 2. Toggle user menu
   // -------------------------------------------
   const handleUserIconClick = () => {
     setShowUserMenu((prev) => !prev);
-  };
-
-  // -------------------------------------------
-  // 3. Logout handler
-  // -------------------------------------------
-  const handleLogout = async () => {
-    try {
-      await logoutUser()
-        console.log("Logged out successfully");
-        // Optionally reset local state
-        setLoggedIn(false);
-        setUserName("Guest User");
-        setUserEmail("guest@example.com");
-        navigate("/login");
-      
-    } catch (err) {
-      console.error("Logout error:", err.message);
-    } finally {
-      googleLogout();
-      setShowUserMenu(false);
-    }
-  };
-  // -------------------------------------------
-  // 3. Logout handler
-  // -------------------------------------------
-  const handleLogoutAll = async () => {
-    try {
-     await logoutAll();
-     
-        console.log("Logged out successfully");
-       
-        setLoggedIn(false);
-        setUserName("");
-        setUserEmail("");
-        navigate("/login");
-      
-    } catch (err) {
-      console.error("Logout error:", err.message);
-    } finally {
-      setShowUserMenu(false);
-    }
   };
 
   // -------------------------------------------
@@ -127,13 +51,13 @@ function DirectoryHeader({
   }, []);
 
   async function handleManageUsers() {
-    navigate('/users')
+    navigate("/users");
   }
   return (
     <header className="directory-header">
       <h1>{directoryName}</h1>
       <div className="header-links">
-      {!isGoogleDrive && <GoogleDriveBtn/>} 
+        {!isGoogleDrive && <GoogleDriveBtn />}
 
         <button
           className="icon-button"
@@ -171,11 +95,11 @@ function DirectoryHeader({
             title="User Menu"
             onClick={handleUserIconClick}
           >
-            {userAvatar && !hasError ? (
+            {user?.avatar && !hasError ? (
               <div className="user-avatar">
                 <img
-                  alt={userName}
-                  src={userAvatar}
+                  alt={user.name}
+                  src={user.avatar}
                   onError={() => setHasError(true)}
                 ></img>
               </div>
@@ -184,10 +108,10 @@ function DirectoryHeader({
                 <span
                   className="dynamic-avatar"
                   style={{
-                    backgroundColor: getColor(userName),
+                    backgroundColor: getColor(user?.name),
                   }}
                 >
-                  {userName?.charAt(0)}
+                  {user.name?.charAt(0)}
                 </span>
               </>
             )}
@@ -200,32 +124,34 @@ function DirectoryHeader({
                   {/* Display name & email if logged in */}
                   <div className="user-menu-item user-info">
                     <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span className="user-name">{userName}</span>
-                      <span className="user-email">{userEmail}</span>
-                      <span style={{textTransform: "capitalize", fontWeight: "bold"}} className="user-email">~{userRole}</span>
+                      <span className="user-name">{user.name}</span>
+                      <span className="user-email">{user.email}</span>
+                      <span
+                        style={{
+                          textTransform: "capitalize",
+                          fontWeight: "bold",
+                        }}
+                        className="user-email"
+                      >
+                        ~{user.role}
+                      </span>
                     </div>
                   </div>
                   <div className="user-menu-divider" />
-                  {userRole !== "user" &&
+                  {user.role !== "user" && (
                     <div
-                    className="user-menu-item login-btn"
-                    onClick={handleManageUsers}
-                  >
-                    <FaUsersCog className="menu-item-icon" />
-                    <span>Manage users</span>
-                  </div>
-                  }
-                  <div
-                    className="user-menu-item login-btn"
-                    onClick={handleLogout}
-                  >
+                      className="user-menu-item login-btn"
+                      onClick={handleManageUsers}
+                    >
+                      <FaUsersCog className="menu-item-icon" />
+                      <span>Manage users</span>
+                    </div>
+                  )}
+                  <div className="user-menu-item login-btn" onClick={logout}>
                     <FaSignOutAlt className="menu-item-icon" />
                     <span>Logout</span>
                   </div>
-                  <div
-                    className="user-menu-item login-btn"
-                    onClick={handleLogoutAll}
-                  >
+                  <div className="user-menu-item login-btn" onClick={logoutAll}>
                     <FaSignOutAlt className="menu-item-icon" />
                     <span>Logout All</span>
                   </div>
