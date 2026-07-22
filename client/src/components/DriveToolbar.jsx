@@ -37,9 +37,9 @@ const {loggedIn} = useAuth();
           : "/";
 
   return (
-    <div className="gd-toolbar bg-[#ffffff] dark:bg-[#131314]">
+    <div className="gd-toolbar">
       {dirContext !== "trash" && dirContext !== "shared" ? (
-        <div className="gd-breadcrumb bg-[#ffffff] dark:bg-[#131314]">
+        <div className="gd-breadcrumb">
           <button
             disabled={disabled}
             className={`${loggedIn ? "gd-breadcrumb-item" : "hide"}`}

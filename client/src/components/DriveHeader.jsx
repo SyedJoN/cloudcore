@@ -28,7 +28,7 @@ const handleSettings = async ()=> {
   console.log('toggled')
 }
   return (
-    <header className="gd-header bg-[#f8fafd] dark:bg-[#1b1b1b]">
+    <header className="gd-header">
       {/* Logo */}
       <a
         className="gd-logo"
@@ -41,7 +41,7 @@ const handleSettings = async ()=> {
 
       {/* Search */}
       <div className="gd-search-wrapper">
-        <div className="gd-search bg-[#e9eef6] dark:bg-[#282a2c]">
+        <div className="gd-search">
           <span className="gd-search-icon">
             <IconSearch size={'25'} />
           </span>

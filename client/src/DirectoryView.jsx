@@ -766,7 +766,7 @@ export default function DirectoryView() {
         isGoogleDrive={isGoogleDrive}
       />
 
-      <div className="gd-body bg-[#f8fafd] dark:bg-[#1b1b1b]">
+      <div className="gd-body">
         {user.email && (
           <DriveSidebar
             dirId={dirId}
@@ -802,8 +802,7 @@ export default function DirectoryView() {
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className="gd-main bg-[#ffffff] dark:bg-[#131314]
-            "
+            className="gd-main"
             onMouseDown={(e) => {
               if (
                 e.target.closest(

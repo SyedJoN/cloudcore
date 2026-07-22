@@ -43,7 +43,7 @@ export default function DriveSidebar({
   );
   
   return (
-    <aside className="gd-sidebar bg-[#f8fafd] dark:bg-[#1b1b1b]">
+    <aside className="gd-sidebar">
       {/* New button */}
       <div style={{ position: "relative", margin: "0 8px 12px" }}>
         <button

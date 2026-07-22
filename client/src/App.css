@@ -30,17 +30,18 @@ body {
 .google-drive {
   display: flex;
   align-items: center;
-  background: #e7e7e7;
+  background: var(--surface-container-dark);
   border-radius: 12px;
   padding: 8px 12px;
   transition: background 0.3s ease;
   cursor: pointer;
+  box-shadow: var(--shadow-1);
 }
 .google-drive svg {
   margin-right: 4px;
 }
 .google-drive:hover {
-  background: #c8c8c8!important;
+  background: var(--surface-container-dark-hover);
 }
 .user-files {
   list-style-type: none;
