@@ -5,6 +5,7 @@ import { AuthProvider } from "./Contexts/AuthContext";
 import { allRoutes } from "./routes/index";
 import BreadcrumbProvider from "./Contexts/BreadcrumbContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
+import { GDriveAuthProvider } from "./Contexts/GoogleDriveAuthContext";
 
 // const router = createBrowserRouter([
 //   { path: "/register", element: <Register /> },
@@ -25,6 +26,7 @@ const router = createBrowserRouter(allRoutes);
 function App() {
   return (
     <AuthProvider>
+      <GDriveAuthProvider>
       <ThemeProvider>
       <ToastProvider>
         <BreadcrumbProvider>
@@ -32,6 +34,7 @@ function App() {
         </BreadcrumbProvider>
       </ToastProvider>
         </ThemeProvider>
+        </GDriveAuthProvider>
     </AuthProvider>
   );
 }

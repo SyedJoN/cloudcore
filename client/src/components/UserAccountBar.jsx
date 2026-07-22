@@ -3,16 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { getColor } from "../../utils/getProfileColor";
 import { IconLogin, IconLogout, IconUsers } from "./Icons";
-import { googleLogout } from "@react-oauth/google";
-import { logoutAll, logoutUser } from "../../apis/authApi";
 import { HardDrive, Package, Users, Diamond, DiamondPlus } from "lucide-react";
 import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useAuth } from "../Contexts/AuthContext";
+import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
+import GoogleDriveBtn from "../components/GoogleDrive"
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 function UserAccountBar() {
-  const { user, setUser, loggedIn, setLoggedIn } = useAuth();
+  const { user, loggedIn, logout, logoutAll } = useAuth();
+  const {isGoogleDrive} = useGDrive();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
   const isMongoId = /\/[a-fA-F0-9]{24}$/.test(window.location.pathname);
@@ -59,48 +60,7 @@ function UserAccountBar() {
         {user.name?.charAt(0)?.toUpperCase()}
       </span>
     );
-  // ── Logout ─────────────────────────────────────────────────────────────
-  async function handleLogout() {
-    try {
-      const res = await logoutUser();
-      console.log("res", res);
-      if (res.status === 200) {
-        setLoggedIn(false);
-        setUser({
-          name: "",
-          avatar: "",
-          email: "",
-          role: "",
-        });
-        navigate("/login");
-      }
-    } catch (err) {
-      console.error("Logout error:", err.message);
-    } finally {
-      googleLogout();
-      setShowUserMenu(false);
-    }
-  }
-
-  async function handleLogoutAll() {
-    try {
-      const res = await logoutAll();
-      if (res.status === 200) {
-        setLoggedIn(false);
-        setUser({
-          name: "",
-          avatar: "",
-          email: "",
-          role: "",
-        });
-        navigate("/login");
-      }
-    } catch (err) {
-      console.error("Logout all error:", err.message);
-    } finally {
-      setShowUserMenu(false);
-    }
-  }
+ 
 
   return (
     <div
@@ -218,16 +178,22 @@ function UserAccountBar() {
                     <Package size={18} /> My Plans
                   </button>
                 )}
+                        {!isGoogleDrive && 
+                        <button  className="flex sm:hidden">
+                                       <GoogleDriveBtn />
+                          </button>
+           }
+                
                 <div className="gd-user-menu-divider" />
                 <button
                   className="gd-user-menu-item danger"
-                  onClick={handleLogout}
+                  onClick={logout}
                 >
                   <IconLogout size={18} /> Logout
                 </button>
                 <button
                   className="gd-user-menu-item danger"
-                  onClick={handleLogoutAll}
+                  onClick={logoutAll}
                 >
                   <IconLogout size={18} /> Logout all devices
                 </button>

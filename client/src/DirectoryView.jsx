@@ -41,6 +41,8 @@ import TopBanner from "./components/TopBanner";
 import { fetchPortalUrl } from "../apis/subscriptionApi";
 import { useAuth } from "./Contexts/AuthContext";
 import { useBreadcrumb } from "./Contexts/BreadcrumbContext";
+import { useGDrive } from "./Contexts/GoogleDriveAuthContext";
+import SearchBar from "./components/SearchBar";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -122,7 +124,6 @@ export default function DirectoryView() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
-  const [isGoogleDrive, setIsGoogleDrive] = useState(false);
   const [viewMode, setViewMode] = useState("grid");
 
   const [showCreateDir, setShowCreateDir] = useState(false);
@@ -141,6 +142,7 @@ export default function DirectoryView() {
   const [isUploading, setIsUploading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchBar, setShowSearchBar] = useState(false);
   const [contextItem, setContextItem] = useState(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -158,22 +160,11 @@ export default function DirectoryView() {
 
   // Auth check + user fetch
 
-  const checkGoogleDriveAccess = async () => {
-    try {
-      const res = await googleDriveCheck();
-      setIsGoogleDrive(res.data.isAuthenticated);
-    } catch (error) {
-      console.log("error", error.message);
-      setIsGoogleDrive(false);
-    }
-  };
+  const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
+    useGDrive();
   useEffect(() => {
     checkGoogleDriveAccess();
   }, []);
-
-
-
-
 
   async function getTrashItems(tab = "") {
     setIsLoading(true);
@@ -742,6 +733,24 @@ export default function DirectoryView() {
   if (needsAccess) {
     return <RequestAccessPage user={user} dirId={dirId} />;
   }
+
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  const handleSearchToggle = () => {
+    setShowSearchBar((prev) => !prev);
+  };
   return (
     <div className="directory-view">
       {user && user.uploadLimit == 0 && (
@@ -755,23 +764,30 @@ export default function DirectoryView() {
           }}
         />
       )}
-      <DriveHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        viewMode={viewMode}
-        disabled={isUploading}
-        onToggleView={() =>
-          setViewMode((v) => (v === "grid" ? "list" : "grid"))
-        }
-        isGoogleDrive={isGoogleDrive}
-      />
+
+      {showSearchBar && windowWidth < 768 ? (
+        <SearchBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          handleSearchToggle={handleSearchToggle}
+          classNames="sticky top-0 z-[4] border-b border-transparent flex flex-0 items-center min-h-[64px]"
+
+        />
+      ) : (
+        <DriveHeader
+        windowWidth={windowWidth}
+        handleSearchToggle={handleSearchToggle}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          disabled={isUploading}
+        />
+      )}
 
       <div className="gd-body">
         {user.email && (
           <DriveSidebar
             dirId={dirId}
             isHomeRoute={isHomeRoute}
-            isGoogleDrive={isGoogleDrive}
             isSharedRoute={isSharedRoute}
             isTrashRoute={isTrashRoute}
             totalStorage={user.totalStorage}
@@ -781,8 +797,6 @@ export default function DirectoryView() {
           />
         )}
         <div className="gd-main-container">
-       
-
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
@@ -833,23 +847,23 @@ export default function DirectoryView() {
             onMouseUp={() => setDragBox(null)}
             onMouseLeave={() => setDragBox(null)}
           >
-               <DriveToolbar
-            dirId={dirId}
-            crumbs={crumbs}
-            setCrumbs={setCrumbs}
-            dirContext={dirContext}
-            directoryName={directoryName}
-            isSharedRoute={isSharedRoute}
-            isTrashRoute={isTrashRoute}
-            breadcrumbs={breadcrumbs}
-            setBreadcrumbs={setBreadcrumbs}
-            disabled={isUploading}
-            viewMode={viewMode}
-            onToggleView={() =>
-              setViewMode((v) => (v === "grid" ? "list" : "grid"))
-            }
-            toggleDetailsBar={() => setShowDetails((prev) => !prev)}
-          />
+            <DriveToolbar
+              dirId={dirId}
+              crumbs={crumbs}
+              setCrumbs={setCrumbs}
+              dirContext={dirContext}
+              directoryName={directoryName}
+              isSharedRoute={isSharedRoute}
+              isTrashRoute={isTrashRoute}
+              breadcrumbs={breadcrumbs}
+              setBreadcrumbs={setBreadcrumbs}
+              disabled={isUploading}
+              viewMode={viewMode}
+              onToggleView={() =>
+                setViewMode((v) => (v === "grid" ? "list" : "grid"))
+              }
+              toggleDetailsBar={() => setShowDetails((prev) => !prev)}
+            />
             {dragBox && (
               <div
                 style={{
@@ -1273,7 +1287,6 @@ export default function DirectoryView() {
           key={viewItem._id}
           item={viewItem}
           onClose={() => setViewItem(null)}
-          isGDrive={isGoogleDrive}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}

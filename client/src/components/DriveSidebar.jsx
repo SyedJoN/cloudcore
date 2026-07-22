@@ -27,12 +27,12 @@ import {
 } from "./Icons";
 import { formatSize } from "../../utils/formatHelpers";
 import { History, Home, House, Share } from "lucide-react";
+import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
 
 export default function DriveSidebar({
   dirId,
   totalStorage,
   totalUsage,
-  isGoogleDrive,
   isHomeRoute,
   isSharedRoute,
   isTrashRoute,
@@ -40,7 +40,8 @@ export default function DriveSidebar({
   onCreateFolder,
   onUploadFiles,
 }) {
-  console.log("totalUsage", totalUsage);
+  const {isGoogleDrive} = useGDrive();
+
   const navigate = useNavigate();
   const [showNewMenu, setShowNewMenu] = useState(false);
   const isMyDriveActive =
