@@ -781,23 +781,7 @@ export default function DirectoryView() {
           />
         )}
         <div className="gd-main-container">
-          <DriveToolbar
-            dirId={dirId}
-            crumbs={crumbs}
-            setCrumbs={setCrumbs}
-            dirContext={dirContext}
-            directoryName={directoryName}
-            isSharedRoute={isSharedRoute}
-            isTrashRoute={isTrashRoute}
-            breadcrumbs={breadcrumbs}
-            setBreadcrumbs={setBreadcrumbs}
-            disabled={isUploading}
-            viewMode={viewMode}
-            onToggleView={() =>
-              setViewMode((v) => (v === "grid" ? "list" : "grid"))
-            }
-            toggleDetailsBar={() => setShowDetails((prev) => !prev)}
-          />
+       
 
           <main
             style={{ userSelect: "none" }}
@@ -849,6 +833,23 @@ export default function DirectoryView() {
             onMouseUp={() => setDragBox(null)}
             onMouseLeave={() => setDragBox(null)}
           >
+               <DriveToolbar
+            dirId={dirId}
+            crumbs={crumbs}
+            setCrumbs={setCrumbs}
+            dirContext={dirContext}
+            directoryName={directoryName}
+            isSharedRoute={isSharedRoute}
+            isTrashRoute={isTrashRoute}
+            breadcrumbs={breadcrumbs}
+            setBreadcrumbs={setBreadcrumbs}
+            disabled={isUploading}
+            viewMode={viewMode}
+            onToggleView={() =>
+              setViewMode((v) => (v === "grid" ? "list" : "grid"))
+            }
+            toggleDetailsBar={() => setShowDetails((prev) => !prev)}
+          />
             {dragBox && (
               <div
                 style={{

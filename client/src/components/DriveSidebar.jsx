@@ -1,6 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  HomeIcon,
+  InboxStackIcon,
+  ShareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
+import {
+  HomeIcon as HomeIconSolid,
+  InboxStackIcon as InboxStackIconSolid,
+  ShareIcon as ShareIconSolid,
+  TrashIcon as TrashIconSolid,
+} from "@heroicons/react/24/solid";
+
+import {
   IconDrive,
   IconMyDrive,
   IconComputers,
@@ -27,7 +40,7 @@ export default function DriveSidebar({
   onCreateFolder,
   onUploadFiles,
 }) {
-  console.log('totalUsage', totalUsage)
+  console.log("totalUsage", totalUsage);
   const navigate = useNavigate();
   const [showNewMenu, setShowNewMenu] = useState(false);
   const isMyDriveActive =
@@ -41,7 +54,8 @@ export default function DriveSidebar({
     0,
     Math.min((totalUsage / Number(totalStorage)) * 100, 100),
   );
-  
+
+  const isDriveRoute = location.pathname.endsWith("/");
   return (
     <aside className="gd-sidebar">
       {/* New button */}
@@ -51,7 +65,6 @@ export default function DriveSidebar({
           onClick={() => setShowNewMenu((v) => !v)}
         >
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-         
             <path d="M17 17V11h2v6h6v2h-6v6h-2v-6h-6v-2h6z" fill="#202124" />
           </svg>
           New
@@ -107,8 +120,12 @@ export default function DriveSidebar({
             navigate("/home");
           }}
         >
-          
-         {isHomeRoute ? <House fill="#c2e7ff" size={20}/> : <IconHome size={20} />} Home
+          {isHomeRoute ? (
+            <HomeIconSolid className="w-5 h-5" size={20} />
+          ) : (
+            <HomeIcon className="w-5 h-5" size={20} />
+          )}{" "}
+          Home
         </button>
         <button
           className={`gd-nav-item ${isMyDriveActive ? "active" : ""}`}
@@ -116,7 +133,12 @@ export default function DriveSidebar({
             navigate("/");
           }}
         >
-          <IconMyDrive size={20} /> My Drive
+          {isDriveRoute ? (
+            <InboxStackIconSolid className="w-5 h-5" />
+          ) : (
+            <InboxStackIcon className="w-5 h-5" />
+          )}{" "}
+          My Drive
         </button>
 
         <button className="gd-nav-item" onClick={() => navigate("/")}>
@@ -129,12 +151,16 @@ export default function DriveSidebar({
             navigate("/shared");
           }}
         >
-          <Share size={20}/>
-        Shared with me
+          {isSharedRoute ? (
+            <ShareIconSolid className="w-5 h-5" />
+          ) : (
+            <ShareIcon className="w-5 h-5" />
+          )}
+          Shared with me
         </button>
 
         <button className="gd-nav-item">
-          <History size={20}/> Recent
+          <History size={20} /> Recent
         </button>
 
         <button className="gd-nav-item">
@@ -147,7 +173,12 @@ export default function DriveSidebar({
             navigate("/trash");
           }}
         >
-          <IconTrash2 size={20} /> Trash
+          {isTrashRoute ? (
+            <TrashIconSolid className="w-5 h-5" />
+          ) : (
+            <TrashIcon className="w-5 h-5" />
+          )}{" "}
+          Trash
         </button>
       </nav>
 

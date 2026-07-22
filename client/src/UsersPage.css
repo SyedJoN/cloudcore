@@ -1,12 +1,12 @@
 .dashboard {
   display: flex;
   min-height: 100vh;
-  background: #f4f6f9;
+  background: var(--surface-container);
 }
 
 .sidebar {
   width: 220px;
-  background: #1f2937;
+  background: var(--btn-bg-medium);
   color: white;
   padding: 20px;
 }
@@ -112,7 +112,7 @@
   color: #dc2626;
 }
 .card {
-  background: white;
+  background: var(--surface-container-dark-hover);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.05);
@@ -126,7 +126,9 @@
   border-collapse: collapse;
   min-width: 750px;
 }
-
+.user-table th {
+  background: var(--surface-container)
+}
 .user-table th,
 .user-table td {
   padding: 12px;
@@ -150,7 +152,7 @@
 .active {
   text-decoration: underline;
 }
-.footer-actions {
+.dashboardooter-actions {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
