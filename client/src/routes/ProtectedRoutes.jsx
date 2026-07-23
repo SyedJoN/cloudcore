@@ -1,6 +1,6 @@
-import Protected from "../AuthLayout";
-import DirectoryView from "../DirectoryView";
-import UsersPage from "../UsersPage";
+import Protected from "../components/Layouts/AuthLayout";
+import DirectoryView from "../Pages/DirectoryView";
+import UsersPage from "../Pages/UsersPage";
 
 export const protectedRoutes = [
   {

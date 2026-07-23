@@ -1,6 +1,6 @@
-import PublicOnlyRoute from "../components/PublicOnlyLayout";
-import Login from "../Login";
-import Register from "../Register";
+import PublicOnlyRoute from "../components/Layouts/PublicOnlyLayout";
+import Login from "../Pages/Login";
+import Register from "../Pages/Register";
 
 export const publicRoutes = [
   {

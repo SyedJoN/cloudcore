@@ -512,6 +512,7 @@ export const restoreFile = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?._id;
+    const totalStorage = req.user?.totalStorage;
     if (!userId) {
       return res
         .status(409)

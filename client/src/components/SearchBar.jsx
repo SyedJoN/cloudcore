@@ -1,5 +1,5 @@
 import React from 'react'
-import { IconSearch } from './Icons'
+import { IconSearch } from './Icons/Icons'
 import { XMarkIcon } from '@heroicons/react/24/solid'
 
 const SearchBar = ({searchQuery, onSearchChange, classNames="", handleSearchToggle=null}) => {

@@ -38,6 +38,7 @@ export const SidebarProvider = ({ children }) => {
   return (
     <SidebarContext.Provider
       value={{
+        windowWidth,
         isSidebarOpen,
         toggleSidebar,
         setIsSidebarOpen,
@@ -57,3 +58,4 @@ export const useSidebar = () => {
 
   return context;
 };
+

@@ -1,13 +1,13 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import { getColor } from "../../utils/getProfileColor";
-import { IconLogin, IconLogout, IconUsers } from "./Icons";
+import { getColor } from "../../Utils/getProfileColor";
+import { IconLogin, IconLogout, IconUsers } from "./Icons/Icons";
 import { HardDrive, Package, Users, Diamond, DiamondPlus } from "lucide-react";
 import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useAuth } from "../Contexts/AuthContext";
 import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
-import GoogleDriveBtn from "../components/GoogleDrive";
+import GoogleDriveBtn from "./ThirdPartyButtons/GoogleDrive";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -126,11 +126,8 @@ function UserAccountBar() {
                   <span className="gd-user-menu-plan-badge">{user.plan}</span>
                   {user.plan !== "business" && (
                     <a
-                      href={
-                        location.pathname.endsWith("/main")
-                          ? "#pricing"
-                          : "/main#pricing"
-                      }
+                    onClick={()=> location.pathname.endsWith("/main") ? navigate("#pricing") : navigate("/main#pricing")}
+                     
                       className="btn hover:bg-blue-200 hover:text-blue-500 flex items-center rounded-md text-xs text-gray-500 capitalize font-medium py-2.5 cursor-pointer"
                     >
                       <DiamondPlus className="mr-1 text-blue-500" size={13} />

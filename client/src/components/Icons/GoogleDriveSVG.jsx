@@ -34,4 +34,5 @@ function GoogleDriveSVG({ size = 20 }) {
     </svg>
   );
 }
-export default GoogleDriveSVG
+
+export default GoogleDriveSVG;

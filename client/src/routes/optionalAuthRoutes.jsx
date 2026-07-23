@@ -1,5 +1,5 @@
-import OptionalAuth from "../components/OptionalAuthLayout";
-import FileViewPage from "../FileViewPage";
+import OptionalAuth from "../components/Layouts/OptionalAuthLayout";
+import FileViewPage from "../Pages/FileViewPage";
 import Home from "../Pages/Home";
 
 export const optionalAuthRoutes = [
