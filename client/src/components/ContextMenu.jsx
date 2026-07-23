@@ -15,6 +15,7 @@ import { useToast } from "../Contexts/ToastContext";
 import { useAuth } from "../Contexts/AuthContext";
 
 export default function ContextMenu({
+  openLeft,
   item,
   position,
   isGoogleDriveRoute,
@@ -23,6 +24,7 @@ export default function ContextMenu({
   onClose,
   onShare,
   onRename,
+  viewMode = "grid",
   onSoftDelete,
   onDelete,
   onRestore,
@@ -31,9 +33,9 @@ export default function ContextMenu({
   isDeleted,
 }) {
   if (!item) return null;
-const BASE_URL = "http://localhost:4000";
-  const {loggedIn} = useAuth();
-  
+  const BASE_URL = "http://localhost:4000";
+  const { loggedIn } = useAuth();
+
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const { toast } = useToast();
@@ -112,10 +114,9 @@ const BASE_URL = "http://localhost:4000";
 
           {showOpenWith && (
             <div
-              className="gd-context-menu"
+              className={`gd-context-menu ${openLeft ? "right-[200px]" : "left-[100%]"}`}
               style={{
                 position: "absolute",
-                left: "100%",
                 top: 0,
                 zIndex: 1001,
                 minWidth: 180,
@@ -162,10 +163,9 @@ const BASE_URL = "http://localhost:4000";
         )}
         {showShare && (
           <div
-            className="gd-context-menu"
+            className={`gd-context-menu ${openLeft ? "right-[200px]" : "left-[100%]"}`}
             style={{
               position: "absolute",
-              left: "100%",
               top: 0,
               zIndex: 1001,
               minWidth: 180,
@@ -190,7 +190,7 @@ const BASE_URL = "http://localhost:4000";
             </button>
           </div>
         )}
-         {isGoogleDriveRoute && (
+        {isGoogleDriveRoute && (
           <button className="gd-context-item" onClick={handleCopyLink}>
             <IconLink size={18} />
             Copy link

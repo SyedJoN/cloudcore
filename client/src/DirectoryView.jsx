@@ -10,6 +10,7 @@ import ContextMenu from "./components/ContextMenu";
 import ShareModal from "./components/ShareModal";
 import UploadTray from "./components/UploadTray";
 import RequestAccessPage from "./RequestAccessPage";
+import GoogleDriveSVG from "./components/Icons/GoogleDriveSVG";
 import {
   IconClose,
   IconDownload,
@@ -46,44 +47,6 @@ import SearchBar from "./components/SearchBar";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
-// Reusable Google Drive logo SVG
-function GoogleDriveSVG({ size = 20 }) {
-  return (
-    <svg
-      viewBox="0 0 87.3 78"
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      style={{ flexShrink: 0 }}
-    >
-      <path
-        d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-        fill="#0066da"
-      />
-      <path
-        d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2   .5h27.5z"
-        fill="#00ac47"
-      />
-      <path
-        d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-        fill="#ea4335"
-      />
-      <path
-        d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-        fill="#00832d"
-      />
-      <path
-        d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-        fill="#2684fc"
-      />
-      <path
-        d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-        fill="#ffba00"
-      />
-    </svg>
-  );
-}
-
 export default function DirectoryView() {
   const { toast } = useToast();
 
@@ -91,6 +54,7 @@ export default function DirectoryView() {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const grantExecutedRef = useRef(false);
+  const mainContainerRef = useRef(null);
   const grantUserId = useMemo(
     () => new URLSearchParams(location.search).get("grant"),
     [],
@@ -606,14 +570,22 @@ export default function DirectoryView() {
       setError(err.message);
     }
   }
-
+  const [openLeft, setOpenLeft] = useState(0);
   // Context menu
   function handleContextMenu(e, id) {
     e.stopPropagation();
     e.preventDefault();
+    const CONTEXT_MENU_WIDTH = 180;
+    const container = mainContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const spaceRight = rect.width - x;
+    const left = spaceRight < CONTEXT_MENU_WIDTH;
+    setOpenLeft(left);
+    setContextPos({ x: e.clientX - 210, y: e.clientY });
+
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
     setContextItem(item || null);
-    setContextPos({ x: e.clientX - 210, y: e.clientY });
   }
 
   function handleSelect(id) {
@@ -682,7 +654,7 @@ export default function DirectoryView() {
   const uploadingFiles = uploadQueue;
 
   const listHeaderRow = (
-    <div className="gd-list-header">
+    <div className="gd-list-header md:text-[11px]">
       <span>Name</span>
       <span>Owner</span>
       <span>Last modified</span>
@@ -771,12 +743,11 @@ export default function DirectoryView() {
           onSearchChange={setSearchQuery}
           handleSearchToggle={handleSearchToggle}
           classNames="sticky top-0 z-[4] border-b border-transparent flex flex-0 items-center min-h-[64px]"
-
         />
       ) : (
         <DriveHeader
-        windowWidth={windowWidth}
-        handleSearchToggle={handleSearchToggle}
+          windowWidth={windowWidth}
+          handleSearchToggle={handleSearchToggle}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           disabled={isUploading}
@@ -796,7 +767,7 @@ export default function DirectoryView() {
             onUploadFiles={() => fileInputRef.current?.click()}
           />
         )}
-        <div className="gd-main-container">
+        <div ref={mainContainerRef} className="gd-main-container">
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
@@ -893,10 +864,13 @@ export default function DirectoryView() {
             ) : (
               <>
                 {/* Google Drive virtual folder row — shown on root when authenticated */}
-                {isGoogleDrive && !dirId && isHomeRoute && (
-                  <>
-                    <div className="gd-section-label">Connected storage</div>
-                    {viewMode === "grid" ? (
+                {isGoogleDrive &&
+                  !dirId &&
+                  isHomeRoute &&
+                  viewMode === "grid" && (
+                    <>
+                      <div className="gd-section-label">Connected storage</div>
+
                       <div className="gd-grid" style={{ marginBottom: 8 }}>
                         <div
                           className="gd-grid-item"
@@ -921,25 +895,8 @@ export default function DirectoryView() {
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="gd-list" style={{ marginBottom: 8 }}>
-                        {listHeaderRow}
-                        <div
-                          className="gd-list-row"
-                          onClick={() => navigate("/directory/google-drive")}
-                        >
-                          <div className="gd-list-row-name">
-                            <GoogleDriveSVG size={20} />
-                            <span>Google Drive</span>
-                          </div>
-                          <div className="gd-list-row-cell">—</div>
-                          <div className="gd-list-row-cell">—</div>
-                          <div />
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
+                    </>
+                  )}
 
                 {/* Empty state */}
                 {combinedItems.length === 0 && !dirId && (
@@ -968,8 +925,11 @@ export default function DirectoryView() {
                 {/* Folders */}
                 {filteredDirs.length > 0 && (
                   <>
-                    <div className="gd-section-label">Folders</div>
+
                     {viewMode === "grid" ? (
+                      <>
+                    <div className="gd-section-label">Folders</div>
+
                       <div className="gd-grid">
                         {filteredDirs.map((item) => (
                           <GridItem
@@ -987,9 +947,12 @@ export default function DirectoryView() {
                           />
                         ))}
                       </div>
+                      </>
                     ) : (
-                      <div className="gd-list">
+                <>
                         {listHeaderRow}
+
+                      <div className="gd-list">
                         {filteredDirs.map((item) => (
                           <ListRow
                             key={item._id}
@@ -1006,6 +969,7 @@ export default function DirectoryView() {
                           />
                         ))}
                       </div>
+               </>
                     )}
                   </>
                 )}
@@ -1013,13 +977,15 @@ export default function DirectoryView() {
                 {/* Files */}
                 {filteredFiles.length > 0 && (
                   <>
-                    <div
+                
+                    {viewMode === "grid" ? (
+                      <>
+                          <div
                       className="gd-section-label"
                       style={{ marginTop: filteredDirs.length ? 16 : 0 }}
                     >
                       Files
                     </div>
-                    {viewMode === "grid" ? (
                       <div className="gd-grid">
                         {filteredFiles.map((item) => (
                           <GridItem
@@ -1037,6 +1003,7 @@ export default function DirectoryView() {
                           />
                         ))}
                       </div>
+                      </>
                     ) : (
                       <div className="gd-list">
                         {!filteredDirs.length && listHeaderRow}
@@ -1260,12 +1227,14 @@ export default function DirectoryView() {
       {/* Context Menu */}
       {contextItem && (
         <ContextMenu
+          openLeft={openLeft}
           item={contextItem}
           position={contextPos}
           isGoogleDriveRoute={isGoogleDriveRoute}
           isTrashRoute={isTrashRoute}
           dirId={dirId}
           isDeleted={isDeleted}
+          viewMode={viewMode}
           onClose={() => {
             setContextItem(null);
             clearSelection();
@@ -1276,7 +1245,7 @@ export default function DirectoryView() {
           onDelete={(item) => handleDelete(item)}
           onRestore={(item) => handleRestoreItem(item)}
           onDownload={(item) => handleDownload(item)}
-          onPreview={(item) => setViewItem(item)} // ✅
+          onPreview={(item) => setViewItem(item)}
         />
       )}
 

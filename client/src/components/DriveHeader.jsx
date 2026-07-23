@@ -85,7 +85,7 @@ export default function DriveHeader({
       <div className="gd-header-actions">
         {!isGoogleDrive && (
           <div className="hidden sm:flex" title="gdrive-btn">
-            <GoogleDriveBtn />
+            <GoogleDriveBtn classNames="bg-[var(--surface-container-dark)] hover:bg-[var(--surface-container-dark-hover)] px-2 py-3 gap-2 shadow-[var(--shadow-1)]"/>
           </div>
         )}
 

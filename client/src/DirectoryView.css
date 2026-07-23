@@ -9,7 +9,7 @@
   --surface-container-primary: #c2e7ff;
   --surface-container-dark: #e9eef6;
   --surface-container-dark-hover: #f6fafe;
-  --btn-bg-medium: #37393b;
+  --btn-bg-medium: rgba(32, 33, 36, 0.08);
   --border: #e0e0e0;
   --border-hover: #dadce0;
   --text-primary: #202124;
@@ -28,6 +28,8 @@
     0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
   --shadow-2:
     0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-dynamic:
+    0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 16px;
@@ -35,7 +37,6 @@
   --folder-color: #5f6368;
   --font-main: "Google Sans", "Roboto", sans-serif;
   --transition: 0.15s ease;
-
 }
 .dark {
   --surface-container: #1b1b1b;
@@ -47,8 +48,10 @@
   --text-secondary: #c4c7c5;
   --surface-container-dark: #282a2c;
   --shadow-1: none;
+  --shadow-dynamic: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
+  --btn-bg-medium: #37393b;
 }
 body {
   font-family: var(--font-main);
@@ -127,7 +130,6 @@ body {
   font-family: "Google Sans", sans-serif;
 }
 
-
 .gd-search {
   display: flex;
   align-items: center;
@@ -149,7 +151,7 @@ body {
 
 .gd-search:focus-within {
   background: var(--surface-white);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-dynamic);
 }
 
 .gd-search input {
@@ -977,16 +979,6 @@ body {
 }
 
 /* ===================== RESPONSIVE ===================== */
-@media (max-width: 768px) {
-
-  .gd-list-header,
-  .gd-list-row {
-    grid-template-columns: 1fr 60px;
-  }
-  .gd-list-row-cell:not(:first-child):not(:last-child) {
-    display: none;
-  }
-}
 
 /* ===================== SHARE MODAL ===================== */
 
@@ -1106,6 +1098,23 @@ body.gd-overlay-open {
 }
 .gd-user-menu-item.danger svg {
   color: #d93025;
+}
+.gd-user-menu-gdrive {
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  font-family: var(--font-main);
+  color: var(--text-primary);
+  cursor: pointer;
+  border: none;
+  padding: 10px 20px;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: background var(--transition);
+}
+.gd-user-menu-gdrive:hover {
+  background: var(--btn-hover-primary);
 }
 .gd-user-menu-divider {
   height: 1px;
@@ -1411,4 +1420,10 @@ body.gd-overlay-open {
 }
 .gd-icon-btn:hover {
   background: var(--btn-hover-primary);
+}
+.google-drive {
+  display: flex;
+  align-items: center;
+  border-radius: 12px;
+  cursor: pointer;
 }

@@ -1,6 +1,6 @@
 import React from "react";
 
-function GoogleDriveBtn() {
+function GoogleDriveBtn({classNames = "", width=24, height=24}) {
  
 const handleDriveBtn = async () => {
     try {
@@ -20,12 +20,12 @@ const handleDriveBtn = async () => {
     }
 }
   return (
-    <div onClick={async ()=> handleDriveBtn()} className="google-drive whitespace-nowrap">
+    <div onClick={async ()=> handleDriveBtn()} className={`google-drive whitespace-nowrap ${classNames}`}>
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 256 229"
-        width="24"
-        height="24"
+        width={width}
+        height={height}
       >
         <path
           fill="#0066DA"

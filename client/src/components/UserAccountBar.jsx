@@ -7,13 +7,13 @@ import { HardDrive, Package, Users, Diamond, DiamondPlus } from "lucide-react";
 import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useAuth } from "../Contexts/AuthContext";
 import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
-import GoogleDriveBtn from "../components/GoogleDrive"
+import GoogleDriveBtn from "../components/GoogleDrive";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 function UserAccountBar() {
   const { user, loggedIn, logout, logoutAll } = useAuth();
-  const {isGoogleDrive} = useGDrive();
+  const { isGoogleDrive } = useGDrive();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
   const isMongoId = /\/[a-fA-F0-9]{24}$/.test(window.location.pathname);
@@ -60,7 +60,6 @@ function UserAccountBar() {
         {user.name?.charAt(0)?.toUpperCase()}
       </span>
     );
- 
 
   return (
     <div
@@ -178,17 +177,13 @@ function UserAccountBar() {
                     <Package size={18} /> My Plans
                   </button>
                 )}
-                        {!isGoogleDrive && 
-                        <button  className="flex sm:hidden">
-                                       <GoogleDriveBtn />
-                          </button>
-           }
-                
+                {!isGoogleDrive && (
+                  <button className="gd-user-menu-gdrive flex sm:hidden">
+                    <GoogleDriveBtn width={18} height={18} classNames="p-0 gap-[14px]" />
+                  </button>
+                )}
                 <div className="gd-user-menu-divider" />
-                <button
-                  className="gd-user-menu-item danger"
-                  onClick={logout}
-                >
+                <button className="gd-user-menu-item danger" onClick={logout}>
                   <IconLogout size={18} /> Logout
                 </button>
                 <button
