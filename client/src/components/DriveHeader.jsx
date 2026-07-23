@@ -16,6 +16,7 @@ import ThemeToggleBtn from "./Buttons/ThemeToggleBtn.jsx";
 import { useGDrive } from "../Contexts/GoogleDriveAuthContext.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import SearchBar from "./SearchBar.jsx";
+import { useSidebar } from "../Contexts/SidebarContext.jsx";
 
 const BASE_URL = "http://localhost:4000";
 
@@ -23,31 +24,12 @@ export default function DriveHeader({
   searchQuery,
   onSearchChange,
   handleSearchToggle,
-  windowWidth,
 }) {
+    const { windowWidth, toggleSidebar } = useSidebar();
+  
   const navigate = useNavigate();
   const { isGoogleDrive } = useGDrive();
 
-  useEffect(() => {
-    if (windowWidth >= 768) {
-      const sidebarWidth = getComputedStyle(document.documentElement)
-        .getPropertyValue("--sidebar-width")
-        .trim();
-      if (sidebarWidth === "0px") {
-        document.documentElement.style.setProperty("--sidebar-width", "256px");
-      }
-    }
-  }, [windowWidth]);
-  const toggleSidebar = () => {
-    const sidebarWidth = getComputedStyle(document.documentElement)
-      .getPropertyValue("--sidebar-width")
-      .trim();
-    if (sidebarWidth === "256px") {
-      document.documentElement.style.setProperty("--sidebar-width", "0px");
-    } else {
-      document.documentElement.style.setProperty("--sidebar-width", "256px");
-    }
-  };
   return (
     <header className="gd-header">
       {/* Logo */}

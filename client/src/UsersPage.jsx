@@ -14,11 +14,13 @@ import CircularLoader from "./components/CircularLoader";
 import "./UsersPage.css";
 import { getColor } from "../utils/getProfileColor.js";
 import FileBrowser from "./components/FileBrowser.jsx";
-
+import { Bars3Icon } from "@heroicons/react/24/solid";
+import { useSidebar } from "./Contexts/SidebarContext.jsx";
 
 const ROLE_OPTIONS = ["admin", "manager", "user"];
 
 export default function UsersPage() {
+  const { toggleSidebar } = useSidebar();
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState({});
   const [userData, setUserData] = useState([]);
@@ -88,7 +90,7 @@ export default function UsersPage() {
           })),
       );
     } catch (err) {
-console.log('err',err)
+      console.log("err", err);
     } finally {
       setIsLoading(false);
     }
@@ -242,47 +244,61 @@ console.log('err',err)
       {/* Sidebar */}
       <aside className="sidebar">
         {/* <img src={currentUser.avatar}/> */}
-        <h2>{currentUser.role} Panel</h2>
-        <ul>
-        
-          <li
-            onClick={() => {
-              setShowDeletedUsers(false);
-                setShowFiles(false);
-            }}
-            className={`${!showDeletedUsers && !showFiles ? "active" : ""}`}
-          >
-            Users
-          </li>
-          {currentUser.role === "superuser" && (
-            <li
-              onClick={() => {setShowDeletedUsers(true); setShowFiles(false)}}
-              className={`${showDeletedUsers && !showFiles  ? "active" : ""}`}
-            >
-              Deleted Users
-            </li>
-            
-          )}
-            {currentUser.role === "superuser" && (
+        <div className="text-[var(--text-primary)] pl-5">
+          <h2>{currentUser.role} Panel</h2>
+
+          <ul>
             <li
               onClick={() => {
-                setShowFiles(true);
                 setShowDeletedUsers(false);
+                setShowFiles(false);
               }}
-              className={showFiles ? "active" : ""}
+              className={`${!showDeletedUsers && !showFiles ? "active" : ""}`}
             >
-             User Files
+              Users
             </li>
-          )}
-        </ul>
+            {currentUser.role === "superuser" && (
+              <li
+                onClick={() => {
+                  setShowDeletedUsers(true);
+                  setIsEditable({});
+
+                  setShowFiles(false);
+                }}
+                className={`${showDeletedUsers && !showFiles ? "active" : ""}`}
+              >
+                Deleted Users
+              </li>
+            )}
+            {currentUser.role === "superuser" && (
+              <li
+                onClick={() => {
+                  setShowFiles(true);
+                  setShowDeletedUsers(false);
+                  setIsEditable({});
+                }}
+                className={showFiles ? "active" : ""}
+              >
+                User Files
+              </li>
+            )}
+          </ul>
+        </div>
       </aside>
 
       {/* Main Content */}
       <main className="main">
         {/* Topbar */}
         <div className="topbar">
-          <h1>User Management</h1>
-
+          <div className="flex items-center">
+            <h1>User Management</h1>
+            <a
+              className="hover:bg-[var(--btn-bg-medium)] md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
+              onClick={toggleSidebar}
+            >
+              <Bars3Icon width="25" height="25" color="var(--text-secondary)" />
+            </a>
+          </div>
           <div className="profile-section" ref={dropdownRef}>
             <div
               className="profile-trigger"
@@ -306,7 +322,7 @@ console.log('err',err)
                       alignItems: "center",
                       width: 36,
                       height: 36,
-                      padding: '8px',
+                      padding: "8px",
                       borderRadius: "50px",
                       backgroundColor: getColor(currentUser.name),
                     }}
@@ -356,14 +372,16 @@ console.log('err',err)
                   </tr>
                 </thead>
 
-                <tbody>
+                <tbody
+                  
+                >
                   {userData.length === 0 ? (
-                    <tr>
+                    <tr >
                       <td colSpan={5}>No users found</td>
                     </tr>
                   ) : (
                     userData.map((user) => (
-                      <tr key={user.id}>
+                      <tr className={`${!showDeletedUsers && userData.length > 0 ? "border-t border-[#eee]" : ""}`} key={user.id}>
                         <td>
                           <input
                             ref={(el) => (inputRef.current[user.id] = el)}
@@ -385,6 +403,7 @@ console.log('err',err)
 
                         <td>
                           <select
+                            className="bg-[var(--surface-white)]"
                             value={role[user.id]}
                             disabled={
                               !canAccess(currentUser.role, user.role) ||
@@ -462,14 +481,16 @@ console.log('err',err)
                   </tr>
                 </thead>
 
-                <tbody>
+                <tbody
+                
+                >
                   {deletedUsers.length === 0 ? (
-                    <tr>
+                    <tr className="flex flex-col">
                       <td colSpan={5}>No users found</td>
                     </tr>
                   ) : (
                     deletedUsers.map((user) => (
-                      <tr key={user.id}>
+                      <tr   className={`${showDeletedUsers && deletedUsers.length > 0 ? "border-t border-[#eee]" : ""}`} key={user.id}>
                         <td>
                           <input
                             ref={(el) => (inputRef.current[user.id] = el)}
@@ -511,7 +532,7 @@ console.log('err',err)
           )}
 
           {Object.keys(isEditable).length !== 0 && (
-            <div className="footer-actions">
+            <div className="footer-actions mt-4">
               <button
                 className="btn btn-secondary"
                 type="button"

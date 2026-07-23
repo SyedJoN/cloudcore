@@ -74,7 +74,7 @@ body {
   border-radius: var(--radius-lg);
 }
 ::-webkit-scrollbar-corner {
-  background: red;
+background: var(--surface-white);
 }
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {

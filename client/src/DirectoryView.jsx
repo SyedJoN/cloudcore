@@ -44,6 +44,7 @@ import { useAuth } from "./Contexts/AuthContext";
 import { useBreadcrumb } from "./Contexts/BreadcrumbContext";
 import { useGDrive } from "./Contexts/GoogleDriveAuthContext";
 import SearchBar from "./components/SearchBar";
+import { useSidebar } from "./Contexts/SidebarContext";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -706,19 +707,7 @@ export default function DirectoryView() {
     return <RequestAccessPage user={user} dirId={dirId} />;
   }
 
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
+  const { windowWidth } = useSidebar();
 
   const handleSearchToggle = () => {
     setShowSearchBar((prev) => !prev);
@@ -746,7 +735,6 @@ export default function DirectoryView() {
         />
       ) : (
         <DriveHeader
-          windowWidth={windowWidth}
           handleSearchToggle={handleSearchToggle}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -925,51 +913,50 @@ export default function DirectoryView() {
                 {/* Folders */}
                 {filteredDirs.length > 0 && (
                   <>
-
                     {viewMode === "grid" ? (
                       <>
-                    <div className="gd-section-label">Folders</div>
+                        <div className="gd-section-label">Folders</div>
 
-                      <div className="gd-grid">
-                        {filteredDirs.map((item) => (
-                          <GridItem
-                            key={item._id}
-                            item={item}
-                            dirId={dirId}
-                            avatar={item.userId?.avatar}
-                            owner={item.userId?.name}
-                            selected={selectedItems.has(item.id ?? item._id)}
-                            onSelect={handleSelect}
-                            selectionActive={selectedItems.size > 0}
-                            onRowClick={handleRowClick}
-                            onDoubleClick={handleRowDoubleClick}
-                            onContextMenu={handleContextMenu}
-                          />
-                        ))}
-                      </div>
+                        <div className="gd-grid">
+                          {filteredDirs.map((item) => (
+                            <GridItem
+                              key={item._id}
+                              item={item}
+                              dirId={dirId}
+                              avatar={item.userId?.avatar}
+                              owner={item.userId?.name}
+                              selected={selectedItems.has(item.id ?? item._id)}
+                              onSelect={handleSelect}
+                              selectionActive={selectedItems.size > 0}
+                              onRowClick={handleRowClick}
+                              onDoubleClick={handleRowDoubleClick}
+                              onContextMenu={handleContextMenu}
+                            />
+                          ))}
+                        </div>
                       </>
                     ) : (
-                <>
+                      <>
                         {listHeaderRow}
 
-                      <div className="gd-list">
-                        {filteredDirs.map((item) => (
-                          <ListRow
-                            key={item._id}
-                            item={item}
-                            dirId={dirId}
-                            avatar={item.userId?.avatar}
-                            owner={item.userId?.name}
-                            selected={selectedItems.has(item.id ?? item._id)}
-                            onSelect={handleSelect}
-                            selectionActive={selectedItems.size > 0}
-                            onRowClick={handleRowClick}
-                            onDoubleClick={handleRowDoubleClick}
-                            onContextMenu={handleContextMenu}
-                          />
-                        ))}
-                      </div>
-               </>
+                        <div className="gd-list">
+                          {filteredDirs.map((item) => (
+                            <ListRow
+                              key={item._id}
+                              item={item}
+                              dirId={dirId}
+                              avatar={item.userId?.avatar}
+                              owner={item.userId?.name}
+                              selected={selectedItems.has(item.id ?? item._id)}
+                              onSelect={handleSelect}
+                              selectionActive={selectedItems.size > 0}
+                              onRowClick={handleRowClick}
+                              onDoubleClick={handleRowDoubleClick}
+                              onContextMenu={handleContextMenu}
+                            />
+                          ))}
+                        </div>
+                      </>
                     )}
                   </>
                 )}
@@ -977,32 +964,31 @@ export default function DirectoryView() {
                 {/* Files */}
                 {filteredFiles.length > 0 && (
                   <>
-                
                     {viewMode === "grid" ? (
                       <>
-                          <div
-                      className="gd-section-label"
-                      style={{ marginTop: filteredDirs.length ? 16 : 0 }}
-                    >
-                      Files
-                    </div>
-                      <div className="gd-grid">
-                        {filteredFiles.map((item) => (
-                          <GridItem
-                            key={item._id}
-                            item={item}
-                            dirId={dirId}
-                            avatar={item.userId?.avatar}
-                            owner={item.userId?.name}
-                            selected={selectedItems.has(item.id ?? item._id)}
-                            onSelect={handleSelect}
-                            selectionActive={selectedItems.size > 0}
-                            onRowClick={handleRowClick}
-                            onDoubleClick={handleRowDoubleClick}
-                            onContextMenu={handleContextMenu}
-                          />
-                        ))}
-                      </div>
+                        <div
+                          className="gd-section-label"
+                          style={{ marginTop: filteredDirs.length ? 16 : 0 }}
+                        >
+                          Files
+                        </div>
+                        <div className="gd-grid">
+                          {filteredFiles.map((item) => (
+                            <GridItem
+                              key={item._id}
+                              item={item}
+                              dirId={dirId}
+                              avatar={item.userId?.avatar}
+                              owner={item.userId?.name}
+                              selected={selectedItems.has(item.id ?? item._id)}
+                              onSelect={handleSelect}
+                              selectionActive={selectedItems.size > 0}
+                              onRowClick={handleRowClick}
+                              onDoubleClick={handleRowDoubleClick}
+                              onContextMenu={handleContextMenu}
+                            />
+                          ))}
+                        </div>
                       </>
                     ) : (
                       <div className="gd-list">

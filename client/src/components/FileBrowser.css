@@ -1,6 +1,5 @@
 .file-browser {
   background: #f6f7fb;
-  min-height: 100vh;
   font-family: system-ui, sans-serif;
 }
 
@@ -14,7 +13,7 @@
 
 .table-container {
   background: white;
-  overflow: hidden;
+  overflow: scroll;
   box-shadow: 0 8px 24px rgba(0,0,0,0.06);
 }
 
@@ -32,7 +31,6 @@
 
 .user-table td {
   padding: 14px;
-  border-top: 1px solid #eee;
   vertical-align: top;
 }
 
@@ -60,7 +58,7 @@
 
 .file-link {
   text-decoration: none;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .file-link:hover {
@@ -99,7 +97,7 @@
 }
 
 .clear-btn {
-  background: #e5e7eb;
+  background: var(--surface-container-dark);
   border: none;
   padding: 8px 12px;
   border-radius: 8px;
@@ -107,9 +105,15 @@
 }
 
 .clear-btn:hover {
-  background: #d1d5db;
+  background: #d3d5d7;
 }
-
+.dark .clear-btn:hover {
+  background: #131314;
+}
+.clear-btn:disabled {
+  background: var(--surface-container-dark-hover);
+  cursor: not-allowed;
+}
 .empty-state {
   text-align: center;
   padding: 30px;
