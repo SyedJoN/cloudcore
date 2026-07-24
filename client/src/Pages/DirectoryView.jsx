@@ -413,6 +413,7 @@ export default function DirectoryView() {
     return <RequestAccess user={user} dirId={dirId} />;
   }
 
+
   return (
     <div className="directory-view">
       {user && user.uploadLimit == 0 && (
@@ -560,17 +561,17 @@ export default function DirectoryView() {
       {showCreateDir && (
         <CreateDirectoryModal
           value={newDirname}
-          onChange={setNewDirname}
-          onSubmit={handleCreateDirectory}
+          setNewDirname={setNewDirname}
+          onCreateDirectory={handleCreateDirectory}
           onClose={() => setShowCreateDir(false)}
         />
       )}
 
       {showRename && (
         <RenameModal
-          value={renameValue}
-          onChange={setRenameValue}
-          onSubmit={handleRenameSubmit}
+          renameValue={renameValue}
+          setRenameValue={setRenameValue}
+          onRenameSubmit={handleRenameSubmit}
           onClose={() => setShowRename(false)}
         />
       )}

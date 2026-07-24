@@ -9,13 +9,11 @@ function CreateDirectoryModal({
   const inputRef = useRef(null);
 
   useEffect(() => {
-    // Focus and select text only once on mount
     if (inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
 
-    // Listen for "Escape" key to close the modal
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         onClose();
@@ -23,26 +21,23 @@ function CreateDirectoryModal({
     };
     document.addEventListener("keydown", handleKeyDown);
 
-    // Cleanup keydown event listener on unmount
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  // Stop propagation when clicking inside the content
   const handleContentClick = (e) => {
     e.stopPropagation();
   };
-
-  // Close when clicking outside the modal content
+  t;
   const handleOverlayClick = () => {
     onClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className="modal-content" onClick={handleContentClick}>
-        <h2>Create a new directory</h2>
+    <div className="gd-modal-overlay" onClick={handleOverlayClick}>
+      <div className="gd-modal" onClick={handleContentClick}>
+        <h2>New folder</h2>
         <form onSubmit={onCreateDirectory}>
           <input
             ref={inputRef}
@@ -52,16 +47,16 @@ function CreateDirectoryModal({
             value={newDirname}
             onChange={(e) => setNewDirname(e.target.value)}
           />
-          <div className="modal-buttons">
-            <button className="primary-button" type="submit">
-              Create
-            </button>
+          <div className="gd-modal-actions">
             <button
-              className="secondary-button"
               type="button"
+              className="gd-btn gd-btn-text"
               onClick={onClose}
             >
               Cancel
+            </button>
+            <button type="submit" className="gd-btn gd-btn-primary">
+              Create
             </button>
           </div>
         </form>

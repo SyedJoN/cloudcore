@@ -16,7 +16,6 @@ import {
 import {
   IconDrive,
   IconMyDrive,
-  IconComputers,
   IconShared,
   IconRecent,
   IconStarred,
@@ -143,9 +142,6 @@ const {user} = useAuth();
           My Drive
         </button>
 
-        <button className="gd-nav-item" onClick={() => navigate("/")}>
-          <IconComputers size={20} /> Computers
-        </button>
 
         <button
           className={`gd-nav-item ${isSharedRoute && !dirId ? "active" : ""}`}

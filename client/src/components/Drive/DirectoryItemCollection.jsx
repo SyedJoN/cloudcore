@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { GridItem, ListRow } from "../Drive";
 
 /**
@@ -34,7 +35,7 @@ export default function DirectoryItemCollection({
       <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
         {items.map((item) => (
           <ItemComponent
-            key={item._id}
+            key={item.id || item._id}
             item={item}
             dirId={dirId}
             avatar={item.userId?.avatar}

@@ -5,15 +5,16 @@ import { getFileByMetaId, toggleFilePublic } from "../../apis/fileApi";
 import ShareModal from "../components/Modals/ShareModal";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useRef } from "react";
+import { useAuth } from "../Contexts";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function FileViewPage() {
+  const {user, setUser, refreshUser} = useAuth();
   const { fileId } = useParams();
   const [item, setItem] = useState(null);
   const [error, setError] = useState(null);
   const [shareItem, setShareItem] = useState(null);
-  const [user, setUser] = useState([]);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [renameId, setRenameId] = useState(null);
@@ -52,19 +53,7 @@ export default function FileViewPage() {
   }
 
   useEffect(() => {
-    axiosWithCreds
-      .get("/user/current-user")
-      .then((r) => r.data)
-      .then((d) => {
-        if (d)
-          setUser({
-            name: d.name || "",
-            avatar: d.avatar,
-            email: d.email || "",
-            role: d.role || "",
-          });
-      })
-      .catch(() => {});
+    refreshUser();
   }, []);
 
   async function getFile() {

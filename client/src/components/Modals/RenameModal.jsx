@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 
 function RenameModal({
-  renameType,
   renameValue,
   setRenameValue,
   onClose,
@@ -10,7 +9,6 @@ function RenameModal({
   const inputRef = useRef(null);
 
   useEffect(() => {
-    // Focus and select text only once on mount
     if (inputRef.current) {
       inputRef.current.focus();
 
@@ -22,7 +20,6 @@ function RenameModal({
       }
     }
 
-    // Listen for "Escape" key to close the modal
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         onClose();
@@ -30,45 +27,42 @@ function RenameModal({
     };
     document.addEventListener("keydown", handleKeyDown);
 
-    // Cleanup keydown event listener on unmount
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
-  // Stop propagation when clicking inside the content
   const handleContentClick = (e) => {
     e.stopPropagation();
   };
 
-  // Close when clicking outside the modal content
+
   const handleOverlayClick = () => {
     onClose();
   };
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className="modal-content" onClick={handleContentClick}>
-        <h2>Rename {renameType === "file" ? "File" : "Folder"}</h2>
+    <div className="gd-modal-overlay" onClick={handleOverlayClick}>
+      <div className="gd-modal" onClick={handleContentClick}>
+        <h2>Rename</h2>
         <form onSubmit={onRenameSubmit}>
           <input
-            ref={inputRef}
             type="text"
-            className="modal-input"
-            placeholder="Enter new name"
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
+            autoFocus
+            onFocus={(e) => e.target.select()}
           />
-          <div className="modal-buttons">
-            <button className="primary-button" type="submit">
-              Save
-            </button>
+          <div className="gd-modal-actions">
             <button
-              className="secondary-button"
               type="button"
+              className="gd-btn gd-btn-text"
               onClick={onClose}
             >
               Cancel
+            </button>
+            <button type="submit" className="gd-btn gd-btn-primary">
+              OK
             </button>
           </div>
         </form>

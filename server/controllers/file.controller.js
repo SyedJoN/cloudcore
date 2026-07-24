@@ -236,11 +236,13 @@ export const getFileById = async (req, res, next) => {
         s3Key,
         fileName: file.name,
       });
+
       return res.redirect(url);
     }
 
     res.setHeader("Content-Type", s3Response.ContentType || "text/plain");
-
+    file.lastInteractedAt = new Date();
+    await file.save();
     return s3Response.Body.pipe(res);
   } catch (error) {
     next(error);
@@ -343,7 +345,8 @@ export const getFileMetaById = async (req, res, next) => {
         userRole: fgaRole || publicRole,
       });
     }
-
+    file.lastInteractedAt = new Date();
+    await file.save();
     // 5b. Anonymous user — honour publicRole directly
     return res.status(200).json({
       ...file,
@@ -351,6 +354,24 @@ export const getFileMetaById = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const getRecentFiles = async (req, res, next) => {
+  const userId = req.user?._id;
+  
+  try {
+    const recentFiles = await File.find({
+      userId,
+      isDeleted: false,
+    })
+      .sort({ lastInteractedAt: -1 })
+      .limit(20);
+         return res.status(200).json({
+      ...recentFiles,
+    });
+  } catch (error) {
+next(error);
   }
 };
 export const updateFile = async (req, res, next) => {
@@ -419,6 +440,8 @@ export const updateFile = async (req, res, next) => {
 // ── helper ────────────────────────────────────────────────────────────────────
 const performRename = async (file, fileId, fileName, res) => {
   console.log("fileName", fileName);
+  file.lastInteractedAt = new Date();
+  await file.save();
   const ext = file.extension;
 
   file.name = fileName;

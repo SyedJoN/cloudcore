@@ -55,12 +55,18 @@ const fileSchema = new Schema(
     isUploading: {
       type: Boolean,
       required: true
-    }
+    },
+    lastInteractedAt: {
+    type: Date,
+    default: Date.now,
+    index: true
+}
   },
   {
     timestamps: true,
     strict: "throw",
   },
+  
 );
 const File = mongoose.model("File", fileSchema);
 export default File;
