@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import {
   deleteUserFromDB,
   fetchUsers,
-  getCurrentUser,
   recoverUser,
   revokeUser,
   softDeleteUser,
@@ -10,19 +9,19 @@ import {
 } from "../../apis/userApi.js";
 import { useNavigate } from "react-router-dom";
 import canAccess from "../../Utils/canAccess.js";
-import CircularLoader from "../components/Loaders/CircularLoader.jsx";
+import CircularLoader from "../Components/Loaders/CircularLoader.jsx";
 import "../Styles/UsersPage.css";
 import { getColor } from "../../Utils/getProfileColor.js";
-import FileBrowser from "../components/File/FileBrowser.jsx";
+import FileBrowser from "../Components/File/FileBrowser.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
-import { useSidebar } from "../Contexts/SidebarContext.jsx";
+import { useAuth, useSidebar } from "../Contexts";
 
 const ROLE_OPTIONS = ["admin", "manager", "user"];
 
 export default function UsersPage() {
+  const {user: currentUser, refreshUser} = useAuth();
   const { toggleSidebar } = useSidebar();
   const [isLoading, setIsLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState({});
   const [userData, setUserData] = useState([]);
   const [role, setRole] = useState({});
   const [isEditable, setIsEditable] = useState({});
@@ -38,7 +37,6 @@ export default function UsersPage() {
   const inputRef = useRef({});
   const dropdownRef = useRef(null);
 
-  // ---------------- LOAD USERS ----------------
   const loadUsers = async () => {
     try {
       setIsLoading(true);
@@ -96,20 +94,9 @@ export default function UsersPage() {
     }
   };
 
-  // ---------------- LOAD CURRENT USER ----------------
-  const loadCurrentUser = async () => {
-    try {
-      const data = await getCurrentUser();
-      if (!data) return navigate("/login");
-      setCurrentUser(data);
-    } catch {
-      navigate("/login");
-    }
-  };
-
   useEffect(() => {
     loadUsers();
-    loadCurrentUser();
+    refreshUser();
   }, []);
 
   useEffect(() => {
@@ -126,15 +113,12 @@ export default function UsersPage() {
     setIsFieldChanged(changed);
   }, [userData, role, isEditable]);
 
-  // Auto focus first editable input
   useEffect(() => {
     const editableId = Object.keys(isEditable)[0];
     if (editableId && inputRef.current[editableId]) {
       inputRef.current[editableId].focus();
     }
   }, [isEditable]);
-
-  // ---------------- ACTIONS ----------------
 
   const handleEdit = (id) => setIsEditable({ [id]: true });
 
@@ -236,8 +220,6 @@ export default function UsersPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  // ---------------- UI ----------------
 
   return (
     <div className="dashboard">

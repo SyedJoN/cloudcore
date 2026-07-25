@@ -12,6 +12,10 @@ const BreadcrumbProvider = ({ children }) => {
 };
 
 export function useBreadcrumb() {
-  return useContext(BreadcrumbContext);
+  const context = useContext(BreadcrumbContext);
+  if (!context) {
+    throw new Error("useBreadcrumb must be used inside BreadcrumbProvider");
+  }
+  return context;
 }
 export default BreadcrumbProvider;

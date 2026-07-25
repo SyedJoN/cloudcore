@@ -17,7 +17,6 @@ export const SidebarProvider = ({ children }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Update CSS variable
   useEffect(() => {
     document.documentElement.style.setProperty(
       "--sidebar-width",

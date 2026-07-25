@@ -5,13 +5,8 @@ import { ROLE_LABEL, ROLE_DESC } from "../../../Utils/displayUtils";
 
 const ROLES = ["viewer", "editor"];
 
-/**
- * Renders via a portal into document.body so it always floats above
- * modals regardless of stacking context. The anchor ref is used to
- * calculate the dropdown's screen position.
- */
 export default function RoleDropdown({
-  anchorRef,        // ref of the trigger button
+  anchorRef,    
   current,
   onChange,
   onClose,
@@ -19,10 +14,7 @@ export default function RoleDropdown({
 }) {
   const dropdownRef = useRef(null);
 
-  // Calculate position from the anchor button's bounding rect
   const rect = anchorRef?.current?.getBoundingClientRect() || { bottom: 0, right: 0, left: 0 };
-  const viewportWidth = window.innerWidth;
-  // Prefer aligning to right edge of anchor; flip left if it would overflow
   const dropdownWidth = 180;
   let left = rect.right - dropdownWidth;
   if (left < 8) left = rect.left;

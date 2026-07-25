@@ -99,7 +99,7 @@ export default function ContextMenu({
       style={{ left: position.x, top: position.y, zIndex: 1000 }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Open with — files only */}
+      {/* Open with files only */}
       {!item.isDirectory && (
         <div style={{ position: "relative" }}>
           <button

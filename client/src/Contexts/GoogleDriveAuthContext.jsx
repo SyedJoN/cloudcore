@@ -1,5 +1,4 @@
-import { createContext, useContext, useState } from "react";
-import { getCurrentUser } from "../../apis/userApi";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   logoutUser,
   logoutAll as logoutAllApi,
@@ -12,30 +11,40 @@ const GDriveContext = createContext(null);
 export function GDriveAuthProvider({ children }) {
   const [isGoogleDrive, setIsGoogleDrive] = useState(false);
 
-  const checkGoogleDriveAccess = async () => {
-    try {
-      const res = await googleDriveCheck();
-      setIsGoogleDrive(res.data.isAuthenticated);
-    } catch (error) {
-      console.log("error", error.message);
-      setIsGoogleDrive(false);
+   const checkGoogleDriveAccess = useCallback(async () => {
+  try {
+    const res = await googleDriveCheck();
+    setIsGoogleDrive(res.data.isAuthenticated);
+  } catch (error) {
+    if (error.response?.status !== 400) {
+      console.error(error);
     }
-  };
+    setIsGoogleDrive(false);
+  }
+}, []);
 
+  const value = useMemo(
+    () => ({
+      isGoogleDrive,
+      setIsGoogleDrive,
+      checkGoogleDriveAccess,
+    }),
+    [isGoogleDrive, checkGoogleDriveAccess],
+  );
   return (
     <GDriveContext.Provider
-      value={{
-        isGoogleDrive,
-        setIsGoogleDrive,
-        checkGoogleDriveAccess,
-      }}
+      value={value}
     >
       {children}
     </GDriveContext.Provider>
   );
 }
 export function useGDrive() {
-  return useContext(GDriveContext);
+  const context = useContext(GDriveContext);
+    if (!context) {
+    throw new Error("useGDrive must be used inside GDriveAuthProvider");
+  }
+  return context;
 }
 
 export default GDriveContext;

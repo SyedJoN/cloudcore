@@ -192,7 +192,7 @@ export const getFileById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?._id;
-    const file = await File.findById(id).lean();
+    const file = await File.findById(id);
     if (!file) return res.status(404).json({ message: "File not found" });
 
     if (!file.isPublic && req.user?.role !== "superuser") {
@@ -359,7 +359,7 @@ export const getFileMetaById = async (req, res, next) => {
 
 export const getRecentFiles = async (req, res, next) => {
   const userId = req.user?._id;
-  
+
   try {
     const recentFiles = await File.find({
       userId,
@@ -367,11 +367,14 @@ export const getRecentFiles = async (req, res, next) => {
     })
       .sort({ lastInteractedAt: -1 })
       .limit(20);
-         return res.status(200).json({
-      ...recentFiles,
+if (!recentFiles) {
+return res.status(400).json({message: "No Files found", files: []})
+}
+    return res.status(200).json({
+      files: [...recentFiles],
     });
   } catch (error) {
-next(error);
+    next(error);
   }
 };
 export const updateFile = async (req, res, next) => {
@@ -457,7 +460,7 @@ export const softDeleteFile = async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user._id;
 
-    const file = await File.findOne({ _id: id, isDeleted: false });
+    const file = await File.findOne({ _id: id });
     if (!file) return res.status(404).json({ message: "File not found!" });
 
     const isOwner = file.userId.toString() === userId.toString();

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { axiosWithCreds } from "../../../apis/axiosInstances";
+import { useAuth } from "../../Contexts";
 
-function RequestAccess({ user, dirId }) {
+function RequestAccess({ dirId }) {
+  const { user } = useAuth();
   const [role, setRole] = useState("viewer");
   const [message, setMessage] = useState("");
   const [requested, setRequested] = useState(false);

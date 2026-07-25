@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import FileViewer from "../components/File/FileViewer";
+import FileViewer from "../Components/File/FileViewer";
 import { getFileByMetaId, toggleFilePublic } from "../../apis/fileApi";
-import ShareModal from "../components/Modals/ShareModal";
+import ShareModal from "../Components/Modals/ShareModal";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useRef } from "react";
 import { useAuth } from "../Contexts";

@@ -3,21 +3,17 @@ import { IconGrid, IconList, IconInfo } from "../Icons/Icons";
 import { useAuth } from "../../Contexts/AuthContext";
 
 export default function DriveToolbar({
-  dirId,
   dirContext,
   crumbs,
   setCrumbs,
   isTrashRoute,
-  breadcrumbs,
-  setBreadcrumbs,
   disabled,
   viewMode,
   onToggleView,
-  filteredDirs,
   toggleDetailsBar,
 }) {
   const navigate = useNavigate();
-  console.log("dirContext", dirContext, "isTrashRoute", isTrashRoute);
+  
 const {loggedIn} = useAuth();
   const rootLabel =
     dirContext === "trash"

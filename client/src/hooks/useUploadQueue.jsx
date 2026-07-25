@@ -5,18 +5,23 @@ import {
   notifyBackend,
 } from "../../apis/fileApi";
 import { formatSize } from "../../Utils/formatHelpers";
+import { useAuth } from "../Contexts";
 
 /**
  * Owns the upload queue: selecting files, validating size/storage limits,
  * running uploads one-by-one via XHR (for progress events), and cancellation.
  */
-export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueComplete }) {
+export function useUploadQueue({ dirId,showError, onQueueComplete }) {
+  const {user, refreshUser} = useAuth();
   const [uploadQueue, setUploadQueue] = useState([]);
   const [uploadXhrMap, setUploadXhrMap] = useState({});
   const [progressMap, setProgressMap] = useState({});
   const [isUploading, setIsUploading] = useState(false);
   const [dbFileId, setDbFileId] = useState("");
   const fileInputRef = useRef(null);
+
+
+  const isUploadingRef = useRef(false);
 
   const handleCancelUpload = useCallback(
     async (tempId, fileId) => {
@@ -40,6 +45,7 @@ export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueCom
         delete copy[tempId];
         return copy;
       });
+      isUploadingRef.current = false;
       setIsUploading(false);
     },
     [uploadXhrMap],
@@ -51,6 +57,7 @@ export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueCom
         setUploadQueue([]);
         setTimeout(() => {
           onQueueComplete?.();
+          isUploadingRef.current = false;
           setIsUploading(false);
         }, 1000);
         return;
@@ -108,6 +115,7 @@ export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueCom
             showError("Upload failed");
             await handleCancelUpload(current._id, fileId);
             await processUploadQueue(rest);
+            isUploadingRef.current = false;
             setIsUploading(false);
           }
         };
@@ -171,18 +179,18 @@ export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueCom
         setProgressMap((prev) => ({ ...prev, [item._id]: 0 })),
       );
 
-      // Functional update avoids the stale-closure issue the original code had
-      // (it read `uploadQueue` from the render closure instead of latest state).
-      setUploadQueue((prev) => {
-        const nextQueue = [...prev, ...newItems];
-        if (!isUploading) {
-          setIsUploading(true);
-          processUploadQueue(nextQueue);
-        }
-        return nextQueue;
-      });
+      setUploadQueue((prev) => [...prev, ...newItems]);
+
+      // Plain side effects, run once, outside of any setState updater.
+      // Gated on the ref (synchronous) rather than `isUploading` state
+      // (async/batched) so two rapid selections can't both pass the check.
+      if (!isUploadingRef.current) {
+        isUploadingRef.current = true;
+        setIsUploading(true);
+        processUploadQueue(newItems);
+      }
     },
-    [user, showError, isUploading, processUploadQueue],
+    [user, showError, processUploadQueue],
   );
 
   return {

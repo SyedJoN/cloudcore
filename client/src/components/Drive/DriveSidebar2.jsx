@@ -25,6 +25,7 @@ import { useAuth, useGDrive } from "../../Contexts";
 
 export default function DriveSidebar({
   dirId,
+  dirType,
   isHomeRoute,
   isSharedRoute,
   isTrashRoute,
@@ -32,17 +33,16 @@ export default function DriveSidebar({
   onCreateFolder,
   onUploadFiles,
 }) {
-  const {isGoogleDrive} = useGDrive();
-const {user} = useAuth();
+  const { isGoogleDrive } = useGDrive();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [showNewMenu, setShowNewMenu] = useState(false);
-  const isMyDriveActive =
-    !isHomeRoute &&
-    !isSharedRoute &&
-    !isTrashRoute &&
-    dirId !== "google-drive" &&
-    !dirId;
-
+  console.log({
+    isHomeRoute,
+    isSharedRoute,
+    isTrashRoute,
+    dirId,
+  });
   const usagePercent = Math.max(
     0,
     Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100),
@@ -51,7 +51,6 @@ const {user} = useAuth();
   const isDriveRoute = location.pathname.endsWith("/");
   return (
     <aside className="gd-sidebar">
-   
       <div style={{ position: "relative", margin: "0 8px 12px" }}>
         <button
           className="gd-new-btn"
@@ -101,7 +100,7 @@ const {user} = useAuth();
       <nav className="gd-nav-section">
         {isGoogleDrive && (
           <button
-            className={`gd-nav-item ${dirId === "google-drive" ? "active" : ""}`}
+            className={`gd-nav-item ${dirType === "gdrive" ? "active" : ""}`}
             onClick={() => navigate("/directory/google-drive")}
           >
             <IconDrive size={20} /> Google Drive
@@ -121,7 +120,7 @@ const {user} = useAuth();
           Home
         </button>
         <button
-          className={`gd-nav-item ${isMyDriveActive ? "active" : ""}`}
+          className={`gd-nav-item ${isDriveRoute ? "active" : ""}`}
           onClick={() => {
             navigate("/");
           }}
@@ -133,7 +132,6 @@ const {user} = useAuth();
           )}{" "}
           My Drive
         </button>
-
 
         <button
           className={`gd-nav-item ${isSharedRoute && !dirId ? "active" : ""}`}
@@ -185,7 +183,14 @@ const {user} = useAuth();
           {user.totalUsage === 0 ? "0 B " : formatSize(user.totalUsage)} of{" "}
           {formatSize(user.totalStorage)} used
         </div>
-        {user.plan !== "business" && <button onClick={()=> navigate("/main#pricing")} className="gd-storage-btn">Get more storage</button>}
+        {user.plan !== "business" && (
+          <button
+            onClick={() => navigate("/main#pricing")}
+            className="gd-storage-btn"
+          >
+            Get more storage
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -1,9 +1,9 @@
+import { useState } from "react";
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
 import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
-import { useState } from "react";
 import { formatDate } from "../../../Utils/formatDate";
 
 export default function GridItem({

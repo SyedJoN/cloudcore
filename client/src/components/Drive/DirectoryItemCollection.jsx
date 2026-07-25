@@ -1,10 +1,6 @@
 import { useEffect } from "react";
 import { GridItem, ListRow } from "../Drive";
 
-/**
- * Renders a section (folders or files) in either grid or list mode.
- * Replaces the four near-duplicate blocks in the original component.
- */
 export default function DirectoryItemCollection({
   items,
   label,

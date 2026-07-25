@@ -7,7 +7,6 @@ import { formatSize } from "../../../Utils/formatHelpers";
 export default function ListRow({
   item,
   owner,
-  avatar,
   dirId,
   onRowClick,
   onDoubleClick,

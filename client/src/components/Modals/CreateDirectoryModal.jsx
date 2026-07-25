@@ -29,7 +29,7 @@ function CreateDirectoryModal({
   const handleContentClick = (e) => {
     e.stopPropagation();
   };
-  t;
+
   const handleOverlayClick = () => {
     onClose();
   };

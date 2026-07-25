@@ -26,7 +26,11 @@ export function ToastProvider({ children }) {
 }
 
 export function useToast() {
-  return useContext(ToastContext);
+  const context = useContext(ToastContext);
+    if (!context) {
+    throw new Error("useToast must be used inside ToastProvider");
+  }
+  return context;
 }
 
 function ToastContainer({ toasts, onRemove }) {
@@ -49,7 +53,7 @@ const styles = {
   container: {
     position: "fixed",
     bottom: 24,
-    left: 24, // ✅
+    left: 24, 
     display: "flex",
     flexDirection: "column",
     gap: 8,

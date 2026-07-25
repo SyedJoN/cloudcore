@@ -73,7 +73,7 @@ export default function DetailsSidebar({
   }
   const isDir = item.isDirectory;
   const owner =
-    userEmail === item.userId?.email || item.owners[0].emailAddress ? "Me" : item.userId?.name || item.owners[0].displayName || "—";
+    userEmail === item.userId?.email || item.owners[0]?.emailAddress ? "Me" : item.userId?.name || item.owners[0].displayName || "—";
   const size = formatSize(item.size);
   const modified = formatDate(item.updatedAt || item.modifiedTime);
   const created = formatDate(item.createdAt || item.createdTime);

@@ -1,4 +1,4 @@
-import Protected from "../components/Layouts/AuthLayout";
+import Protected from "../Components/Layouts/AuthLayout";
 import DirectoryView from "../Pages/DirectoryView";
 import UsersPage from "../Pages/UsersPage";
 
@@ -8,7 +8,7 @@ export const protectedRoutes = [
     children: [
       {
         path: "/",
-        element: <DirectoryView />,
+        element: <DirectoryView route="home" />,
       },
       {
         path: "/directory/:dirId",
@@ -16,7 +16,7 @@ export const protectedRoutes = [
       },
       {
         path: "/home",
-        element: <DirectoryView />,
+        element: <DirectoryView route="home" />,
       },
       {
         path: "/users",
@@ -24,15 +24,11 @@ export const protectedRoutes = [
       },
       {
         path: "/shared",
-        element: <DirectoryView />,
+        element: <DirectoryView route="shared" />,
       },
       {
         path: "/trash",
-        element: <DirectoryView />,
-      },
-      {
-        path: "/trash/directory/:dirId",
-        element: <DirectoryView />,
+        element: <DirectoryView route="trash" />,
       },
     ],
   },

@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo } from "react";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { getDirectory } from "../../apis/directoryApi";
+import { driveConfig } from "../../Utils/driveConfig";
 
 const isRootName = (n) => (n ?? "").startsWith("root");
-
 
 export function useDirectoryData({
   route,
@@ -27,17 +27,16 @@ export function useDirectoryData({
   const getDirectoryItems = useCallback(
     async (dirType) => {
       setIsLoading(true);
-      try {
-        const api =
-          dirType === "google-drive"
-            ? "/auth/google-drive/files"
-            : dirType === "shared"
-              ? "/shared"
-              : dirType === "trash"
-                ? `/trash/${dirId || ""}`
-                : `/directory/${dirId || ""}`;
 
-        const { data } = await getDirectory(api);
+      if (!driveConfig[dirType]) {
+        console.log("Invalid Directory Type");
+        return;
+      }
+
+      try {
+        const { fetch } = driveConfig[dirType];
+
+        const { data } = await fetch(dirId || "");
 
         const name =
           isSharedRoute && !dirId
@@ -48,19 +47,19 @@ export function useDirectoryData({
 
         setDirectoryName(name);
 
-        const cleanPath = Array.isArray(data.path)
-          ? data.path
+        const cleanPath = Array.isArray(data?.path)
+          ? data?.path
               .filter((p) => !isRootName(p.name))
               .map((p) => ({ id: p._id, name: p.name }))
-          : (data.path ?? []);
-        const currentCrumb = data.path
-          ? isRootName(data.name)
+          : (data?.path ?? []);
+        const currentCrumb = data?.path
+          ? isRootName(data?.name)
             ? {}
-            : { id: data._id, name: data.name }
+            : { id: data?._id, name: data?.name }
           : {};
         setCrumbs([...cleanPath, currentCrumb]);
 
-        if (!data.directories || !data.files) return;
+        if (!data?.directories || !data?.files) return;
 
         setIsDeleted(
           data.directories.some((d) => d.isDeleted) ||
@@ -85,11 +84,16 @@ export function useDirectoryData({
         setIsLoading(false);
       }
     },
-    [dirId, dirContext, isSharedRoute, isGoogleDrive, setIsGoogleDrive, navigate],
+    [
+      dirId,
+      dirContext,
+      isSharedRoute,
+      isGoogleDrive,
+      setIsGoogleDrive,
+      navigate,
+    ],
   );
 
-  // `tab === "trash"` mirrors the original call sites, which only ever
-  // invoke this with no argument (i.e. always hits `/trash/` with no id).
   const getTrashItems = useCallback(
     async (showError, tab = "") => {
       setIsLoading(true);

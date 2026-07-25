@@ -28,16 +28,15 @@ function DirectoryHeader({
   const userMenuRef = useRef(null);
   const navigate = useNavigate();
 
-  // -------------------------------------------
-  // 2. Toggle user menu
-  // -------------------------------------------
+
+  // Toggle user menu
   const handleUserIconClick = () => {
     setShowUserMenu((prev) => !prev);
   };
 
-  // -------------------------------------------
-  // 4. Close menu on outside click
-  // -------------------------------------------
+
+  // Close menu on outside click
+  
   useEffect(() => {
     function handleDocumentClick(e) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
