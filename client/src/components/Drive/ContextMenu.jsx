@@ -35,7 +35,6 @@ function useTransitionClass(open, onExited) {
   return { animate, nodeRef, onTransitionEnd };
 }
 
-/** Self-contained version for elements that own their own mount/unmount. */
 function useSelfMountedTransition(open) {
   const [mounted, setMounted] = useState(open);
 
@@ -56,10 +55,10 @@ function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
     <div
       ref={nodeRef}
       onTransitionEnd={onTransitionEnd}
-      className={`gd-context-menu gd-context-submenu ${
-        openLeft ? "right-[200px]" : "left-[100%]"
+      className={`gd-context-menu gd-context-submenu min-w-45 lg:min-w-75 ${
+        openLeft ? "right-75" : "left-full"
       } ${animate ? "open" : ""}`}
-      style={{ position: "absolute", top: 0, zIndex: 1001, minWidth: 180 }}
+      style={{ position: "absolute", top: 0, zIndex: 1001}}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -67,18 +66,25 @@ function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
     </div>
   );
 }
-
-/**
- * The actual menu markup.
- *
- * - Mounted fresh (via a `key` on the caller) every time a *new* open
- *   instance starts (new right click, even while already open, or a
- *   file<->folder switch) — so the entrance transition always starts from
- *   the plain closed styles, never mid-transition class state.
- * - Stays mounted after `open` flips to false so the closing transition can
- *   actually play; it calls `onExited` once that transition finishes, and
- *   the parent unmounts it then.
- */
+const SUBMENU_OPEN_DELAY = 150;
+const SUBMENU_CLOSE_DELAY = 120;
+ 
+function useHoverIntent(setOpen) {
+  const timerRef = useRef(null);
+ 
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+ 
+  return {
+    onMouseEnter: () => {
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setOpen(true), SUBMENU_OPEN_DELAY);
+    },
+    onMouseLeave: () => {
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setOpen(false), SUBMENU_CLOSE_DELAY);
+    },
+  };
+}
 function ContextMenuContent({
   open,
   onExited,
@@ -100,6 +106,8 @@ function ContextMenuContent({
 }) {
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
+   const openWithHover = useHoverIntent(setShowOpenWith);
+  const shareHover = useHoverIntent(setShowShare);
   const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open, onExited);
   const { toast } = useToast();
 
@@ -150,9 +158,10 @@ function ContextMenuContent({
     <div
       ref={nodeRef}
       onTransitionEnd={onTransitionEnd}
-      className={`gd-context-menu ${animate ? "open" : ""}`}
+      className={`gd-context-menu jon ${animate ? "open" : ""}`}
       style={{ left: position.x, top: position.y, zIndex: 1000 }}
       onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e)=> e.preventDefault()}
     >
       {showDeleteActions ? (
         <>
@@ -172,8 +181,8 @@ function ContextMenuContent({
             <div style={{ position: "relative" }}>
               <button
                 className="gd-context-item"
-                onMouseEnter={() => setShowOpenWith(true)}
-                onMouseLeave={() => setShowOpenWith(false)}
+                onMouseEnter={openWithHover.onMouseEnter}
+                onMouseLeave={openWithHover.onMouseLeave}
               >
                 <IconOpenWith size={18} />
                 <span style={{ flex: 1 }}>Open with</span>
@@ -183,8 +192,8 @@ function ContextMenuContent({
               <SubMenu
                 open={showOpenWith}
                 openLeft={openLeft}
-                onMouseEnter={() => setShowOpenWith(true)}
-                onMouseLeave={() => setShowOpenWith(false)}
+              onMouseEnter={openWithHover.onMouseEnter}
+                onMouseLeave={openWithHover.onMouseLeave}
               >
                 <button className="gd-context-item" onClick={close(() => onPreview(item))}>
                   <IconPreview size={18} /> Preview
@@ -198,19 +207,13 @@ function ContextMenuContent({
 
           {/* Share / copy link */}
           <div style={{ position: "relative" }}>
-            {isGoogleDriveRoute ? (
-              // Google Drive items only support copying the link.
-              <button className="gd-context-item" onClick={handleCopyLink}>
-                <IconLink size={18} />
-                Copy link
-              </button>
-            ) : (
+         {
               item && (
                 <>
                   <button
                     className="gd-context-item"
-                    onMouseEnter={() => setShowShare(true)}
-                    onMouseLeave={() => setShowShare(false)}
+                    onMouseEnter={shareHover.onMouseEnter}
+                    onMouseLeave={shareHover.onMouseLeave}
                   >
                     <IconShare size={18} />
                     <span style={{ flex: 1 }}>Share</span>
@@ -220,8 +223,8 @@ function ContextMenuContent({
                   <SubMenu
                     open={showShare}
                     openLeft={openLeft}
-                    onMouseEnter={() => setShowShare(true)}
-                    onMouseLeave={() => setShowShare(false)}
+                     onMouseEnter={shareHover.onMouseEnter}
+                    onMouseLeave={shareHover.onMouseLeave}
                   >
                     {canEdit && (
                       <button className="gd-context-item" onClick={close(() => onShare(item))}>
@@ -235,7 +238,7 @@ function ContextMenuContent({
                   </SubMenu>
                 </>
               )
-            )}
+}
           </div>
 
           {/* Download */}

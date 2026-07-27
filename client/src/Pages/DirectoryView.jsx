@@ -216,9 +216,9 @@ export default function DirectoryView({ route }) {
   }, [dirId, grantUserId, grantRole, navigate, toast]);
 
   // Navigation
-  function handleRowClick(_type, id) {
+  function handleRowClick(_type, itemId) {
     setContextItem(null);
-    handleSelect(id);
+    handleSelect(itemId);
   }
 
   const handleRowDoubleClick = (type, id) => {
@@ -458,6 +458,7 @@ export default function DirectoryView({ route }) {
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
+            onContextMenu={(e)=> e.preventDefault()}
             onMouseLeave={handleMainMouseUp}
           >
             <DriveToolbar
@@ -582,6 +583,7 @@ export default function DirectoryView({ route }) {
 
       <SelectionBar
         dirId={dirId}
+        combinedItems={combinedItems}
         selectedItems={selectedItems}
         hasFileSelected={hasFileSelected}
         isDeleted={isDeleted}

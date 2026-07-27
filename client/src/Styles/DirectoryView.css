@@ -785,9 +785,6 @@ body {
   opacity: 1;
 }
 
-.gd-context-submenu {
-  min-width: 220px;
-}
 .gd-context-item {
   display: flex;
   align-items: center;
