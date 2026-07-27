@@ -1,5 +1,5 @@
 import "../Styles/DirectoryView.css";
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 import {
@@ -39,7 +39,7 @@ import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu"
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
-export default function DirectoryView({route}) {
+export default function DirectoryView({ route }) {
   const { user, refreshUser } = useAuth();
   const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
     useGDrive();
@@ -60,21 +60,12 @@ export default function DirectoryView({route}) {
     [],
   );
 
-  const isHomeRoute = location.pathname.startsWith("/home");
+  const isHomeRoute = route === "home";
   const isSharedRoute =
-    route === "shared" ||
-    params.get("usp") === "drive_link";
+    route === "shared" || params.get("usp") === "drive_link";
   const isTrashRoute = route === "trash";
   const isGoogleDriveRoute = location.pathname.endsWith("/google-drive");
-  const dirContext =
-    location.state?.dirContext ||
-    (isTrashRoute
-      ? "trash"
-      : isSharedRoute
-        ? "shared"
-        : isHomeRoute
-          ? "home"
-          : "root");
+  // const [dirContext, setDirContext] = useState("home");
 
   const navigate = useNavigate();
 
@@ -92,7 +83,17 @@ export default function DirectoryView({route}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
+  const dirContext =
+    location.state?.dirContext ||
+    (isTrashRoute
+      ? "trash"
+      : isSharedRoute
+        ? "shared"
+        : isHomeRoute
+          ? "home"
+          : "root");
 
+  const previousDirContext = useRef(dirContext);
   function showError(message, autoClear = false) {
     setError(message);
     if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
@@ -100,6 +101,9 @@ export default function DirectoryView({route}) {
       errorTimeoutRef.current = setTimeout(() => setError(""), 5000);
     }
   }
+  useEffect(() => {
+    previousDirContext.current = dirContext;
+  }, [dirContext]);
 
   const {
     directoryName,
@@ -155,6 +159,8 @@ export default function DirectoryView({route}) {
     handleSelect,
     clearSelection,
     handleContextMenu,
+    open,
+    setOpen,
     handleMainMouseDown,
     handleMainMouseMove,
     handleMainMouseUp,
@@ -165,19 +171,16 @@ export default function DirectoryView({route}) {
   }, []);
 
   useEffect(() => {
-    if (route === "google-drive") getDirectoryItems("google-drive");
-    else if (isSharedRoute)
-      getDirectoryItems("shared");
-    else if (isTrashRoute) {
-      setBreadcrumbs([]);
-      getDirectoryItems("root");
-    } else {
+    if (dirId === "google-drive") getDirectoryItems("google-drive");
+    else if (dirContext === "trash" || isTrashRoute) getDirectoryItems("trash");
+    else if (isSharedRoute) getDirectoryItems("shared");
+    else {
       getDirectoryItems("root");
     }
     setContextItem(null);
     clearSelection();
     setSearchQuery("");
-  }, [route]);
+  }, [dirContext, dirId, isSharedRoute, isTrashRoute]);
 
   useEffect(() => {
     const channel = new BroadcastChannel("file-sync");
@@ -218,14 +221,16 @@ export default function DirectoryView({route}) {
     handleSelect(id);
   }
 
-  function handleRowDoubleClick(type, id) {
+  const handleRowDoubleClick = (type, id) => {
     clearSelection();
     if (type === "google-directory") {
       window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
       return;
     }
     if (type === "directory") {
-      navigate(`/directory/${id}`, { state: { dirContext } });
+      navigate(`/directory/${id}`, {
+        state: { dirContext: previousDirContext.current },
+      });
       return;
     }
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -413,7 +418,6 @@ export default function DirectoryView({route}) {
     return <RequestAccess dirId={dirId} />;
   }
 
-
   return (
     <div className="directory-view">
       {user && user.uploadLimit == 0 && (
@@ -577,6 +581,7 @@ export default function DirectoryView({route}) {
       )}
 
       <SelectionBar
+        dirId={dirId}
         selectedItems={selectedItems}
         hasFileSelected={hasFileSelected}
         isDeleted={isDeleted}
@@ -616,6 +621,12 @@ export default function DirectoryView({route}) {
             if (item) handleRestoreItem(item);
           });
         }}
+        onSoftDelete={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item) handleMoveToTrash(item);
+          });
+        }}
         onDeleteForever={() => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -624,29 +635,29 @@ export default function DirectoryView({route}) {
         }}
       />
 
-      {contextItem && (
-        <ContextMenu
-          openLeft={openLeft}
-          item={contextItem}
-          position={contextPos}
-          isGoogleDriveRoute={isGoogleDriveRoute}
-          isTrashRoute={isTrashRoute}
-          dirId={dirId}
-          isDeleted={isDeleted}
-          viewMode={viewMode}
-          onClose={() => {
-            setContextItem(null);
-            clearSelection();
-          }}
-          onShare={(item) => setShareItem(item)}
-          onRename={(item) => openRename(item)}
-          onSoftDelete={(item) => handleMoveToTrash(item)}
-          onDelete={(item) => handleDelete(item)}
-          onRestore={(item) => handleRestoreItem(item)}
-          onDownload={(item) => handleDownload(item)}
-          onPreview={(item) => setViewItem(item)}
-        />
-      )}
+      <ContextMenu
+        open={open}
+        openLeft={openLeft}
+        item={contextItem}
+        position={contextPos}
+        isGoogleDriveRoute={isGoogleDriveRoute}
+        isTrashRoute={isTrashRoute}
+        dirId={dirId}
+        isDeleted={isDeleted}
+        viewMode={viewMode}
+     onClose={() => {
+  setOpen(false);
+  setContextItem(null);
+  clearSelection();
+}}
+        onShare={(item) => setShareItem(item)}
+        onRename={(item) => openRename(item)}
+        onSoftDelete={(item) => handleMoveToTrash(item)}
+        onDelete={(item) => handleDelete(item)}
+        onRestore={(item) => handleRestoreItem(item)}
+        onDownload={(item) => handleDownload(item)}
+        onPreview={(item) => setViewItem(item)}
+      />
 
       {viewItem && (
         <FileViewer

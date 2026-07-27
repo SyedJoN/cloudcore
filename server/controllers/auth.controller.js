@@ -437,7 +437,7 @@ export const googleAuth = async (req, res, next) => {
     const { name, email, picture } = await fetchUserUsingIdToken(token);
 
     let user;
-
+    let fgaTuple = null;
     await session.withTransaction(async () => {
       user = await User.findOne({ email }).session(session);
 
@@ -486,23 +486,20 @@ export const googleAuth = async (req, res, next) => {
           user.avatar = picture;
           await user.save();
         }
-
-        fgaClient
-          .write({
-            writes: [
-              {
-                user: `user:${userId.toString()}`,
-                relation: "owner",
-                object: `folder:${dirId.toString()}`,
-              },
-            ],
-          })
-          .catch((err) => {
-            console.error("FGA async error:", err);
-          });
+        fgaTuple = {
+          user: `user:${userId.toString()}`,
+          relation: "owner",
+          object: `folder:${dirId}`,
+        };
+     
       }
     });
-
+   if (fgaTuple) {
+          await fgaClient
+            .write({
+              writes: [fgaTuple],
+            })
+        }
     // REDIS SESSION HANDLING
 
     const userSessions = await redisClient.ft.search(

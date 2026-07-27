@@ -48,7 +48,8 @@
   --text-secondary: #c4c7c5;
   --surface-container-dark: #282a2c;
   --shadow-1: none;
-  --shadow-dynamic: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-dynamic:
+    0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
   --btn-bg-medium: #37393b;
@@ -74,7 +75,7 @@ body {
   border-radius: var(--radius-lg);
 }
 ::-webkit-scrollbar-corner {
-background: var(--surface-white);
+  background: var(--surface-white);
 }
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
@@ -258,6 +259,7 @@ background: var(--surface-white);
   background-color: var(--surface-container);
   flex-shrink: 0;
   padding: 12px 0;
+  overflow-x: hidden;
   overflow-y: auto;
   flex-direction: column;
   gap: 4px;
@@ -301,7 +303,6 @@ background: var(--surface-white);
   padding: 0 18px 0 8px;
   height: 56px;
   background: var(--surface-container-dark);
-
   border: none;
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -741,31 +742,52 @@ background: var(--surface-white);
 }
 
 /* ===================== CONTEXT MENU ===================== */
-.gd-context-menu {
+.gd-menu {
   position: fixed;
+  overflow: hidden;
   background: var(--surface-white);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   box-shadow:
     0 2px 6px 2px rgba(60, 64, 67, 0.15),
     0 1px 2px rgba(60, 64, 67, 0.3);
-  min-width: 200px;
+  min-width: 300px;
   padding: 8px 0;
   z-index: 1000;
-  animation: ctx-appear 0.1s ease;
+
+}
+.gd-context-menu {
+  position: fixed;
+  overflow: hidden;
+  background: var(--surface-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 2px 6px 2px rgba(60, 64, 67, 0.15),
+    0 1px 2px rgba(60, 64, 67, 0.3);
+  min-width: 300px;
+  padding: 8px 0;
+  z-index: 1000;
+  transform-origin: top;
+  transform: scaleY(0.8);
+  margin-top: -10px;
+  opacity: 0;
+  transition:
+    transform 267ms cubic-bezier(0.4, 0, 0.2, 1) 0s,
+    margin-top 267ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 267ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes ctx-appear {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.gd-context-menu.open {
+  overflow: visible;
+  margin-top: 0;
+  transform: scaleY(1);
+  opacity: 1;
 }
 
+.gd-context-submenu {
+  min-width: 220px;
+}
 .gd-context-item {
   display: flex;
   align-items: center;

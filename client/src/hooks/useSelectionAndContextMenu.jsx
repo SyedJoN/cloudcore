@@ -1,17 +1,14 @@
 import { useState, useCallback } from "react";
 
-const CONTEXT_MENU_WIDTH = 180;
+const CONTEXT_MENU_WIDTH = 300;
 
-/**
- * Owns selection state, the drag-to-select marquee box, and context-menu
- * positioning/open logic.
- */
 export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [contextItem, setContextItem] = useState(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
   const [openLeft, setOpenLeft] = useState(false);
   const [dragBox, setDragBox] = useState(null);
+  const [open, setOpen] = useState(false);
 
   const handleSelect = useCallback((id) => setSelectedItems(new Set([id])), []);
   const clearSelection = useCallback(() => setSelectedItems(new Set()), []);
@@ -43,6 +40,7 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
       }
 
       setOpenLeft(left);
+      setOpen(true);
       setContextPos({ x, y: e.clientY });
 
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -110,6 +108,8 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     clearSelection,
     handleSelectAll,
     handleContextMenu,
+    open,
+    setOpen,
     handleMainMouseDown,
     handleMainMouseMove,
     handleMainMouseUp,

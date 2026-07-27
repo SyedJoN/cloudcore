@@ -476,50 +476,6 @@ export const softDeleteDirectory = async (req, res, next) => {
         });
         childFiles.forEach((f) => allFileIds.push(f._id));
       }
-
-      await Promise.allSettled([
-        ...allFolderIds.flatMap((folderId) => [
-          fgaClient.write({
-            deletes: [
-              {
-                user: `user:${userId}`,
-                relation: "viewer",
-                object: `folder:${folderId}`,
-              },
-            ],
-          }),
-          fgaClient.write({
-            deletes: [
-              {
-                user: `user:${userId}`,
-                relation: "editor",
-                object: `folder:${folderId}`,
-              },
-            ],
-          }),
-        ]),
-        ...allFileIds.flatMap((fileId) => [
-          fgaClient.write({
-            deletes: [
-              {
-                user: `user:${userId}`,
-                relation: "viewer",
-                object: `file:${fileId}`,
-              },
-            ],
-          }),
-          fgaClient.write({
-            deletes: [
-              {
-                user: `user:${userId}`,
-                relation: "editor",
-                object: `file:${fileId}`,
-              },
-            ],
-          }),
-        ]),
-      ]);
-
       return res
         .status(200)
         .json({ message: "Folder removed from shared view" });

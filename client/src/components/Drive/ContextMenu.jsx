@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   IconShare,
   IconDownload,
@@ -12,9 +13,75 @@ import {
   IconRestore,
 } from "../Icons/Icons";
 import { useToast } from "../../Contexts/ToastContext";
-import { useAuth } from "../../Contexts/AuthContext";
 
-export default function ContextMenu({
+function useTransitionClass(open, onExited) {
+  const [animate, setAnimate] = useState(false);
+  const nodeRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      const id = requestAnimationFrame(() => setAnimate(true));
+      return () => cancelAnimationFrame(id);
+    }
+    setAnimate(false);
+  }, [open]);
+
+  function onTransitionEnd(e) {
+    if (e.target !== nodeRef.current) return; 
+    if (e.propertyName !== "transform") return; 
+    if (!open) onExited?.();
+  }
+
+  return { animate, nodeRef, onTransitionEnd };
+}
+
+/** Self-contained version for elements that own their own mount/unmount. */
+function useSelfMountedTransition(open) {
+  const [mounted, setMounted] = useState(open);
+
+  useEffect(() => {
+    if (open) setMounted(true);
+  }, [open]);
+
+  const transition = useTransitionClass(open, () => setMounted(false));
+  return { mounted, ...transition };
+}
+
+function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
+  const { mounted, animate, nodeRef, onTransitionEnd } = useSelfMountedTransition(open);
+
+  if (!mounted) return null;
+
+  return (
+    <div
+      ref={nodeRef}
+      onTransitionEnd={onTransitionEnd}
+      className={`gd-context-menu gd-context-submenu ${
+        openLeft ? "right-[200px]" : "left-[100%]"
+      } ${animate ? "open" : ""}`}
+      style={{ position: "absolute", top: 0, zIndex: 1001, minWidth: 180 }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The actual menu markup.
+ *
+ * - Mounted fresh (via a `key` on the caller) every time a *new* open
+ *   instance starts (new right click, even while already open, or a
+ *   file<->folder switch) — so the entrance transition always starts from
+ *   the plain closed styles, never mid-transition class state.
+ * - Stays mounted after `open` flips to false so the closing transition can
+ *   actually play; it calls `onExited` once that transition finishes, and
+ *   the parent unmounts it then.
+ */
+function ContextMenuContent({
+  open,
+  onExited,
   openLeft,
   item,
   position,
@@ -24,7 +91,6 @@ export default function ContextMenu({
   onClose,
   onShare,
   onRename,
-  viewMode = "grid",
   onSoftDelete,
   onDelete,
   onRestore,
@@ -32,21 +98,24 @@ export default function ContextMenu({
   onPreview,
   isDeleted,
 }) {
-  if (!item) return null;
-  const BASE_URL = "http://localhost:4000";
-  const { loggedIn } = useAuth();
-
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open, onExited);
   const { toast } = useToast();
-  const isOwner = item.userRole === "owner";
-  const isViewer = item.userRole === "viewer" || item.publicRole === "viewer";
+
+  const isOwner = item?.userRole === "owner";
+  const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
+  const canEdit = isOwner || !isViewer;
 
   const showDeleteActions = isTrashRoute && isDeleted && !dirId;
+  const showFileActions = Boolean(item) && !item?.isDirectory;
 
   useEffect(() => {
     function handleClick(e) {
-      if (!e.target.closest(".gd-context-menu")) {
+      if (
+        !e.target.closest(".gd-context-menu") &&
+        !e.target.closest(".gd-context-submenu")
+      ) {
         onClose();
       }
     }
@@ -54,185 +123,173 @@ export default function ContextMenu({
     return () => document.removeEventListener("click", handleClick, true);
   }, [onClose]);
 
+  const close = (action) => (...args) => {
+    action?.(...args);
+    onClose();
+  };
+
   function handleCopyLink() {
-    const url = item.webViewLink
-      ? item.webViewLink
-      : item.isDirectory
-        ? `${window.location.origin}/directory/${item._id}?usp=drive_link`
-        : `${window.location.origin}/file/${item._id}?usp=drive_link`;
+    const url =
+      item?.webViewLink ??
+      (item?.isDirectory
+        ? `${window.location.origin}/directory/${item?._id}?usp=drive_link`
+        : `${window.location.origin}/file/${item?._id}?usp=drive_link`);
+
     navigator.clipboard.writeText(url).then(() => {
       toast({ message: "Link copied to clipboard", type: "success" });
       onClose();
     });
   }
-  return showDeleteActions ? (
-    <div
-      className="gd-context-menu"
-      style={{ left: position.x, top: position.y, zIndex: 1000 }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button
-        className="gd-context-item"
-        onClick={() => {
-          onRestore(item);
-          onClose();
-        }}
-      >
-        <IconRestore size={18} />
-        Restore
-      </button>
-      <div className="gd-context-divider" />
-      <button
-        className="gd-context-item danger"
-        onClick={() => {
-          onDelete(item);
-          onClose();
-        }}
-      >
-        <IconTrash size={18} /> Delete forever
-      </button>
-    </div>
-  ) : (
-    // Normal Actions
-    <div
-      className={`gd-context-menu ${openLeft ? "right-[200px]" : "left-[100%]"}`}
-      style={{ left: position.x, top: position.y, zIndex: 1000 }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Open with files only */}
-      {!item.isDirectory && (
-        <div style={{ position: "relative" }}>
-          <button
-            className="gd-context-item"
-            onMouseEnter={() => setShowOpenWith(true)}
-            onMouseLeave={() => setShowOpenWith(false)}
-          >
-            <IconOpenWith size={18} />
-            <span style={{ flex: 1 }}>Open with</span>
-            <IconChevronRight size={16} />
-          </button>
 
-          {showOpenWith && (
-            <div
-              className={`gd-context-menu ${openLeft ? "right-[200px]" : "left-[100%]"}`}
-              style={{
-                position: "absolute",
-                top: 0,
-                zIndex: 1001,
-                minWidth: 180,
-              }}
-              onMouseEnter={() => setShowOpenWith(true)}
-              onMouseLeave={() => setShowOpenWith(false)}
-            >
+  function handleOpenInNewTab() {
+    window.open(item?.webViewLink || `/file/${item?._id}`, "_blank");
+    onClose();
+  }
+
+  return (
+    <div
+      ref={nodeRef}
+      onTransitionEnd={onTransitionEnd}
+      className={`gd-context-menu ${animate ? "open" : ""}`}
+      style={{ left: position.x, top: position.y, zIndex: 1000 }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {showDeleteActions ? (
+        <>
+          <button className="gd-context-item" onClick={close(() => onRestore(item))}>
+            <IconRestore size={18} />
+            Restore
+          </button>
+          <div className="gd-context-divider" />
+          <button className="gd-context-item danger" onClick={close(() => onDelete(item))}>
+            <IconTrash size={18} /> Delete forever
+          </button>
+        </>
+      ) : (
+        <div>
+          {/* Open with */}
+          {showFileActions && (
+            <div style={{ position: "relative" }}>
               <button
                 className="gd-context-item"
-                onClick={() => {
-                  onPreview(item);
-                  onClose();
-                }}
+                onMouseEnter={() => setShowOpenWith(true)}
+                onMouseLeave={() => setShowOpenWith(false)}
               >
-                <IconPreview size={18} /> Preview
+                <IconOpenWith size={18} />
+                <span style={{ flex: 1 }}>Open with</span>
+                <IconChevronRight size={16} />
               </button>
-              <button
-                className="gd-context-item"
-                onClick={() => {
-                  const url = item.webViewLink || `/file/${item._id}`;
-                  window.open(url, "_blank");
-                  onClose();
-                }}
+
+              <SubMenu
+                open={showOpenWith}
+                openLeft={openLeft}
+                onMouseEnter={() => setShowOpenWith(true)}
+                onMouseLeave={() => setShowOpenWith(false)}
               >
-                <IconNewTab size={18} /> Open in new tab
-              </button>
+                <button className="gd-context-item" onClick={close(() => onPreview(item))}>
+                  <IconPreview size={18} /> Preview
+                </button>
+                <button className="gd-context-item" onClick={handleOpenInNewTab}>
+                  <IconNewTab size={18} /> Open in new tab
+                </button>
+              </SubMenu>
             </div>
+          )}
+
+          {/* Share / copy link */}
+          <div style={{ position: "relative" }}>
+            {isGoogleDriveRoute ? (
+              // Google Drive items only support copying the link.
+              <button className="gd-context-item" onClick={handleCopyLink}>
+                <IconLink size={18} />
+                Copy link
+              </button>
+            ) : (
+              item && (
+                <>
+                  <button
+                    className="gd-context-item"
+                    onMouseEnter={() => setShowShare(true)}
+                    onMouseLeave={() => setShowShare(false)}
+                  >
+                    <IconShare size={18} />
+                    <span style={{ flex: 1 }}>Share</span>
+                    <IconChevronRight size={16} />
+                  </button>
+
+                  <SubMenu
+                    open={showShare}
+                    openLeft={openLeft}
+                    onMouseEnter={() => setShowShare(true)}
+                    onMouseLeave={() => setShowShare(false)}
+                  >
+                    {canEdit && (
+                      <button className="gd-context-item" onClick={close(() => onShare(item))}>
+                        <IconShare size={18} /> Share
+                      </button>
+                    )}
+                    <button className="gd-context-item" onClick={handleCopyLink}>
+                      <IconLink size={18} />
+                      Copy link
+                    </button>
+                  </SubMenu>
+                </>
+              )
+            )}
+          </div>
+
+          {/* Download */}
+          {showFileActions && (
+            <button className="gd-context-item" onClick={close(() => onDownload(item))}>
+              <IconDownload size={18} /> Download
+            </button>
+          )}
+
+          {/* Rename / trash */}
+          {!isGoogleDriveRoute && canEdit && item && (
+            <>
+              <button className="gd-context-item" onClick={close(() => onRename(item))}>
+                <IconRename size={18} /> Rename
+              </button>
+              <div className="gd-context-divider" />
+              <button className="gd-context-item danger" onClick={close(() => onSoftDelete(item))}>
+                <IconTrash size={18} /> Move to trash
+              </button>
+            </>
           )}
         </div>
       )}
-
-      {/* Share dropdown */}
-      <div style={{ position: "relative" }}>
-        {!isGoogleDriveRoute && (
-          <button
-            className="gd-context-item"
-            onMouseEnter={() => setShowShare(true)}
-            onMouseLeave={() => setShowShare(false)}
-          >
-            <IconShare size={18} />
-            <span style={{ flex: 1 }}>Share</span>
-            <IconChevronRight size={16} />
-          </button>
-        )}
-        {showShare && (
-          <div
-            className={`gd-context-menu ${openLeft ? "right-[200px]" : "left-[100%]"}`}
-            style={{
-              position: "absolute",
-              top: 0,
-              zIndex: 1001,
-              minWidth: 180,
-            }}
-            onMouseEnter={() => setShowShare(true)}
-            onMouseLeave={() => setShowShare(false)}
-          >
-            {(isOwner || !isViewer) && (
-              <button
-                className="gd-context-item"
-                onClick={() => {
-                  onShare(item);
-                  onClose();
-                }}
-              >
-                <IconShare size={18} /> Share
-              </button>
-            )}
-            <button className="gd-context-item" onClick={handleCopyLink}>
-              <IconLink size={18} />
-              Copy link
-            </button>
-          </div>
-        )}
-        {isGoogleDriveRoute && (
-          <button className="gd-context-item" onClick={handleCopyLink}>
-            <IconLink size={18} />
-            Copy link
-          </button>
-        )}
-      </div>
-
-      {!item.isDirectory && (
-        <button
-          className="gd-context-item"
-          onClick={() => {
-            onDownload(item);
-            onClose();
-          }}
-        >
-          <IconDownload size={18} /> Download
-        </button>
-      )}
-
-      {!isGoogleDriveRoute && (isOwner || !isViewer) && loggedIn && (
-        <>
-          <button
-            className="gd-context-item"
-            onClick={() => {
-              onRename(item);
-              onClose();
-            }}
-          >
-            <IconRename size={18} /> Rename
-          </button>
-          <div className="gd-context-divider" />
-          <button
-            className="gd-context-item danger"
-            onClick={() => {
-              onSoftDelete(item);
-              onClose();
-            }}
-          >
-            <IconTrash size={18} /> Move to trash
-          </button>
-        </>
-      )}
     </div>
+  );
+}
+
+export default function ContextMenu({ open, item, position, ...rest }) {
+  const [mounted, setMounted] = useState(false);
+  const [render, setRender] = useState({ item: null, position: null, key: null });
+
+  useEffect(() => {
+
+    if (!open || !item) return;
+    const instanceKey = `${position.x},${position.y},${item?._id ?? ""},${
+      item?.isDirectory ? "dir" : "file"
+    }`;
+    setRender((prev) =>
+      prev.key === instanceKey ? prev : { item, position, key: instanceKey }
+    );
+    setMounted(true);
+  }, [open, item, position]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <ContextMenuContent
+      key={render.key}
+      item={render.item}
+      position={render.position}
+      open={open}
+      onExited={() => setMounted(false)}
+      {...rest}
+    />,
+    document.body
   );
 }

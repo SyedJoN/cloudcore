@@ -118,6 +118,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: "Something went wrong" });
 });
 startSubscriptionCron();
+
 app.listen(PORT, () => {
   console.log(`Server Started on PORT ${PORT}`);
 });

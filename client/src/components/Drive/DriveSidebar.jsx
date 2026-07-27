@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   HomeIcon,
   InboxStackIcon,
@@ -23,6 +24,63 @@ import { formatSize } from "../../../Utils/formatHelpers";
 import { History } from "lucide-react";
 import { useAuth, useGDrive } from "../../Contexts";
 
+/**
+ * The "New" dropdown, portaled to document.body so it can't get clipped by
+ * the sidebar's own overflow/stacking context. Position is computed from
+ * the trigger button's rect since the portal escapes the sidebar's normal
+ * flow (no more `position: relative` ancestor to anchor `top: 100%` to).
+ */
+function NewMenu({ anchorRef, onClose, onCreateFolder, onUploadFiles, disabled }) {
+  const [rect, setRect] = useState(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const btn = anchorRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    setRect({ left: r.left, top: r.bottom, width: r.width });
+  }, [anchorRef]);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (
+        !e.target.closest(".gd-menu") &&
+        !anchorRef.current?.contains(e.target)
+      ) {
+        onClose();
+      }
+    }
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [anchorRef, onClose]);
+
+  if (!rect) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="gd-menu"
+      style={{
+        position: "fixed",
+        left: rect.left,
+        top: rect.top + 4,
+        width: rect.width,
+        zIndex: 200,
+      }}
+      onClick={onClose}
+    >
+      <button className="gd-context-item" onClick={onCreateFolder}>
+        <IconNewFolder size={18} /> New folder
+      </button>
+      <div className="gd-context-divider" />
+      <button className="gd-context-item" onClick={onUploadFiles} disabled={disabled}>
+        <IconUpload size={18} /> File upload
+      </button>
+    </div>,
+    document.body
+  );
+}
+
 export default function DriveSidebar({
   dirId,
   isHomeRoute,
@@ -32,10 +90,13 @@ export default function DriveSidebar({
   onCreateFolder,
   onUploadFiles,
 }) {
-  const {isGoogleDrive} = useGDrive();
-const {user} = useAuth();
+  const { isGoogleDrive } = useGDrive();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const newBtnRef = useRef(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
+
   const isMyDriveActive =
     !isHomeRoute &&
     !isSharedRoute &&
@@ -45,15 +106,14 @@ const {user} = useAuth();
 
   const usagePercent = Math.max(
     0,
-    Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100),
+    Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100)
   );
 
-  const isDriveRoute = location.pathname.endsWith("/");
   return (
     <aside className="gd-sidebar">
-   
       <div style={{ position: "relative", margin: "0 8px 12px" }}>
         <button
+          ref={newBtnRef}
           className="gd-new-btn"
           onClick={() => setShowNewMenu((v) => !v)}
         >
@@ -64,36 +124,13 @@ const {user} = useAuth();
         </button>
 
         {showNewMenu && (
-          <>
-            <div
-              style={{ position: "fixed", inset: 0, zIndex: 199 }}
-              onClick={() => setShowNewMenu(false)}
-            />
-            <div
-              className="gd-context-menu"
-              style={{
-                left: 8,
-                top: "100%",
-                marginTop: 4,
-                zIndex: 200,
-                position: "absolute",
-                width: "calc(100% - 16px)",
-              }}
-              onClick={() => setShowNewMenu(false)}
-            >
-              <button className="gd-context-item" onClick={onCreateFolder}>
-                <IconNewFolder size={18} /> New folder
-              </button>
-              <div className="gd-context-divider" />
-              <button
-                className="gd-context-item"
-                onClick={onUploadFiles}
-                disabled={disabled}
-              >
-                <IconUpload size={18} /> File upload
-              </button>
-            </div>
-          </>
+          <NewMenu
+            anchorRef={newBtnRef}
+            onClose={() => setShowNewMenu(false)}
+            onCreateFolder={onCreateFolder}
+            onUploadFiles={onUploadFiles}
+            disabled={disabled}
+          />
         )}
       </div>
 
@@ -109,9 +146,7 @@ const {user} = useAuth();
         )}
         <button
           className={`gd-nav-item ${isHomeRoute ? "active" : ""}`}
-          onClick={() => {
-            navigate("/home");
-          }}
+          onClick={() => navigate("/home")}
         >
           {isHomeRoute ? (
             <HomeIconSolid className="w-5 h-5" size={20} />
@@ -122,11 +157,9 @@ const {user} = useAuth();
         </button>
         <button
           className={`gd-nav-item ${isMyDriveActive ? "active" : ""}`}
-          onClick={() => {
-            navigate("/");
-          }}
+          onClick={() => navigate("/")}
         >
-          {isDriveRoute ? (
+          {isMyDriveActive ? (
             <InboxStackIconSolid className="w-5 h-5" />
           ) : (
             <InboxStackIcon className="w-5 h-5" />
@@ -134,12 +167,9 @@ const {user} = useAuth();
           My Drive
         </button>
 
-
         <button
           className={`gd-nav-item ${isSharedRoute && !dirId ? "active" : ""}`}
-          onClick={() => {
-            navigate("/shared");
-          }}
+          onClick={() => navigate("/shared")}
         >
           {isSharedRoute ? (
             <ShareIconSolid className="w-5 h-5" />
@@ -159,9 +189,7 @@ const {user} = useAuth();
 
         <button
           className={`gd-nav-item ${isTrashRoute && !dirId ? "active" : ""}`}
-          onClick={() => {
-            navigate("/trash");
-          }}
+          onClick={() => navigate("/trash")}
         >
           {isTrashRoute ? (
             <TrashIconSolid className="w-5 h-5" />
@@ -175,17 +203,17 @@ const {user} = useAuth();
       {/* Storage */}
       <div className="gd-storage-section">
         <div className="gd-storage-bar-bg">
-          <div
-            style={{ width: `${usagePercent}%` }}
-            className="gd-storage-bar-fill"
-          />
+          <div style={{ width: `${usagePercent}%` }} className="gd-storage-bar-fill" />
         </div>
         <div className="gd-storage-text">
-          {" "}
           {user.totalUsage === 0 ? "0 B " : formatSize(user.totalUsage)} of{" "}
           {formatSize(user.totalStorage)} used
         </div>
-        {user.plan !== "business" && <button onClick={()=> navigate("/main#pricing")} className="gd-storage-btn">Get more storage</button>}
+        {user.plan !== "business" && (
+          <button onClick={() => navigate("/main#pricing")} className="gd-storage-btn">
+            Get more storage
+          </button>
+        )}
       </div>
     </aside>
   );
