@@ -12,6 +12,7 @@ import {
   softDeleteFile,
   toggleFilePublic,
   updateFile,
+  updateGoogleDrivePermission,
   uploadFile,
 } from "../controllers/file.controller.js";
 import { validateSuperAdmin } from "../middlewares/validateRoleMiddleware.js";
@@ -39,6 +40,7 @@ router.delete("/soft-delete/:id", checkAuth, softDeleteFile);
 router.patch("/:id/restore", checkAuth, restoreFile);
 router.patch("/:id/:newFilename", checkAuth, updateFile);
 router.patch("/:itemId/public/:role", checkAuth, toggleFilePublic);
+
 
 // Shareble file
 router.post("/grant-access/:id", checkAuth, giveAccessById);

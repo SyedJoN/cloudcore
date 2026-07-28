@@ -16,9 +16,9 @@ const router = express.Router();
 router.param("id", validateIdMiddleware);
 
 // Write
+router.post("/send-link", sendLink);
 router.route("/{:id}").patch(editDirectory).delete(deleteDirectory);
 router.post("/:id/request-access", requestAccess);
-router.post("/:id/send-link", sendLink);
 router.patch("/:id/restore", restoreDirectory);
 router.post("/{:parentDirId}", addDirectory);
 router.delete("/soft-delete/:id", softDeleteDirectory);

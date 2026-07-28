@@ -27,6 +27,7 @@ import {
   deleteFile,
   restoreFile,
   softDeleteFile,
+  toggleDriveFilePermission,
   toggleFilePublic,
 } from "../../apis/fileApi";
 import { useAuth, useGDrive, useBreadcrumb, useToast } from "../Contexts";
@@ -124,7 +125,7 @@ export default function DirectoryView({ route }) {
     dirContext,
     isSharedRoute,
     isTrashRoute,
-    isGoogleDrive,
+    isGoogleDriveRoute,
     setIsGoogleDrive,
     navigate,
     searchQuery,
@@ -235,7 +236,7 @@ export default function DirectoryView({ route }) {
     }
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
     if (item) setViewItem(item);
-  }
+  };
 
   // Item actions
   async function handleMoveToTrash(item) {
@@ -356,13 +357,31 @@ export default function DirectoryView({ route }) {
   const handleShareItem = async (item, role, access) => {
     try {
       setIsShareLoading(true);
-      const { _id, isDirectory } = item;
-      const type = isDirectory ? "folder" : "file";
-      await toggleFilePublic(_id, role, access, type);
+      const id = item.id ?? item._id;
+      const type = item.webViewLink
+        ? item.isDirectory
+          ? "google-drive-directory"
+          : "google-drive-file"
+        : item.isDirectory
+          ? "folder"
+          : "file";
+      if (type.startsWith("google-drive")) {
+        const userRole =
+          role === "editor"
+            ? "writer"
+            : role === "viewer"
+              ? "reader"
+              : "reader";
+        const message = await toggleDriveFilePermission(id, userRole);
+        toast({ message, type: "success" });
+
+        return;
+      }
+      await toggleFilePublic(id, role, access, type);
 
       const update = (list) =>
         list.map((f) =>
-          f._id === _id
+          f._id === id
             ? {
                 ...f,
                 isPublic: access !== "restricted",
@@ -374,6 +393,8 @@ export default function DirectoryView({ route }) {
       setDirectoriesList((prev) => update(prev));
       toast({ message: "Access updated", type: "success" });
     } catch (error) {
+      toast({ message: error.message, type: "error" });
+
       throw new Error(error || "Something went wrong!");
     } finally {
       setIsShareLoading(false);
@@ -458,7 +479,7 @@ export default function DirectoryView({ route }) {
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
-            onContextMenu={(e)=> e.preventDefault()}
+            onContextMenu={(e) => e.preventDefault()}
             onMouseLeave={handleMainMouseUp}
           >
             <DriveToolbar
@@ -647,11 +668,11 @@ export default function DirectoryView({ route }) {
         dirId={dirId}
         isDeleted={isDeleted}
         viewMode={viewMode}
-     onClose={() => {
-  setOpen(false);
-  setContextItem(null);
-  clearSelection();
-}}
+        onClose={() => {
+          setOpen(false);
+          setContextItem(null);
+          clearSelection();
+        }}
         onShare={(item) => setShareItem(item)}
         onRename={(item) => openRename(item)}
         onSoftDelete={(item) => handleMoveToTrash(item)}
@@ -691,6 +712,7 @@ export default function DirectoryView({ route }) {
           onClose={handleShareItem}
           setShareItem={setShareItem}
           isShareLoading={isShareLoading}
+          isGoogleDriveRoute={isGoogleDriveRoute}
           setIsShareLoading={setIsShareLoading}
         />
       )}

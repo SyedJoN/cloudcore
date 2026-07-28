@@ -20,6 +20,7 @@ import {
 import z from "zod";
 import { sanitizeText } from "../utils/sanitizeText.js";
 import Subscription from "../models/subscription.model.js";
+import { getDriveClient } from "../services/googleDriveClient.js";
 
 let MAX_TRIES = 2;
 
@@ -491,15 +492,13 @@ export const googleAuth = async (req, res, next) => {
           relation: "owner",
           object: `folder:${dirId}`,
         };
-     
       }
     });
-   if (fgaTuple) {
-          await fgaClient
-            .write({
-              writes: [fgaTuple],
-            })
-        }
+    if (fgaTuple) {
+      await fgaClient.write({
+        writes: [fgaTuple],
+      });
+    }
     // REDIS SESSION HANDLING
 
     const userSessions = await redisClient.ft.search(
@@ -692,145 +691,174 @@ export const githubAuth = async (req, res, next) => {
 
 export const googleDrive = async (req, res) => {
   const code = req.query.code;
+
   const { accessToken } = await fetchTokenForDrive(code);
+
   if (!accessToken) {
-    return res.status(400).json({ message: "Missing or invalid access token" });
+    return res.status(400).json({
+      message: "Missing or invalid access token",
+    });
   }
+
   res.cookie("drive_access_token", accessToken, {
     httpOnly: true,
     signed: true,
-    secure: false, // true in production (HTTPS)
+    secure: false,
     sameSite: "lax",
-    maxAge: 60 * 60 * 1000, // 1 hour
+    maxAge: 60 * 60 * 1000,
   });
+
   res.redirect("http://localhost:5173");
 };
 
 export const checkDriveAuth = async (req, res) => {
   const { drive_access_token } = req.signedCookies;
+
   if (!drive_access_token) {
-    return res.status(400).json({ message: "Token missing" });
+    return res.status(400).json({
+      message: "Token missing",
+    });
   }
-  return res.status(200).json({ isAuthenticated: true });
+
+  res.status(200).json({
+    isAuthenticated: true,
+  });
 };
 
-export const fetchGoogleDriveFiles = async (req, res) => {
+export const fetchGoogleDriveFiles = async (req, res, next) => {
   try {
     const { drive_access_token } = req.signedCookies;
-    if (!drive_access_token)
-      return res.status(400).json({ message: "Missing token" });
 
-    const driveRes = await fetch(
-      "https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners)",
-      { headers: { Authorization: `Bearer ${drive_access_token}` } },
-    );
-    const data = await driveRes.json();
-    if (!driveRes.ok) {
-      console.log("Google Drive API error:", data);
-      return res.status(driveRes.status).json({ message: data });
+    if (!drive_access_token) {
+      return res.status(401).json({
+        message: "Missing token",
+      });
     }
-    const driveFiles = data.files || [];
+
+    const drive = getDriveClient(drive_access_token);
+
+    const response = await drive.files.list({
+      pageSize: 10,
+      fields:
+        "files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,permissions(type,role,allowFileDiscovery))",
+    });
+
+    const files = response.data.files || [];
 
     const FOLDER_MIME = "application/vnd.google-apps.folder";
 
-    const directories = driveFiles.filter(
-      (file) => file.mimeType === FOLDER_MIME,
-    );
-
-    const files = driveFiles.filter((file) => file.mimeType !== FOLDER_MIME);
-
-    res.status(200).json({ files, directories });
+    res.json({
+      files: files.filter((file) => file.mimeType !== FOLDER_MIME),
+      directories: files.filter((file) => file.mimeType === FOLDER_MIME),
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// controllers/googleDriveController.js
 export const viewGoogleDriveFile = async (req, res, next) => {
-  try {
-    const { drive_access_token } = req.signedCookies;
-    if (!drive_access_token)
-      return res.status(401).json({ message: "Unauthorized" });
-
-    const { fileId } = req.query;
-    if (!fileId) return res.status(400).json({ message: "Missing fileId" });
-
-    // Get metadata to detect Google Docs vs normal file
-    const metaRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType`,
-      { headers: { Authorization: `Bearer ${drive_access_token}` } },
-    );
-
-    const metadata = await metaRes.json();
-    const mimeType = metadata.mimeType;
-
-    let url;
-    if (mimeType.startsWith("application/vnd.google-apps.")) {
-      // Docs/Sheets/Slides → export to PDF
-      url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/pdf`;
-    } else {
-      // PDFs, images, videos
-      url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
-    }
-
-    const driveRes = await fetch(url, {
-      headers: { Authorization: `Bearer ${drive_access_token}` },
-    });
-
-    res.writeHead(200, {
-      "Content-Type": mimeType.startsWith("application/vnd.google-apps.")
-        ? "application/pdf"
-        : mimeType,
-      "Content-Disposition": "inline; filename=file.pdf",
-    });
-    await pipeline(driveRes.body, res);
-  } catch (err) {
-    next(err);
-  }
-};
-export const downloadGoogleDriveFiles = async (req, res) => {
   try {
     const { drive_access_token } = req.signedCookies;
 
     if (!drive_access_token) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
     }
 
     const { fileId } = req.query;
 
     if (!fileId) {
-      return res.status(400).json({ message: "Missing fileId" });
+      return res.status(400).json({
+        message: "Missing fileId",
+      });
     }
 
-    // Get metadata
-    const metaRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=name,mimeType,size`,
-      {
-        headers: {
-          Authorization: `Bearer ${drive_access_token}`,
+    const drive = getDriveClient(drive_access_token);
+
+    const meta = await drive.files.get({
+      fileId,
+      fields: "id,name,mimeType",
+    });
+
+    const mimeType = meta.data.mimeType;
+
+    let response;
+
+    if (mimeType.startsWith("application/vnd.google-apps.")) {
+      response = await drive.files.export(
+        {
+          fileId,
+          mimeType: "application/pdf",
         },
-      },
+        {
+          responseType: "stream",
+        },
+      );
+    } else {
+      response = await drive.files.get(
+        {
+          fileId,
+          alt: "media",
+        },
+        {
+          responseType: "stream",
+        },
+      );
+    }
+
+    res.setHeader(
+      "Content-Type",
+      mimeType.startsWith("application/vnd.google-apps.")
+        ? "application/pdf"
+        : mimeType,
     );
 
-    if (!metaRes.ok) {
-      return res.status(metaRes.status).send(await metaRes.text());
+    res.setHeader("Content-Disposition", "inline");
+
+    response.data.pipe(res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const downloadGoogleDriveFiles = async (req, res, next) => {
+  try {
+    const { drive_access_token } = req.signedCookies;
+
+    if (!drive_access_token) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
     }
 
-    const meta = await metaRes.json();
+    const { fileId } = req.query;
 
-    let downloadUrl;
-    let fileName = meta.name;
-    let contentType = meta.mimeType;
+    if (!fileId) {
+      return res.status(400).json({
+        message: "Missing fileId",
+      });
+    }
 
-    const isGoogleDoc = meta.mimeType.startsWith(
+    const drive = getDriveClient(drive_access_token);
+
+    const meta = await drive.files.get({
+      fileId,
+      fields: "name,mimeType,size",
+    });
+
+    let response;
+    let fileName = meta.data.name;
+    let contentType = meta.data.mimeType;
+
+    const isGoogleFile = meta.data.mimeType.startsWith(
       "application/vnd.google-apps.",
     );
 
-    // Handle Google docs export
-    if (isGoogleDoc) {
+    if (isGoogleFile) {
       let exportMime;
 
-      switch (meta.mimeType) {
+      switch (meta.data.mimeType) {
         case "application/vnd.google-apps.document":
           exportMime = "application/pdf";
           fileName += ".pdf";
@@ -839,6 +867,7 @@ export const downloadGoogleDriveFiles = async (req, res) => {
         case "application/vnd.google-apps.spreadsheet":
           exportMime =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
           fileName += ".xlsx";
           break;
 
@@ -848,44 +877,46 @@ export const downloadGoogleDriveFiles = async (req, res) => {
           break;
 
         default:
-          return res
-            .status(400)
-            .json({ message: "Unsupported Google file type" });
+          return res.status(400).json({
+            message: "Unsupported Google file type",
+          });
       }
 
-      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=${exportMime}`;
+      response = await drive.files.export(
+        {
+          fileId,
+          mimeType: exportMime,
+        },
+        {
+          responseType: "stream",
+        },
+      );
+
       contentType = exportMime;
     } else {
-      downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+      response = await drive.files.get(
+        {
+          fileId,
+          alt: "media",
+        },
+        {
+          responseType: "stream",
+        },
+      );
     }
 
-    // Fetch actual file stream
-    const fileRes = await fetch(downloadUrl, {
-      headers: {
-        Authorization: `Bearer ${drive_access_token}`,
-      },
-    });
-
-    if (!fileRes.ok || !fileRes.body) {
-      return res.status(fileRes.status).send(await fileRes.text());
-    }
-
-    // Important headers
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
 
     res.setHeader("Content-Type", contentType);
 
-    if (!isGoogleDoc && meta.size) {
-      res.setHeader("Content-Length", meta.size);
+    if (!isGoogleFile && meta.data.size) {
+      res.setHeader("Content-Length", meta.data.size);
     }
 
-    // Stream directly
-    Readable.fromWeb(fileRes.body).pipe(res);
-  } catch (err) {
-    console.error(err);
-
-    if (!res.headersSent) {
-      res.status(500).json({ message: "Download failed" });
-    }
+    response.data.pipe(res);
+  } catch (error) {
+    next(error);
   }
 };
+
+

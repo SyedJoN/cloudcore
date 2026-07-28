@@ -557,7 +557,7 @@ export const deleteDirectory = async (req, res, next) => {
     }
 
     // Delete files from S3 Bucket
-   await deleteFileArray(files);
+    await deleteFileArray(files);
 
     const fileIds = files.map((f) => f._id);
     const allDirIds = [
@@ -630,7 +630,7 @@ export const restoreDirectory = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?._id;
-  const totalStorage = req.user.totalStorage;
+    const totalStorage = req.user.totalStorage;
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
@@ -725,17 +725,31 @@ export const requestAccess = async (req, res, next) => {
 
 export const sendLink = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const { toEmail, message, type } = req.body;
+    const { id, toEmail, message, name, type, url, isPublic, publicRole } =
+      req.body;
     const userId = req.user._id;
+    const isGoogleDriveLink = type.startsWith("google-drive");
+    const sender = await User.findById(userId).select("name email").lean();
+    const cleanMessage = sanitizeText(message || "");
 
+    if (isGoogleDriveLink) {
+      await sendLinkEmail({
+        toEmail,
+        fromName: sender.name,
+        fromEmail: sender.email,
+        itemName: name,
+        itemType: type,
+        itemUrl: url,
+        isPublic: isPublic,
+        publicRole: publicRole,
+        message: cleanMessage,
+      });
+      return res.status(200).json({ message: "Link sent" });
+    }
     const item =
       type === "folder"
         ? await Directory.findById(id).lean()
         : await File.findById(id).lean();
-
-    const sender = await User.findById(userId).select("name email").lean();
-    const cleanMessage = sanitizeText(message || "");
 
     await sendLinkEmail({
       toEmail,

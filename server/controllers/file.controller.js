@@ -22,6 +22,7 @@ import { createGetSignedUrl } from "../services/s3/getSignedUrl.js";
 import Subscription from "../models/subscription.model.js";
 import { pauseUploads } from "../services/subscription/pauseUploads.js";
 import { updateUserPlan } from "../utils/updateUserPlan.js";
+import { getDriveClient } from "../services/googleDriveClient.js";
 
 export const generateSignedUploadUrl = async (req, res, next) => {
   const { name, size, contentType } = req.body;
@@ -367,9 +368,9 @@ export const getRecentFiles = async (req, res, next) => {
     })
       .sort({ lastInteractedAt: -1 })
       .limit(20);
-if (!recentFiles) {
-return res.status(400).json({message: "No Files found", files: []})
-}
+    if (!recentFiles) {
+      return res.status(400).json({ message: "No Files found", files: [] });
+    }
     return res.status(200).json({
       files: [...recentFiles],
     });
@@ -865,6 +866,106 @@ export const fetchUserWithFiles = async (req, res, next) => {
 
     return res.status(200).json({ users: usersWithFiles });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const updateGoogleDrivePermission = async (req, res, next) => {
+  try {
+    const { drive_access_token } = req.signedCookies;
+
+    if (!drive_access_token) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const { fileId, role } = req.body;
+
+    if (!fileId || !role) {
+      return res.status(400).json({
+        message: "fileId and role are required",
+      });
+    }
+
+    const drive = getDriveClient(drive_access_token);
+
+
+    // Get current file permissions
+    const permissions = await drive.permissions.list({
+      fileId,
+      fields: "permissions(id,type,role,allowFileDiscovery)",
+    });
+
+
+    const publicPermission = permissions.data.permissions.find(
+      (p) => p.type === "anyone"
+    );
+
+
+    if (!publicPermission) {
+      return res.status(400).json({
+        message: "No public permission found",
+      });
+    }
+
+
+    // Check parent folder
+    const file = await drive.files.get({
+      fileId,
+      fields: "parents",
+    });
+
+
+    const parentId = file.data.parents?.[0];
+
+
+    if (parentId) {
+
+      const parentPermissions = await drive.permissions.list({
+        fileId: parentId,
+        fields: "permissions(id,type,role,allowFileDiscovery)",
+      });
+
+
+      const parentPublicPermission =
+        parentPermissions.data.permissions.find(
+          (p) => p.type === "anyone"
+        );
+
+
+      if (
+        parentPublicPermission &&
+        parentPublicPermission.role === "writer" &&
+        role === "reader"
+      ) {
+        return res.status(400).json({
+          message:
+            "Parent folder has higher public access. Update parent permission first.",
+        });
+      }
+    }
+
+
+    // Update file permission
+    const response = await drive.permissions.update({
+      fileId,
+      permissionId: publicPermission.id,
+      requestBody: {
+        role,
+      },
+      fields: "id,type,role,emailAddress,allowFileDiscovery",
+    });
+
+
+    res.status(200).json({
+      message: "Permission updated successfully",
+      permission: response.data,
+    });
+
+
+  } catch (error) {
+    console.error("Update permission error:", error);
     next(error);
   }
 };

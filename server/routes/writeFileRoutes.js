@@ -10,6 +10,7 @@ import {
   toggleFilePublic,
   updateFile,
   completeUpload,
+  updateGoogleDrivePermission,
 } from "../controllers/file.controller.js";
 
 import { checkAuth } from "../middlewares/authMiddleware.js";
@@ -33,6 +34,7 @@ router.patch("/:itemId/public/:role", checkAuth, toggleFilePublic);
 // Shareble file
 router.post("/grant-access/:id", checkAuth, giveAccessById);
 router.post("/revoke-access/:id", checkAuth, revokeFileAccess);
+router.patch("/google-drive/permissions/update", updateGoogleDrivePermission);
 
 
 // Upload

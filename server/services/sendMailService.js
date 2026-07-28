@@ -296,7 +296,7 @@ export const sendLinkEmail = async function ({
 }) {
   try {
     const accessLabel = isPublic ? "Anyone with the link" : "Restricted";
-    const roleLabel = isPublic ? (publicRole === "editor" ? "Editor" : "Viewer") : null;
+    const roleLabel = isPublic ? publicRole.charAt(0).toUpperCase() + publicRole.slice(1) : null;
     const itemIcon = itemType === "folder"
       ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
       : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;

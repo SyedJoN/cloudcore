@@ -9,7 +9,7 @@ const handleDriveBtn = async () => {
       redirect_uri: "http://localhost:4000/auth/google-drive/callback",
       response_type: "code",
       access_type: "offline", // allows refresh token
-      scope: "https://www.googleapis.com/auth/drive.readonly",
+      scope: "https://www.googleapis.com/auth/drive",
       prompt: "consent", // forces consent screen to get refresh token
     });
     

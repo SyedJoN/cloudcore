@@ -26,5 +26,5 @@ export function getAvatarColor(email) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-export const ROLE_LABEL = { viewer: "Viewer", editor: "Editor"};
-export const ROLE_DESC  = { viewer: "Can view", editor: "Can edit" };
+export const ROLE_LABEL = { viewer: "Viewer", reader: "Viewer", editor: "Editor", writer: "Editor"};
+export const ROLE_DESC  = { viewer: "can view", reader: "can view", editor: "can edit", writer: "can edit" };

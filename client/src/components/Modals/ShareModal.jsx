@@ -10,7 +10,7 @@ import {
   IconLock,
 } from "../Icons/Icons.jsx";
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
-import { ROLE_LABEL } from "../../../Utils/displayUtils.js";
+import { ROLE_DESC, ROLE_LABEL } from "../../../Utils/displayUtils.js";
 import { searchUsers } from "../../../apis/userApi.js";
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
@@ -22,7 +22,7 @@ import {
 } from "../../../apis/fileApi.js";
 import { useToast } from "../../Contexts/ToastContext.jsx";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function ShareModal({
   item,
@@ -30,6 +30,7 @@ export default function ShareModal({
   setShareItem,
   isShareLoading,
   setIsShareLoading,
+  isGoogleDriveRoute
 }) {
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
@@ -56,14 +57,15 @@ export default function ShareModal({
   const suggestionsRef = useRef(null);
   const inviteSuggestionsRef = useRef(null);
   const accessDropdownRef = useRef(null);
-
   const type = item.isDirectory ? "folder" : "file";
   const isOwner = item.userRole === "owner";
+  const isEditor =
+    item.userRole === "editor" ||
+    item.publicRole === "writer" ||
+    item.publicRole === "editor";
   const { toast } = useToast();
 
-  useEffect(()=> {
-    console.log('item', item)
-  }, [item])
+
   useEffect(() => {
     if (!isOwner) return;
     async function load() {
@@ -154,27 +156,42 @@ export default function ShareModal({
     if (isShareLoading) return;
     e.preventDefault();
     if (!emailInput.trim()) return;
+    const type = item.webViewLink
+      ? item.isDirectory
+        ? "google-drive-directory"
+        : "google-drive-file"
+      : item.isDirectory
+        ? "folder"
+        : "file";
+
     try {
       setIsShareLoading(true);
-      const response = await fetch(`${BASE_URL}/directory/${item._id}/send-link`, {
+      const response = await fetch(`${BASE_URL}/directory/send-link`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           toEmail: emailInput,
           message,
-          type: item.isDirectory ? "folder" : "file",
+          type,
+          id: item._id ?? item.id,
+          name: item.name,
+          url: item.webViewLink ?? "",
+          isPublic: item.isPublic,
+          publicRole: item.publicRole,
         }),
       });
       const data = await response.json();
-         if (!response.ok) {
-      throw new Error(data.error || "Failed to send link");
-    }
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send link");
+      }
       toast({ message: "Link sent successfully", type: "success" });
       setShareItem(null);
     } catch (error) {
-
-      toast({ message: error.message || "Something went wrong", type: "error" });
+      toast({
+        message: error.message || "Something went wrong",
+        type: "error",
+      });
       setShareItem(null);
     } finally {
       setIsShareLoading(false);
@@ -203,9 +220,11 @@ export default function ShareModal({
   }
 
   function handleCopyLink() {
-    const url = item
-      ? `${window.location.origin}/${item.isDirectory ? "directory" : "file"}/${item._id}?usp=drive_link`
-      : window.location.href;
+    const url = item.webViewLink
+      ? item.webViewLink
+      : itme
+        ? `${window.location.origin}/${item.isDirectory ? "directory" : "file"}/${item._id}?usp=drive_link`
+        : window.location.href;
     navigator.clipboard
       .writeText(url)
       .then(() => {
@@ -215,7 +234,7 @@ export default function ShareModal({
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
   }
-  if (!isOwner) {
+  if ((!isOwner && !isEditor)) {
     return (
       <div className="gd-modal-overlay" onClick={() => setShareItem(null)}>
         <div className="gd-share-modal" onClick={(e) => e.stopPropagation()}>
@@ -299,7 +318,7 @@ export default function ShareModal({
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                     {item.isPublic
-                      ? `Anyone on the internet with the link can ${item.publicRole || "view"}`
+                      ? `Anyone on the internet with the link ${ROLE_DESC[item.publicRole] || "view"}`
                       : "Only people with access can open with this link"}
                   </div>
                 </div>

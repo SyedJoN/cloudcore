@@ -35,7 +35,14 @@ export async function toggleFilePublic(itemId, role, access, type) {
 
   return data.message;
 }
+export async function toggleDriveFilePermission(fileId, role) {
+  const { data } = await axiosWithCreds.patch(
+    `/file/google-drive/permissions/update`,
+    {fileId, role}
+  );
 
+  return data.message;
+}
 export async function grantAccessById(type, fileId, usersArray, message) {
   const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {
     usersArray,

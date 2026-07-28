@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { getDirectory } from "../../apis/directoryApi";
 import { driveConfig } from "../../Utils/driveConfig";
+import { useGDrive } from "../Contexts";
 
 const isRootName = (n) => (n ?? "").startsWith("root");
 
@@ -11,11 +12,12 @@ export function useDirectoryData({
   dirContext,
   isSharedRoute,
   isTrashRoute,
-  isGoogleDrive,
+  isGoogleDriveRoute,
   setIsGoogleDrive,
   navigate,
   searchQuery,
 }) {
+  const { isGoogleDrive } = useGDrive();
   const [directoryName, setDirectoryName] = useState("My Drive");
   const [directoriesList, setDirectoriesList] = useState([]);
   const [filesList, setFilesList] = useState([]);
@@ -61,11 +63,47 @@ export function useDirectoryData({
 
         if (!data?.directories || !data?.files) return;
 
+        if (isGoogleDrive && isGoogleDriveRoute) {
+          const directories = data.directories?.map((directory) => {
+            const publicPermission = directory.permissions?.find(
+              (p) => p.type === "anyone" && p.allowFileDiscovery === false,
+            );
+            const directoryOwnerData = {
+              name: directory.owners[0].displayName,
+              avatar: directory.owners[0].photoLink,
+            };
+            return {
+              ...directory,
+              isPublic: !!publicPermission,
+              publicRole: publicPermission?.role || null,
+              userId: directoryOwnerData,
+            };
+          });
+
+          const files = data.files?.map((file) => {
+            const publicPermission = file.permissions?.find(
+              (p) => p.type === "anyone" && p.allowFileDiscovery === false,
+            );
+            const fileOwnerData = {
+              name: file.owners[0].displayName,
+              avatar: file.owners[0].photoLink,
+            };
+            return {
+              ...file,
+              isPublic: !!publicPermission,
+              publicRole: publicPermission?.role || null,
+              userId: fileOwnerData,
+            };
+          });
+
+          setDirectoriesList(directories.reverse());
+          setFilesList(files.reverse());
+          return;
+        }
         setIsDeleted(
           data.directories.some((d) => d.isDeleted) ||
             data.files.some((f) => f.isDeleted),
         );
-
         setDirectoriesList([...data.directories].reverse());
         setFilesList([...data.files].reverse());
       } catch (err) {
