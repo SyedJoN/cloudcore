@@ -10,6 +10,13 @@ export async function notifyBackend(fileId) {
   });
   return response;
 }
+export async function uploadDriveFileToS3(fileId, driveFileId) {
+  const response = await axiosWithCreds.post(`/file/uploads/google/complete`, {
+    fileId,
+    driveFileId
+  });
+  return response;
+}
 
 export async function fetchFilePermissions(fileId, type) {
   const { data } = await axiosWithCreds.get(

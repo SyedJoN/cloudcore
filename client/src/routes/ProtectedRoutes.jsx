@@ -8,7 +8,7 @@ export const protectedRoutes = [
     children: [
       {
         path: "/",
-        element: <DirectoryView route="home" />,
+        element: <DirectoryView />,
       },
       {
         path: "/directory/:dirId",

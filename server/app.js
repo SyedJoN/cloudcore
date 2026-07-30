@@ -21,6 +21,7 @@ import { LIMITERS } from "./config/limiters.js";
 import {
   getSharedWithMe,
   getTrashItems,
+  sendLink,
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
@@ -111,6 +112,7 @@ app.use("/user", checkAuth, validateDeletedUser, userRoutes);
 app.use("/auth", /*rateLimitMiddleware(LIMITERS.auth)*/ authRoutes);
 app.get("/shared", checkAuth, getSharedWithMe);
 app.get("/trash/{:id}", checkAuth, getTrashItems);
+app.post("/resource/send-link", checkAuth, sendLink);
 
 
 app.use((err, req, res, next) => {

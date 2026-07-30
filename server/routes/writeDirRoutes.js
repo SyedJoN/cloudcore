@@ -16,7 +16,6 @@ const router = express.Router();
 router.param("id", validateIdMiddleware);
 
 // Write
-router.post("/send-link", sendLink);
 router.route("/{:id}").patch(editDirectory).delete(deleteDirectory);
 router.post("/:id/request-access", requestAccess);
 router.patch("/:id/restore", restoreDirectory);

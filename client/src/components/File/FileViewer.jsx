@@ -134,7 +134,7 @@ export default function FileViewer({
   }, []);
 
   return (
-    <div className="fv-overlay" onClick={onClose}>
+    <div className="fv-overlay z-500" onClick={onClose}>
       <div
         className={`fv-shell ${meta ? "fv-shell-full" : ""}`}
         onClick={(e) => e.stopPropagation()}

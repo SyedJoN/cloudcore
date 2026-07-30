@@ -37,6 +37,8 @@ import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useDirectoryData } from "../Hooks/useDirectoryData";
 import { useUploadQueue } from "../Hooks/useUploadQueue";
 import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu";
+import { getResourceType } from "../../Utils/getResourceType";
+import { DRIVE_ROLES } from "../../Utils/displayUtils";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -139,13 +141,15 @@ export default function DirectoryView({ route }) {
     uploadQueue,
     progressMap,
     isUploading,
-    dbFileId,
     handleFileSelect,
     handleCancelUpload,
+    setItemProgress,
+    enqueueItem,
+    completeItem,
+    dbFileId,
+    setDbFileId,
   } = useUploadQueue({
     dirId,
-    user,
-    refreshUser,
     showError,
     onQueueComplete: refreshCurrentDirectory,
   });
@@ -181,7 +185,14 @@ export default function DirectoryView({ route }) {
     setContextItem(null);
     clearSelection();
     setSearchQuery("");
-  }, [dirContext, dirId, isSharedRoute, isTrashRoute]);
+  }, [
+    getDirectoryItems,
+    dirContext,
+    dirId,
+    isSharedRoute,
+    isTrashRoute,
+    location.pathname,
+  ]);
 
   useEffect(() => {
     const channel = new BroadcastChannel("file-sync");
@@ -217,13 +228,13 @@ export default function DirectoryView({ route }) {
   }, [dirId, grantUserId, grantRole, navigate, toast]);
 
   // Navigation
-  function handleRowClick(_type, itemId) {
+  function handleRowClick(itemId) {
     setContextItem(null);
     handleSelect(itemId);
   }
 
   const handleRowDoubleClick = (type, id) => {
-    clearSelection();
+  // clearSelection();
     if (type === "google-directory") {
       window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
       return;
@@ -358,20 +369,10 @@ export default function DirectoryView({ route }) {
     try {
       setIsShareLoading(true);
       const id = item.id ?? item._id;
-      const type = item.webViewLink
-        ? item.isDirectory
-          ? "google-drive-directory"
-          : "google-drive-file"
-        : item.isDirectory
-          ? "folder"
-          : "file";
+      const type = getResourceType(item);
       if (type.startsWith("google-drive")) {
-        const userRole =
-          role === "editor"
-            ? "writer"
-            : role === "viewer"
-              ? "reader"
-              : "reader";
+        const userRole = DRIVE_ROLES[role] ?? "reader";
+
         const message = await toggleDriveFilePermission(id, userRole);
         toast({ message, type: "success" });
 
@@ -462,6 +463,13 @@ export default function DirectoryView({ route }) {
       <div className="gd-body">
         {user.email && (
           <DriveSidebar
+            enqueueItem={enqueueItem}
+            setItemProgress={setItemProgress}
+            completeItem={completeItem}
+            handleCancelUpload={handleCancelUpload}
+            setDbFileId={setDbFileId}
+            refreshCurrentDirectory={refreshCurrentDirectory}
+            showError={showError}
             dirId={dirId}
             isHomeRoute={isHomeRoute}
             isSharedRoute={isSharedRoute}

@@ -39,7 +39,9 @@ export default function DetailsSidebar({
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
           <p>Select an item to see its details</p>
+          
         </div>
+        
       </aside>
     );
   if (selectedItemSize > 1) {

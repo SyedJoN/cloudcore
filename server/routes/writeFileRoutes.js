@@ -11,6 +11,7 @@ import {
   updateFile,
   completeUpload,
   updateGoogleDrivePermission,
+  uploadDriveFileToS3,
 } from "../controllers/file.controller.js";
 
 import { checkAuth } from "../middlewares/authMiddleware.js";
@@ -39,6 +40,7 @@ router.patch("/google-drive/permissions/update", updateGoogleDrivePermission);
 
 // Upload
 router.post("/uploads/initiate", checkAuth, generateSignedUploadUrl);
+router.post("/uploads/google/complete", checkAuth, uploadDriveFileToS3);
 router.post("/uploads/complete", checkAuth, completeUpload);
 
 

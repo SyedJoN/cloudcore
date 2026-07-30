@@ -5,6 +5,7 @@ import FilePreview from "../File/FilePreview";
 import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
 import { formatDate } from "../../../Utils/formatDate";
+import { useLocation } from "react-router-dom";
 
 export default function GridItem({
   item,
@@ -20,7 +21,9 @@ export default function GridItem({
 
   const isGDrive = dirId === "google-drive";
   const [hasImgError, setHasImgError] = useState(false);
+  const location = useLocation();
 
+  const isDriveRoute = location.pathname.endsWith('/')
   const type = item.isDirectory
     ? isGDrive ? "google-directory" : "directory"
     : isGDrive ? "google-file"      : "file";
@@ -44,9 +47,9 @@ export default function GridItem({
 
   return (
       <div
-      className={`gd-grid-item ${selected ? "selected" : ""}`}
+      className={`gd-grid-item ${selected ? "selected" : ""} ${isDriveRoute ? "h-[260.5px]" : ""}`}
         data-id={itemId} 
-      onClick={() => onRowClick(type, itemId)}
+      onClick={() => onRowClick(itemId)}
       onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
       onContextMenu={(e) => { e.preventDefault(); onSelect?.(itemId); onContextMenu(e, itemId); }}
     >
@@ -63,13 +66,13 @@ export default function GridItem({
         </div>
       </div>
 
-      <div className="gd-grid-item-preview">
+      <div className={`gd-grid-item-preview ${isDriveRoute ? 'h-50.25' : 'h-41.75'}`}>
         {item.isDirectory
           ? <IconFolder size={48} style={{ color: "#5f6368" }} />
           : <FilePreview item={item} />}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", padding: "0px 8px 0px 12px", gap: 8 }}>
+      <div style={{ display: isDriveRoute ? "none" : "flex", alignItems: "center", padding: "0px 8px 0px 12px", gap: 8 }}>
         {avatarEl}
         <span className="gd-grid-item-last-action">
           <span>You {isOpened ? "opened" : "modified"}</span>

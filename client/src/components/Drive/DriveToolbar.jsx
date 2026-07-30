@@ -33,7 +33,7 @@ const {loggedIn} = useAuth();
           : "/";
 
   return (
-    <div className="gd-toolbar">
+    <div className="gd-toolbar" onMouseDown={(e)=> e.stopPropagation()}>
       {dirContext !== "trash" && dirContext !== "shared" ? (
         <div className="gd-breadcrumb">
           <button

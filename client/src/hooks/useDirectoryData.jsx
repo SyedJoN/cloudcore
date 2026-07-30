@@ -7,15 +7,15 @@ import { useGDrive } from "../Contexts";
 const isRootName = (n) => (n ?? "").startsWith("root");
 
 export function useDirectoryData({
-  route,
-  dirId,
-  dirContext,
-  isSharedRoute,
-  isTrashRoute,
-  isGoogleDriveRoute,
-  setIsGoogleDrive,
-  navigate,
-  searchQuery,
+  route = "",
+  dirId = "",
+  dirContext = "",
+  isSharedRoute = "",
+  isTrashRoute = "",
+  isGoogleDriveRoute = "",
+  setIsGoogleDrive = "",
+  navigate = "",
+  searchQuery = "",
 }) {
   const { isGoogleDrive } = useGDrive();
   const [directoryName, setDirectoryName] = useState("My Drive");
@@ -115,6 +115,7 @@ export function useDirectoryData({
         } else if (status === 401 || status === 404) {
           navigate("/login");
         } else {
+          console.log(err);
           console.error(err);
           navigate("/");
         }

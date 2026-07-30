@@ -5,14 +5,8 @@ import {
   notifyBackend,
 } from "../../apis/fileApi";
 import { formatSize } from "../../Utils/formatHelpers";
-import { useAuth } from "../Contexts";
 
-/**
- * Owns the upload queue: selecting files, validating size/storage limits,
- * running uploads one-by-one via XHR (for progress events), and cancellation.
- */
-export function useUploadQueue({ dirId,showError, onQueueComplete }) {
-  const {user, refreshUser} = useAuth();
+export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueComplete }) {
   const [uploadQueue, setUploadQueue] = useState([]);
   const [uploadXhrMap, setUploadXhrMap] = useState({});
   const [progressMap, setProgressMap] = useState({});
@@ -20,8 +14,24 @@ export function useUploadQueue({ dirId,showError, onQueueComplete }) {
   const [dbFileId, setDbFileId] = useState("");
   const fileInputRef = useRef(null);
 
-
   const isUploadingRef = useRef(false);
+
+  const enqueueItem = useCallback((item) => {
+    setUploadQueue((prev) => [...prev, item]);
+    setProgressMap((prev) => ({ ...prev, [item._id]: 0 }));
+  }, []);
+
+  const setItemProgress = useCallback((id, pct) => {
+    setProgressMap((prev) => ({ ...prev, [id]: pct }));
+  }, []);
+
+  const completeItem = useCallback((id) => {
+    setUploadQueue((prev) => prev.filter((i) => i._id !== id));
+    setProgressMap((prev) => {
+      const { [id]: _omit, ...rest } = prev;
+      return rest;
+    });
+  }, []);
 
   const handleCancelUpload = useCallback(
     async (tempId, fileId) => {
@@ -181,9 +191,6 @@ export function useUploadQueue({ dirId,showError, onQueueComplete }) {
 
       setUploadQueue((prev) => [...prev, ...newItems]);
 
-      // Plain side effects, run once, outside of any setState updater.
-      // Gated on the ref (synchronous) rather than `isUploading` state
-      // (async/batched) so two rapid selections can't both pass the check.
       if (!isUploadingRef.current) {
         isUploadingRef.current = true;
         setIsUploading(true);
@@ -199,7 +206,11 @@ export function useUploadQueue({ dirId,showError, onQueueComplete }) {
     progressMap,
     isUploading,
     dbFileId,
+    setDbFileId,
     handleFileSelect,
     handleCancelUpload,
+    enqueueItem,
+    setItemProgress,
+    completeItem,
   };
 }

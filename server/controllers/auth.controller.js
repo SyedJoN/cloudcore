@@ -443,11 +443,10 @@ export const googleAuth = async (req, res, next) => {
       user = await User.findOne({ email }).session(session);
 
       if (user && user.isDeleted) {
-        throw {
-          status: 403,
+        return res.status(403).json({
           message: "Account deleted. To recover, contact owner.",
           code: "ACCOUNT_DELETED",
-        };
+        });
       }
 
       // CREATE USER IF NOT EXISTS
@@ -918,5 +917,3 @@ export const downloadGoogleDriveFiles = async (req, res, next) => {
     next(error);
   }
 };
-
-

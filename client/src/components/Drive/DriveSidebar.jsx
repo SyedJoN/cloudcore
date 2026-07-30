@@ -23,22 +23,37 @@ import {
 import { formatSize } from "../../../Utils/formatHelpers";
 import { History } from "lucide-react";
 import { useAuth, useGDrive } from "../../Contexts";
+import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
+import GoogleDriveBrowser from "./GoogleDriveBrowser";
+import CircularLoader from "../Loaders/CircularLoader";
 
-/**
- * The "New" dropdown, portaled to document.body so it can't get clipped by
- * the sidebar's own overflow/stacking context. Position is computed from
- * the trigger button's rect since the portal escapes the sidebar's normal
- * flow (no more `position: relative` ancestor to anchor `top: 100%` to).
- */
-function NewMenu({ anchorRef, onClose, onCreateFolder, onUploadFiles, disabled }) {
+function NewMenu({
+  anchorRef,
+  onClose,
+  onCreateFolder,
+  onUploadFromDrive,
+  onUploadFiles,
+  disabled,
+}) {
   const [rect, setRect] = useState(null);
   const menuRef = useRef(null);
-
+  const close =
+    (action) =>
+    (...args) => {
+      action?.(...args);
+      onClose();
+    };
   useEffect(() => {
     const btn = anchorRef.current;
     if (!btn) return;
+
     const r = btn.getBoundingClientRect();
-    setRect({ left: r.left, top: r.bottom, width: r.width });
+
+    setRect({
+      left: r.left,
+      top: r.bottom,
+      width: r.width,
+    });
   }, [anchorRef]);
 
   useEffect(() => {
@@ -50,37 +65,90 @@ function NewMenu({ anchorRef, onClose, onCreateFolder, onUploadFiles, disabled }
         onClose();
       }
     }
+
     document.addEventListener("click", handleClick, true);
+
     return () => document.removeEventListener("click", handleClick, true);
   }, [anchorRef, onClose]);
 
   if (!rect) return null;
 
   return createPortal(
-    <div
-      ref={menuRef}
-      className="gd-menu"
-      style={{
-        position: "fixed",
-        left: rect.left,
-        top: rect.top + 4,
-        width: rect.width,
-        zIndex: 200,
-      }}
-      onClick={onClose}
-    >
-      <button className="gd-context-item" onClick={onCreateFolder}>
-        <IconNewFolder size={18} /> New folder
-      </button>
-      <div className="gd-context-divider" />
-      <button className="gd-context-item" onClick={onUploadFiles} disabled={disabled}>
-        <IconUpload size={18} /> File upload
-      </button>
-    </div>,
-    document.body
+    <>
+      <div
+        ref={menuRef}
+        className="gd-menu"
+        style={{
+          position: "fixed",
+          left: rect.left,
+          top: rect.top + 4,
+          width: rect.width,
+          zIndex: 200,
+        }}
+      >
+        <button
+          className="gd-context-item"
+          onClick={close(() => onCreateFolder())}
+        >
+          <IconNewFolder size={18} />
+          New folder
+        </button>
+
+        <div className="gd-context-divider" />
+
+        <button
+          className="gd-context-item"
+          onClick={close(() => onUploadFiles())}
+          disabled={disabled}
+        >
+          <IconUpload size={18} />
+          File upload
+        </button>
+
+        <button
+          className="gd-context-item"
+          onClick={close(() => onUploadFromDrive())}
+          disabled={disabled}
+        >
+          <GoogleDriveSVG size={18} />
+          Import from Drive
+        </button>
+      </div>
+    </>,
+    document.body,
   );
 }
-
+function GDrivePicker({
+  onClose,
+  open,
+  setOpen,
+  showError,
+  refreshCurrentDirectory,
+  enqueueItem,
+  setItemProgress,
+  completeItem,
+  handleCancelUpload,
+  setDbFileId,
+}) {
+  return createPortal(
+    <>
+      {open && (
+        <GoogleDriveBrowser
+          enqueueItem={enqueueItem}
+          setItemProgress={setItemProgress}
+          completeItem={completeItem}
+          handleCancelUpload={handleCancelUpload}
+          setDbFileId={setDbFileId}
+          onUploadComplete={refreshCurrentDirectory}
+          open={open}
+          setOpen={setOpen}
+          showError={showError}
+        />
+      )}
+    </>,
+    document.body,
+  );
+}
 export default function DriveSidebar({
   dirId,
   isHomeRoute,
@@ -88,7 +156,14 @@ export default function DriveSidebar({
   isTrashRoute,
   disabled,
   onCreateFolder,
+  refreshCurrentDirectory,
   onUploadFiles,
+  showError,
+  enqueueItem,
+  setItemProgress,
+  completeItem,
+  handleCancelUpload,
+  setDbFileId,
 }) {
   const { isGoogleDrive } = useGDrive();
   const { user } = useAuth();
@@ -96,6 +171,8 @@ export default function DriveSidebar({
   const location = useLocation();
   const newBtnRef = useRef(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const isMyDriveActive =
     !isHomeRoute &&
@@ -106,7 +183,7 @@ export default function DriveSidebar({
 
   const usagePercent = Math.max(
     0,
-    Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100)
+    Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100),
   );
 
   return (
@@ -122,14 +199,30 @@ export default function DriveSidebar({
           </svg>
           New
         </button>
-
+    
         {showNewMenu && (
           <NewMenu
             anchorRef={newBtnRef}
             onClose={() => setShowNewMenu(false)}
             onCreateFolder={onCreateFolder}
+            onUploadFromDrive={() => setOpen(true)}
             onUploadFiles={onUploadFiles}
             disabled={disabled}
+          />
+        )}
+        {open && (
+          <GDrivePicker
+            enqueueItem={enqueueItem}
+            setItemProgress={setItemProgress}
+            completeItem={completeItem}
+            handleCancelUpload={handleCancelUpload}
+            setDbFileId={setDbFileId}
+            refreshCurrentDirectory={refreshCurrentDirectory}
+            onClose={() => setShowNewMenu(false)}
+            setLoading={setLoading}
+            open={open}
+            setOpen={setOpen}
+            showError={showError}
           />
         )}
       </div>
@@ -203,14 +296,20 @@ export default function DriveSidebar({
       {/* Storage */}
       <div className="gd-storage-section">
         <div className="gd-storage-bar-bg">
-          <div style={{ width: `${usagePercent}%` }} className="gd-storage-bar-fill" />
+          <div
+            style={{ width: `${usagePercent}%` }}
+            className="gd-storage-bar-fill"
+          />
         </div>
         <div className="gd-storage-text">
           {user.totalUsage === 0 ? "0 B " : formatSize(user.totalUsage)} of{" "}
           {formatSize(user.totalStorage)} used
         </div>
         {user.plan !== "business" && (
-          <button onClick={() => navigate("/main#pricing")} className="gd-storage-btn">
+          <button
+            onClick={() => navigate("/main#pricing")}
+            className="gd-storage-btn"
+          >
             Get more storage
           </button>
         )}

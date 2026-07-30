@@ -21,6 +21,7 @@ import {
   revokeFileAccess,
 } from "../../../apis/fileApi.js";
 import { useToast } from "../../Contexts/ToastContext.jsx";
+import { sendLink } from "../../../apis/resourceApi.js";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -156,35 +157,35 @@ export default function ShareModal({
     if (isShareLoading) return;
     e.preventDefault();
     if (!emailInput.trim()) return;
-    const type = item.webViewLink
-      ? item.isDirectory
-        ? "google-drive-directory"
-        : "google-drive-file"
-      : item.isDirectory
-        ? "folder"
-        : "file";
+    const type = getResourceType(item);
 
     try {
       setIsShareLoading(true);
-      const response = await fetch(`${BASE_URL}/directory/send-link`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          toEmail: emailInput,
-          message,
-          type,
-          id: item._id ?? item.id,
-          name: item.name,
-          url: item.webViewLink ?? "",
-          isPublic: item.isPublic,
-          publicRole: item.publicRole,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send link");
-      }
+      await sendLink({
+        toEmail: emailInput,
+        message,
+        type,
+        id: item._id ?? item.id,
+        name: item.name,
+        url: item.webViewLink ?? "",
+        isPublic: item.isPublic,
+        publicRole: item.publicRole
+      })
+      // const response = await fetch(`${BASE_URL}/resource/send-link`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   credentials: "include",
+      //   body: JSON.stringify({
+      //     toEmail: emailInput,
+      //     message,
+      //     type,
+      //     id: item._id ?? item.id,
+      //     name: item.name,
+      //     url: item.webViewLink ?? "",
+      //     isPublic: item.isPublic,
+      //     publicRole: item.publicRole,
+      //   }),
+      // });
       toast({ message: "Link sent successfully", type: "success" });
       setShareItem(null);
     } catch (error) {

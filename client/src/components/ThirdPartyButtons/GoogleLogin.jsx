@@ -3,23 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { fetchUserDetails } from "../../../apis/authApi";
 import { useAuth } from "../../Contexts/AuthContext";
 import { createSubscription } from "../../../apis/subscriptionApi";
+import { useRef } from "react";
 
 function GoogleLoginBtn({ setServerError, priceId }) {
   console.log("priceId", priceId);
   const navigate = useNavigate();
-  const {setLoggedIn} = useAuth()
+  const { setLoggedIn } = useAuth();
+  const inFlight = useRef(false);
 
- 
   return (
     <GoogleLogin
       onSuccess={async (credentialResponse) => {
+        if (inFlight.current) return;
+        inFlight.current = true;
         try {
           const response = await fetchUserDetails(
             credentialResponse.credential,
-            setServerError,
           );
           if (response.status === 200) {
-            
             setServerError("");
             setLoggedIn(true);
 
@@ -43,6 +44,8 @@ function GoogleLoginBtn({ setServerError, priceId }) {
           }
           setServerError(error.message || "Error while fetching user details");
           setLoggedIn(false);
+        } finally {
+          inFlight.current = false;
         }
         console.log("credentialResponse", credentialResponse);
       }}

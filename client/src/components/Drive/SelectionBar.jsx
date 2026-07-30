@@ -27,12 +27,11 @@ export default function SelectionBar({
 }) {
   if (selectedItems.size === 0) return null;
   const { toast } = useToast();
-  console.log("combinedItems", combinedItems);
-  console.log("selectedItems", selectedItems);
+
   const item = combinedItems.find((item) =>
     selectedItems.has(item.id ?? item._id),
   );
-  console.log("item", item);
+
   const userRole = item.userRole;
   const isFile = !item.isDirectory;
   const publicRole = item.publicRole;

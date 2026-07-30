@@ -462,12 +462,13 @@ body {
 .gd-toolbar {
   display: flex;
   align-items: center;
-  padding: 12px 0 8px;
+  padding: 12px 0;
   background-color: var(--surface-white);
   gap: 8px;
   position: sticky;
   top: 0;
   z-index: 3;
+  margin-left: -20px;
 }
 
 .gd-breadcrumb {
@@ -476,6 +477,7 @@ body {
   background-color: var(--surface-white);
   gap: 2px;
   flex: 1;
+  padding-left: 16px;
   min-width: 0;
 }
 
@@ -533,8 +535,8 @@ body {
 /* ===================== GRID VIEW ===================== */
 .gd-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(246px, 246px));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));;
+  gap: 20px;
   padding-bottom: 16px;
 }
 
@@ -1173,12 +1175,11 @@ body.gd-overlay-open {
 
 /* ===================== FILE PREVIEW ===================== */
 .gd-grid-item-preview {
-  height: 167px;
   background: var(--surface-white);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 8px;
+  margin: 0 6px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   overflow: hidden;
 }
@@ -1188,6 +1189,7 @@ body.gd-overlay-open {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: var(--radius-sm);
   transition: transform 0.2s ease;
 }
 
