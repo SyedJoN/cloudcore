@@ -5,6 +5,8 @@ import {
   IconShare,
   IconTrash,
   IconRename,
+  IconLink,
+  IconRestore,
 } from "../Icons/Icons";
 import "./FileViewer.css";
 import UserAccountBar from "../UserAccountBar";
@@ -18,7 +20,7 @@ import {
   ImageViewer,
 } from "../Viewers";
 import getCategory from "../../../Utils/getFileCategory";
-import { useAuth } from "../../Contexts";
+import { useAuth, useToast } from "../../Contexts";
 import getExt from "../../../Utils/getExtension";
 
 const BASE_URL = "http://localhost:4000";
@@ -32,14 +34,17 @@ export default function FileViewer({
   onNavigate,
   files = [],
   isSharedRoute,
+  isDeleted,
   onSoftDelete,
   onRename,
   onDownload,
+  onRestore,
+  onDelete,
   onDeleteSuccess,
   meta = false,
 }) {
   const { user, refreshUser } = useAuth();
-
+  const { toast } = useToast();
   const category = getCategory(item?.name || "");
   const isGDrive = !!item?.webViewLink;
   const fileUrl = isGDrive
@@ -52,16 +57,10 @@ export default function FileViewer({
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < files.length - 1;
 
-  const isEditorOrOwner =
-    !!user.name &&
-    !isGDrive &&
-    !isSharedRoute &&
-    (item.publicRole === "editor" ||
-      item.userRole === "owner" ||
-      item.userRole === "editor");
-  console.log("!isSharedRoute", isEditorOrOwner);
-
-  // ✅ keyboard navigation
+  const isOwner = item.userRole === "owner";
+  const isViewer = item.userRole === "viewer" || item.publicRole === "viewer";
+  const canEdit = isOwner || !isViewer;
+  // keyboard navigation
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "Escape") onClose();
@@ -133,6 +132,17 @@ export default function FileViewer({
     refreshUser();
   }, []);
 
+  function handleCopyLink() {
+    const url =
+      item?.webViewLink ??
+      (item?.isDirectory
+        ? `${window.location.origin}/directory/${item?._id}?usp=drive_link`
+        : `${window.location.origin}/file/${item?._id}?usp=drive_link`);
+
+    navigator.clipboard.writeText(url).then(() => {
+      toast({ message: "Link copied to clipboard", type: "success" });
+    });
+  }
   return (
     <div className="fv-overlay z-500" onClick={onClose}>
       <div
@@ -205,82 +215,120 @@ export default function FileViewer({
         </div>
         {/* ── Action bar ── */}
         <div className="fv-topbar-actions">
-          {!isGDrive && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Download"
-              onClick={() => onDownload?.(item)}
-            >
-              <IconDownload size={20} />
-            </button>
-          )}
-          {isEditorOrOwner && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Share"
-              onClick={() => onShare?.(item)}
-            >
-              <IconShare size={20} />
-            </button>
-          )}
+          {(isGDrive || !isDeleted) && (
+            <>
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Download"
+                onClick={() => onDownload?.(item)}
+              >
+                <IconDownload size={20} />
+              </button>
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Share"
+                onClick={() => onShare?.(item)}
+              >
+                <IconShare size={20} />
+              </button>
 
-          {isEditorOrOwner && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Rename"
-              onClick={() => onRename?.(item)}
-            >
-              <IconRename size={20} />
-            </button>
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Copy link"
+                onClick={handleCopyLink}
+              >
+                <IconLink size={20} />
+              </button>
+           
+            </>
           )}
-          {isEditorOrOwner && (
-            <button
-              className="fv-action-btn gd-icon-btn fv-action-danger"
-              title="Delete"
-              onClick={async () => {
-                await onSoftDelete?.(item);
-                onDeleteSuccess?.(item._id);
-                onClose();
-              }}
-            >
-              <IconTrash size={20} />
-            </button>
+          {(isOwner || canEdit) && !isDeleted && (
+            <>
+               <button
+                className="fv-action-btn gd-icon-btn"
+                title="Rename"
+                onClick={() => onRename?.(item)}
+              >
+                <IconRename size={20} />
+              </button>
+              {!isGDrive &&
+                   <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Move to trash"
+                onClick={async () => {
+                  await onSoftDelete?.(item);
+                  onDeleteSuccess?.(item._id);
+                  onClose();
+                }}
+              >
+                <IconTrash size={20} />
+              </button>
+              }
+         
+            </>
+          )}
+          {(isDeleted && !isGDrive) && (
+            <>
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Restore"
+                onClick={() => onRestore?.(item)}
+              >
+                <IconRestore size={20} />
+              </button>
+              <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Delete Forever"
+                onClick={() => onDelete?.(item)}
+              >
+                <IconTrash size={20} />
+              </button>
+            </>
           )}
           {isGDrive && (
-            <a
-              className="fv-action-btn gd-icon-btn"
-              href={item.webViewLink}
-              target="_blank"
-              rel="noreferrer"
-              title="Open in Google Drive"
-            >
-              <svg viewBox="0 0 87.3 78" width="20" height="20">
-                <path
-                  d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-                  fill="#0066da"
-                />
-                <path
-                  d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
-                  fill="#00ac47"
-                />
-                <path
-                  d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-                  fill="#ea4335"
-                />
-                <path
-                  d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-                  fill="#00832d"
-                />
-                <path
-                  d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-                  fill="#2684fc"
-                />
-                <path
-                  d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-                  fill="#ffba00"
-                />
-              </svg>
-            </a>
+            <>
+              <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Delete Forever"
+                onClick={() => onDelete?.(item)}
+              >
+                <IconTrash size={20} />
+              </button>
+              <a
+                className="fv-action-btn gd-icon-btn"
+                href={item.webViewLink}
+                target="_blank"
+                rel="noreferrer"
+                title="Open in Google Drive"
+              >
+                <svg viewBox="0 0 87.3 78" width="20" height="20">
+                  <path
+                    d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                    fill="#0066da"
+                  />
+                  <path
+                    d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
+                    fill="#00ac47"
+                  />
+                  <path
+                    d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+                    fill="#ea4335"
+                  />
+                  <path
+                    d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                    fill="#00832d"
+                  />
+                  <path
+                    d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                    fill="#2684fc"
+                  />
+                  <path
+                    d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                    fill="#ffba00"
+                  />
+                </svg>
+              </a>
+            </>
           )}
         </div>
         {/* ── Viewer area ── */}

@@ -408,64 +408,104 @@ export const getRecentFiles = async (req, res, next) => {
 };
 export const updateFile = async (req, res, next) => {
   const { id: fileId } = req.params;
-  const { fileName } = req.body;
+  let { fileName } = req.body;
+  const { type } = req.query;
   if (!fileName || typeof fileName !== "string") {
     return res.status(400).json({ message: "Filename is required" });
   }
   const userId = req.user._id;
 
-  if (!fileName) {
-    return res.status(400).json({ message: "Filename is required" });
-  }
+  if (type === "google") {
+    try {
+      const { drive_access_token } = req.signedCookies;
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Unauthorized",
+        });
+      }
+      const drive = getDriveClient(drive_access_token);
 
-  try {
-    const file = await File.findById(fileId);
-    if (!file) return res.status(404).json({ message: "File not found" });
-    const ext = file.extension || path.extname(file.name);
+      const file = await drive.files.get({
+        fileId,
+        fields: "name",
+      });
 
-    const base = path.basename(fileName, path.extname(fileName));
+      const oldName = file.data.name;
+      const extension = oldName.includes(".")
+        ? oldName.slice(oldName.lastIndexOf("."))
+        : "";
 
-    const safeBase = sanitizeFilename(base);
+      if (
+        extension &&
+        !fileName.toLowerCase().endsWith(extension.toLowerCase())
+      ) {
+        fileName += extension;
+      }
 
-    const finalName = safeBase + ext;
-    const isOwner = file.userId?.toString() === userId?.toString();
+      await drive.files.update({
+        fileId,
+        requestBody: {
+          name: fileName,
+        },
+      });
 
-    // 1. OWNER OR SUPERUSER — always allowed
-    if (req.user?.role === "superuser" || isOwner) {
-      return await performRename(file, fileId, finalName, res);
+      return res.status(200).json({
+        message: "File renamed successfully",
+      });
+    } catch (error) {
+      console.error("File rename error:", error);
+      next(error);
     }
+  } else {
+    try {
+      const file = await File.findById(fileId);
+      if (!file) return res.status(404).json({ message: "File not found" });
+      const ext = file.extension || path.extname(file.name);
 
-    // 2. FGA CHECK
-    const canEdit = await fgaClient.check({
-      user: `user:${userId}`,
-      relation: "can_edit",
-      object: `file:${fileId}`,
-    });
+      const base = path.basename(fileName, path.extname(fileName));
 
-    if (canEdit.allowed) {
-      return await performRename(file, fileId, finalName, res);
-    }
+      const safeBase = sanitizeFilename(base);
 
-    const parentDir = file.parentDirId
-      ? await Directory.findById(file.parentDirId).lean()
-      : null;
+      const finalName = safeBase + ext;
+      const isOwner = file.userId?.toString() === userId?.toString();
 
-    const publicRole = file.isPublic
-      ? file.publicRole || "viewer"
-      : parentDir?.isPublic
-        ? parentDir?.publicRole || "viewer"
+      // 1. OWNER OR SUPERUSER — always allowed
+      if (req.user?.role === "superuser" || isOwner) {
+        return await performRename(file, fileId, finalName, res);
+      }
+
+      // 2. FGA CHECK
+      const canEdit = await fgaClient.check({
+        user: `user:${userId}`,
+        relation: "can_edit",
+        object: `file:${fileId}`,
+      });
+
+      if (canEdit.allowed) {
+        return await performRename(file, fileId, finalName, res);
+      }
+
+      const parentDir = file.parentDirId
+        ? await Directory.findById(file.parentDirId).lean()
         : null;
 
-    if (publicRole === "editor") {
-      return await performRename(file, fileId, finalName, res);
-    }
+      const publicRole = file.isPublic
+        ? file.publicRole || "viewer"
+        : parentDir?.isPublic
+          ? parentDir?.publicRole || "viewer"
+          : null;
 
-    // 4. DENY
-    return res.status(403).json({
-      message: "You don't have permission to rename this file",
-    });
-  } catch (error) {
-    next(error);
+      if (publicRole === "editor") {
+        return await performRename(file, fileId, finalName, res);
+      }
+
+      // 4. DENY
+      return res.status(403).json({
+        message: "You don't have permission to rename this file",
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 };
 
@@ -529,38 +569,76 @@ export const softDeleteFile = async (req, res, next) => {
   }
 };
 export const deleteFile = async (req, res, next) => {
-  const { id } = req.params;
   const userId = req.user._id;
-  try {
-    const fileToDelete = await File.findOne({
-      _id: id,
-    }).select("name extension size");
-    if (!fileToDelete) {
-      return res.status(404).json({ message: "File not found!" });
-    }
+  const { id } = req.params;
+  const { type } = req.query;
 
-    await fgaClient.write(
-      {
-        deletes: [
-          { user: `user:${userId}`, relation: "owner", object: `file:${id}` },
-          { user: `user:${userId}`, relation: "editor", object: `file:${id}` },
-          { user: `user:${userId}`, relation: "viewer", object: `file:${id}` },
-        ],
-      },
-      {
-        conflict: {
-          onMissingDeletes: ClientWriteRequestOnMissingDeletes.Ignore,
+  if (!id) {
+    return res.status(400).json({
+      message: "fileId is required",
+    });
+  }
+  if (type === "google") {
+    try {
+      const { drive_access_token } = req.signedCookies;
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Unauthorized",
+        });
+      }
+      const drive = getDriveClient(drive_access_token);
+
+      await drive.files.delete({
+        fileId: id,
+      });
+
+      return res.status(200).json({
+        message: "File deleted successfully",
+      });
+    } catch (error) {
+      console.error("File delete error:", error);
+      next(error);
+    }
+  } else {
+    try {
+      const fileToDelete = await File.findOne({
+        _id: id,
+      }).select("name extension size");
+      if (!fileToDelete) {
+        return res.status(404).json({ message: "File not found!" });
+      }
+
+      await fgaClient.write(
+        {
+          deletes: [
+            { user: `user:${userId}`, relation: "owner", object: `file:${id}` },
+            {
+              user: `user:${userId}`,
+              relation: "editor",
+              object: `file:${id}`,
+            },
+            {
+              user: `user:${userId}`,
+              relation: "viewer",
+              object: `file:${id}`,
+            },
+          ],
         },
-      },
-    );
-    const s3Key = `${fileToDelete._id}${fileToDelete.extension}`;
-    await deleteFileFromS3(s3Key);
-    await fileToDelete.deleteOne();
-    await updateParentDirSize(fileToDelete.parentDirId, fileToDelete.size);
-    return res.status(200).json({ message: "File Deleted Successfully" });
-  } catch (error) {
-    console.log(error);
-    next(error);
+        {
+          conflict: {
+            onMissingDeletes: ClientWriteRequestOnMissingDeletes.Ignore,
+          },
+        },
+      );
+      const s3Key = `${fileToDelete._id}${fileToDelete.extension}`;
+      await deleteFileFromS3(s3Key);
+      await fileToDelete.deleteOne();
+      await updateParentDirSize(fileToDelete.parentDirId, fileToDelete.size);
+      return res.status(200).json({ message: "File Deleted Successfully" });
+    } catch (error) {
+      console.log(error);
+      next(error);
+    }
   }
 };
 export const restoreFile = async (req, res, next) => {

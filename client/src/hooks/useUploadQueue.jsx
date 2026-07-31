@@ -5,14 +5,16 @@ import {
   notifyBackend,
 } from "../../apis/fileApi";
 import { formatSize } from "../../Utils/formatHelpers";
+import { useAuth } from "../Contexts";
 
-export function useUploadQueue({ dirId, user, refreshUser, showError, onQueueComplete }) {
+export function useUploadQueue({ dirId, showError, onQueueComplete }) {
   const [uploadQueue, setUploadQueue] = useState([]);
   const [uploadXhrMap, setUploadXhrMap] = useState({});
   const [progressMap, setProgressMap] = useState({});
   const [isUploading, setIsUploading] = useState(false);
   const [dbFileId, setDbFileId] = useState("");
   const fileInputRef = useRef(null);
+  const {user, refreshUser} = useAuth();
 
   const isUploadingRef = useRef(false);
 

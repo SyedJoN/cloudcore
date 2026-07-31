@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=.env --watch app.js",
-    "setup": "node --env-file=.env ./config/setup.js"
+    "setup": "node --env-file=.env ./config/setup.js",
+    "test": "node --watch --watch-preserve-output --env-file=.env app.js"
   },
   "keywords": [],
   "author": "",

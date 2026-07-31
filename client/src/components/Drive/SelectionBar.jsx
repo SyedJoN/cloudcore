@@ -31,10 +31,10 @@ export default function SelectionBar({
   const item = combinedItems.find((item) =>
     selectedItems.has(item.id ?? item._id),
   );
-
-  const userRole = item.userRole;
-  const isFile = !item.isDirectory;
-  const publicRole = item.publicRole;
+  const type = item?.webViewLink ? "google" : "";
+  const userRole = item?.userRole;
+  const isFile = !item?.isDirectory;
+  const publicRole = item?.publicRole;
 
   const isOwner = userRole === "owner";
   const isViewer = userRole === "viewer" || publicRole === "viewer";
@@ -67,7 +67,7 @@ export default function SelectionBar({
       <span className="gd-selection-count">{selectedItems.size} selected</span>
 
       <div className="gd-selection-actions">
-        {!isTrashRoute && (
+        {!isTrashRoute && !isDeleted && (
           <>
             {showFileActions && (
               <button
@@ -88,13 +88,7 @@ export default function SelectionBar({
             </button>
           </>
         )}
-        {!isGoogleDriveRoute && (isOwner || canEdit) && !trashRoute && (
-          <button className="gd-sel-action-btn" title="Edit" onClick={onRename}>
-            <IconRename size={18} />
-          </button>
-        )}
-        {/* for google just show copy link */}
-        {!trashRoute && (
+        {!isDeleted && (
           <button
             className="gd-sel-action-btn"
             title="Copy link"
@@ -103,8 +97,14 @@ export default function SelectionBar({
             <IconLink size={18} />
           </button>
         )}
+        {!isGoogleDriveRoute && (isOwner || canEdit) && !isDeleted && (
+          <button className="gd-sel-action-btn" title="Edit" onClick={onRename}>
+            <IconRename size={18} />
+          </button>
+        )}
+        {/* for google just show copy link */}
 
-        {trashRoute && (
+        {isDeleted && (
           <>
             <button
               className="gd-sel-action-btn gd-sel-action-success"
@@ -113,10 +113,29 @@ export default function SelectionBar({
             >
               <IconRestore size={18} />
             </button>
+
             <button
               className="gd-sel-action-btn gd-sel-action-danger"
               title="Delete Forever"
-              onClick={onDeleteForever}
+              onClick={() => onDeleteForever(type)}
+            >
+              <IconTrash size={18} />
+            </button>
+          </>
+        )}
+        {isGoogleDriveRoute && (
+          <>
+            <button
+              className="gd-sel-action-btn"
+              title="Edit"
+              onClick={onRename}
+            >
+              <IconRename size={18} />
+            </button>
+            <button
+              className="gd-sel-action-btn gd-sel-action-danger"
+              title="Delete Forever"
+              onClick={() => onDeleteForever(type)}
             >
               <IconTrash size={18} />
             </button>

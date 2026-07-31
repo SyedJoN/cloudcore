@@ -39,6 +39,11 @@ import { useUploadQueue } from "../Hooks/useUploadQueue";
 import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu";
 import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES } from "../../Utils/displayUtils";
+import {
+  clearPendingDriveFile,
+  getPendingDriveFile,
+} from "../Components/Drive/PendingGoogleDriveFile";
+import { uploadGoogleDriveFile } from "../Components/Drive/uploadGoogleDriveFile";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -86,6 +91,7 @@ export default function DirectoryView({ route }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
+
   const dirContext =
     location.state?.dirContext ||
     (isTrashRoute
@@ -97,6 +103,8 @@ export default function DirectoryView({ route }) {
           : "root");
 
   const previousDirContext = useRef(dirContext);
+  const resumedDriveUploadRef = useRef(false);
+
   function showError(message, autoClear = false) {
     setError(message);
     if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
@@ -108,6 +116,12 @@ export default function DirectoryView({ route }) {
     previousDirContext.current = dirContext;
   }, [dirContext]);
 
+  useEffect(()=> {
+    if (!dirId) {
+      console.log('refresh')
+      refreshUser();
+    }
+  }, [dirId])
   const {
     directoryName,
     isDeleted,
@@ -133,8 +147,10 @@ export default function DirectoryView({ route }) {
     searchQuery,
   });
 
-  const refreshCurrentDirectory = () =>
-    getDirectoryItems(isSharedRoute ? "shared" : "root");
+  const refreshCurrentDirectory = (type = "") =>
+    getDirectoryItems(
+      type === "google" ? "google-drive" : isSharedRoute ? "shared" : "root",
+    );
 
   const {
     fileInputRef,
@@ -174,6 +190,30 @@ export default function DirectoryView({ route }) {
   useEffect(() => {
     checkGoogleDriveAccess();
   }, []);
+
+  useEffect(() => {
+    if (!isGoogleDrive || resumedDriveUploadRef.current) return;
+
+    const pending = getPendingDriveFile();
+    if (!pending) return;
+
+    resumedDriveUploadRef.current = true;
+    clearPendingDriveFile();
+
+    uploadGoogleDriveFile(pending, {
+      enqueueItem,
+      setItemProgress,
+      completeItem,
+      handleCancelUpload,
+      user,
+      refreshUser,
+      setDbFileId,
+      onUploadComplete: refreshCurrentDirectory,
+    }).catch((err) => {
+      console.error("Resumed Drive upload failed:", err);
+      showError("Couldn't finish uploading the file you picked from Drive.");
+    });
+  }, [isGoogleDrive]);
 
   useEffect(() => {
     if (dirId === "google-drive") getDirectoryItems("google-drive");
@@ -234,7 +274,7 @@ export default function DirectoryView({ route }) {
   }
 
   const handleRowDoubleClick = (type, id) => {
-  // clearSelection();
+    // clearSelection();
     if (type === "google-directory") {
       window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
       return;
@@ -290,13 +330,16 @@ export default function DirectoryView({ route }) {
     }
   }
 
-  async function handleDelete(item) {
+  async function handleDelete(item, type = "local") {
     try {
-      const url = item.isDirectory
-        ? `/directory/${item._id}`
-        : `/file/${item._id}`;
+      const url =
+        item?.isDirectory && type === "local"
+          ? `/directory/${item._id}`
+          : `/file/${item._id ?? item.id}?type=${type}`;
       await deleteFile(url);
-      getTrashItems(showError);
+      type === "google"
+        ? refreshCurrentDirectory("google")
+        : getTrashItems(showError);
       clearSelection();
     } catch (err) {
       showError(err.message);
@@ -321,8 +364,10 @@ export default function DirectoryView({ route }) {
   }
 
   function openRename(item) {
-    setRenameType(item.isDirectory ? "directory" : "file");
-    setRenameId(item._id);
+    setRenameType(
+      item?.webViewLink ? "google" : item.isDirectory ? "directory" : "file",
+    );
+    setRenameId(item._id ?? item.id);
     setRenameValue(item.name);
     setShowRename(true);
   }
@@ -332,15 +377,19 @@ export default function DirectoryView({ route }) {
     showError("");
     try {
       const url =
-        renameType === "file" ? `/file/${renameId}` : `/directory/${renameId}`;
+        renameType === "file" || "google"
+          ? `/file/${renameId}?type=${renameType}`
+          : `/directory/${renameId}`;
       const body =
-        renameType === "file"
+        renameType === "google"
           ? { fileName: renameValue }
-          : { newDirName: renameValue };
+          : renameType === "file"
+            ? { fileName: renameValue }
+            : { newDirName: renameValue };
 
       await axiosWithCreds.patch(url, body);
       setShowRename(false);
-      refreshCurrentDirectory();
+      refreshCurrentDirectory(renameType);
     } catch (err) {
       showError(err.message);
     }
@@ -658,10 +707,10 @@ export default function DirectoryView({ route }) {
             if (item) handleMoveToTrash(item);
           });
         }}
-        onDeleteForever={() => {
+        onDeleteForever={(type) => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleDelete(item);
+            if (item) handleDelete(item, type);
           });
         }}
       />
@@ -684,7 +733,7 @@ export default function DirectoryView({ route }) {
         onShare={(item) => setShareItem(item)}
         onRename={(item) => openRename(item)}
         onSoftDelete={(item) => handleMoveToTrash(item)}
-        onDelete={(item) => handleDelete(item)}
+        onDelete={(item, type) => handleDelete(item, type)}
         onRestore={(item) => handleRestoreItem(item)}
         onDownload={(item) => handleDownload(item)}
         onPreview={(item) => setViewItem(item)}
@@ -694,6 +743,7 @@ export default function DirectoryView({ route }) {
         <FileViewer
           key={viewItem._id}
           item={viewItem}
+          isDeleted={isDeleted}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
@@ -708,6 +758,14 @@ export default function DirectoryView({ route }) {
           }}
           onSoftDelete={(item) => {
             handleMoveToTrash(item);
+            setViewItem(null);
+          }}
+          onDelete={(item, type) => {
+            handleDelete(item, type);
+            setViewItem(null);
+          }}
+          onRestore={(item) => {
+            handleRestoreItem(item);
             setViewItem(null);
           }}
           onDownload={handleDownload}

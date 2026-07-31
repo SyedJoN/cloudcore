@@ -1,26 +1,12 @@
 import React from "react";
+import { redirectToGoogleDriveAuth } from "../../Hooks/useGoogleDriveAuth";
 
-function GoogleDriveBtn({classNames = "", width=24, height=24}) {
- 
-const handleDriveBtn = async () => {
-    try {
-         const params = new URLSearchParams({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      redirect_uri: "http://localhost:4000/auth/google-drive/callback",
-      response_type: "code",
-      access_type: "offline", // allows refresh token
-      scope: "https://www.googleapis.com/auth/drive",
-      prompt: "consent", // forces consent screen to get refresh token
-    });
-    
-     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-        window.location.href = authUrl;  
-    } catch (error) {
-        console.log(error);
-    }
-}
+function GoogleDriveBtn({ classNames = "", width = 24, height = 24 }) {
   return (
-    <div onClick={async ()=> handleDriveBtn()} className={`google-drive whitespace-nowrap ${classNames}`}>
+    <div
+      onClick={async () => redirectToGoogleDriveAuth()}
+      className={`google-drive whitespace-nowrap ${classNames}`}
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 256 229"

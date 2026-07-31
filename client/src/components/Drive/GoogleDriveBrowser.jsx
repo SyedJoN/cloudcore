@@ -2,13 +2,13 @@ import {
   DrivePicker,
   DrivePickerDocsView,
 } from "@googleworkspace/drive-picker-react";
-import {
-  getSignedUploadUrl,
-  notifyBackend,
-  uploadDriveFileToS3,
-} from "../../../apis/fileApi";
 import { useAuth, useGDrive, useToast } from "../../Contexts";
+
+import { uploadGoogleDriveFile } from "./uploadGoogleDriveFile"; // adjust to your actual path
+import { savePendingDriveFile } from "./PendingGoogleDriveFile";
 import { redirectToGoogleDriveAuth } from "../../Hooks/useGoogleDriveAuth";
+
+
 function GoogleDriveBrowser({
   open,
   setOpen,
@@ -23,6 +23,7 @@ function GoogleDriveBrowser({
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const { isGoogleDrive } = useGDrive();
+
   if (!open) return null;
 
   return (
@@ -31,81 +32,52 @@ function GoogleDriveBrowser({
       app-id={import.meta.env.VITE_GOOGLE_APP_ID}
       scope="https://www.googleapis.com/auth/drive.readonly"
       onPicked={async (e) => {
-        if (!isGoogleDrive) {
-          redirectToGoogleDriveAuth();
-          return;
-        }
         const selected = e.detail.docs[0];
-        const { id, name, sizeBytes: size, mimeType: contentType } = selected;
-        const type = "google";
+        const pickedFile = {
+          id: selected.id,
+          name: selected.name,
+          size: selected.sizeBytes,
+          contentType: selected.mimeType,
+        };
 
         if (user.uploadLimit !== null && user.uploadLimit == 0) {
           toast({
-            message:
-              "Uploads are paused. Please complete your payment to continue",
+            message: "Uploads are paused. Please complete your payment to continue",
             type: "warning",
           });
           return;
         }
 
-        if (size >= user.uploadLimit) {
+        if (pickedFile.size >= user.uploadLimit) {
           showError("Max upload size limit reached!");
           return;
         }
 
-        // Show it in the tray immediately, same shape as a normal queue item.
-        enqueueItem({ _id: id, name, size });
+        if (!isGoogleDrive) {
+          savePendingDriveFile(pickedFile);
+          setOpen(false);
+          redirectToGoogleDriveAuth();
+          return;
+        }
+
+        setOpen(false);
 
         try {
-          const { uploadUrl, fileId } = await getSignedUploadUrl({
-            name,
-            size,
-            contentType,
-            type,
+          await uploadGoogleDriveFile(pickedFile, {
+            enqueueItem,
+            setItemProgress,
+            completeItem,
+            handleCancelUpload,
+            setDbFileId,
+            refreshUser,
+            onUploadComplete,
           });
-          setDbFileId(fileId);
-
-          const response = await uploadDriveFileToS3(fileId, id);
-          const bytes = new Uint8Array(response.data.buffer.data);
-
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", uploadUrl);
-          xhr.withCredentials = true;
-
-          xhr.upload.addEventListener("progress", (evt) => {
-            if (evt.lengthComputable) {
-              setItemProgress(id, (evt.loaded / evt.total) * 100);
-            }
-          });
-
-          xhr.onload = async () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              await notifyBackend(fileId);
-              await refreshUser();
-              completeItem(id);
-              onUploadComplete?.();
-            } else {
-              console.error("Upload failed:", xhr.status, xhr.responseText);
-              await handleCancelUpload(id, fileId);
-            }
-          };
-
-          xhr.addEventListener("error", async () => {
-            console.error("Network error during upload");
-            await handleCancelUpload(id, fileId);
-          });
-
-          xhr.addEventListener("abort", () => {
-            console.warn("Upload aborted");
-          });
-
-          xhr.setRequestHeader("Content-Type", contentType);
-          xhr.send(bytes);
         } catch (error) {
-          console.error("err", error);
-          await handleCancelUpload(id);
-        } finally {
-          setOpen(false);
+          const status = error?.response?.status;
+          if (status === 401 || status === 403) {
+            savePendingDriveFile(pickedFile);
+            redirectToGoogleDriveAuth();
+          }
         }
       }}
       onCanceled={() => {

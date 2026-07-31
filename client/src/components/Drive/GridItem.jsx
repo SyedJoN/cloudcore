@@ -19,21 +19,21 @@ export default function GridItem({
   onContextMenu,
 }) {
 
-  const isGDrive = dirId === "google-drive";
   const [hasImgError, setHasImgError] = useState(false);
+  const isGDrive = dirId === "google-drive";
   const location = useLocation();
-
+  
   const isDriveRoute = location.pathname.endsWith('/')
   const type = item.isDirectory
-    ? isGDrive ? "google-directory" : "directory"
+  ? isGDrive ? "google-directory" : "directory"
     : isGDrive ? "google-file"      : "file";
-  const iconType = item.isDirectory ? null : getFileType(item.name);
-  const itemId = item.id ?? item._id;
-
+    const iconType = item.isDirectory ? null : getFileType(item.name);
+    const itemId = item.id ?? item._id;
+    
   const avatarEl =
-    avatar && !hasImgError ? (
+  avatar && !hasImgError ? (
       <img src={avatar} alt={owner} onError={() => setHasImgError(true)}
-        style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+      style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", display: "block" }} />
     ) : (
       <span className="gd-avatar"
         style={{ width: 24, height: 24, background: getColor(owner), cursor: "pointer", userSelect: "none" }}>

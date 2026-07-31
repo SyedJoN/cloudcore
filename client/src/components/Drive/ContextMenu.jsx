@@ -27,8 +27,8 @@ function useTransitionClass(open, onExited) {
   }, [open]);
 
   function onTransitionEnd(e) {
-    if (e.target !== nodeRef.current) return; 
-    if (e.propertyName !== "transform") return; 
+    if (e.target !== nodeRef.current) return;
+    if (e.propertyName !== "transform") return;
     if (!open) onExited?.();
   }
 
@@ -47,7 +47,8 @@ function useSelfMountedTransition(open) {
 }
 
 function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
-  const { mounted, animate, nodeRef, onTransitionEnd } = useSelfMountedTransition(open);
+  const { mounted, animate, nodeRef, onTransitionEnd } =
+    useSelfMountedTransition(open);
 
   if (!mounted) return null;
 
@@ -58,7 +59,7 @@ function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
       className={`gd-context-menu gd-context-submenu min-w-45 lg:min-w-75 ${
         openLeft ? "right-75" : "left-full"
       } ${animate ? "open" : ""}`}
-      style={{ position: "absolute", top: 0, zIndex: 1001}}
+      style={{ position: "absolute", top: 0, zIndex: 1001 }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -68,12 +69,12 @@ function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
 }
 const SUBMENU_OPEN_DELAY = 150;
 const SUBMENU_CLOSE_DELAY = 120;
- 
+
 function useHoverIntent(setOpen) {
   const timerRef = useRef(null);
- 
+
   useEffect(() => () => clearTimeout(timerRef.current), []);
- 
+
   return {
     onMouseEnter: () => {
       clearTimeout(timerRef.current);
@@ -106,11 +107,15 @@ function ContextMenuContent({
 }) {
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
-   const openWithHover = useHoverIntent(setShowOpenWith);
+  const openWithHover = useHoverIntent(setShowOpenWith);
   const shareHover = useHoverIntent(setShowShare);
-  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open, onExited);
+  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(
+    open,
+    onExited,
+  );
   const { toast } = useToast();
 
+  const type = item?.webViewLink ? "google" : "";
   const isOwner = item?.userRole === "owner";
   const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
   const canEdit = isOwner || !isViewer;
@@ -131,10 +136,12 @@ function ContextMenuContent({
     return () => document.removeEventListener("click", handleClick, true);
   }, [onClose]);
 
-  const close = (action) => (...args) => {
-    action?.(...args);
-    onClose();
-  };
+  const close =
+    (action) =>
+    (...args) => {
+      action?.(...args);
+      onClose();
+    };
 
   function handleCopyLink() {
     const url =
@@ -161,23 +168,29 @@ function ContextMenuContent({
       className={`gd-context-menu jon ${animate ? "open" : ""}`}
       style={{ left: position.x, top: position.y, zIndex: 1000 }}
       onClick={(e) => e.stopPropagation()}
-      onContextMenu={(e)=> e.preventDefault()}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {showDeleteActions ? (
         <>
-          <button className="gd-context-item" onClick={close(() => onRestore(item))}>
+          <button
+            className="gd-context-item"
+            onClick={close(() => onRestore(item))}
+          >
             <IconRestore size={18} />
             Restore
           </button>
           <div className="gd-context-divider" />
-          <button className="gd-context-item danger" onClick={close(() => onDelete(item))}>
+          <button
+            className="gd-context-item danger"
+            onClick={close(() => onDelete(item, type))}
+          >
             <IconTrash size={18} /> Delete forever
           </button>
         </>
       ) : (
         <div>
           {/* Open with */}
-          {showFileActions && (
+          {showFileActions && !isDeleted && (
             <div style={{ position: "relative" }}>
               <button
                 className="gd-context-item"
@@ -192,13 +205,19 @@ function ContextMenuContent({
               <SubMenu
                 open={showOpenWith}
                 openLeft={openLeft}
-              onMouseEnter={openWithHover.onMouseEnter}
+                onMouseEnter={openWithHover.onMouseEnter}
                 onMouseLeave={openWithHover.onMouseLeave}
               >
-                <button className="gd-context-item" onClick={close(() => onPreview(item))}>
+                <button
+                  className="gd-context-item"
+                  onClick={close(() => onPreview(item))}
+                >
                   <IconPreview size={18} /> Preview
                 </button>
-                <button className="gd-context-item" onClick={handleOpenInNewTab}>
+                <button
+                  className="gd-context-item"
+                  onClick={handleOpenInNewTab}
+                >
                   <IconNewTab size={18} /> Open in new tab
                 </button>
               </SubMenu>
@@ -207,58 +226,97 @@ function ContextMenuContent({
 
           {/* Share / copy link */}
           <div style={{ position: "relative" }}>
-         {
-              item && (
-                <>
+            {item && !isDeleted && (
+              <>
+                <button
+                  className="gd-context-item"
+                  onMouseEnter={shareHover.onMouseEnter}
+                  onMouseLeave={shareHover.onMouseLeave}
+                >
+                  <IconShare size={18} />
+                  <span style={{ flex: 1 }}>Share</span>
+                  <IconChevronRight size={16} />
+                </button>
+
+                <SubMenu
+                  open={showShare}
+                  openLeft={openLeft}
+                  onMouseEnter={shareHover.onMouseEnter}
+                  onMouseLeave={shareHover.onMouseLeave}
+                >
                   <button
                     className="gd-context-item"
-                    onMouseEnter={shareHover.onMouseEnter}
-                    onMouseLeave={shareHover.onMouseLeave}
+                    onClick={close(() => onShare(item))}
                   >
-                    <IconShare size={18} />
-                    <span style={{ flex: 1 }}>Share</span>
-                    <IconChevronRight size={16} />
+                    <IconShare size={18} /> Share
                   </button>
 
-                  <SubMenu
-                    open={showShare}
-                    openLeft={openLeft}
-                     onMouseEnter={shareHover.onMouseEnter}
-                    onMouseLeave={shareHover.onMouseLeave}
-                  >
-                    {canEdit && (
-                      <button className="gd-context-item" onClick={close(() => onShare(item))}>
-                        <IconShare size={18} /> Share
-                      </button>
-                    )}
-                    <button className="gd-context-item" onClick={handleCopyLink}>
-                      <IconLink size={18} />
-                      Copy link
-                    </button>
-                  </SubMenu>
-                </>
-              )
-}
+                  <button className="gd-context-item" onClick={handleCopyLink}>
+                    <IconLink size={18} />
+                    Copy link
+                  </button>
+                </SubMenu>
+              </>
+            )}
           </div>
 
           {/* Download */}
-          {showFileActions && (
-            <button className="gd-context-item" onClick={close(() => onDownload(item))}>
+          {showFileActions && !isDeleted && (
+            <button
+              className="gd-context-item"
+              onClick={close(() => onDownload(item))}
+            >
               <IconDownload size={18} /> Download
             </button>
           )}
 
           {/* Rename / trash */}
-          {!isGoogleDriveRoute && canEdit && item && (
+          {canEdit && item && !isDeleted && (
             <>
-              <button className="gd-context-item" onClick={close(() => onRename(item))}>
+              <button
+                className="gd-context-item"
+                onClick={close(() => onRename(item))}
+              >
                 <IconRename size={18} /> Rename
               </button>
               <div className="gd-context-divider" />
-              <button className="gd-context-item danger" onClick={close(() => onSoftDelete(item))}>
-                <IconTrash size={18} /> Move to trash
+            </>
+          )}
+          {canEdit && isDeleted && (
+            <>
+              <button
+                className="gd-context-item"
+                onClick={close(() => onRestore(item))}
+              >
+                <IconRestore size={18} />
+                Restore
+              </button>
+              <div className="gd-context-divider" />
+
+              <button
+                className="gd-context-item danger"
+                onClick={close(() => onDelete(item, type))}
+              >
+                <IconTrash size={18} /> Delete Forever
               </button>
             </>
+          )}
+          {isGoogleDriveRoute &&
+               <button
+                className="gd-context-item danger"
+                onClick={close(() => onDelete(item, type))}
+                
+              >
+                <IconTrash size={18} /> Delete Forever
+              </button>
+          }
+          {canEdit && item && !isDeleted && !isGoogleDriveRoute && (
+            <button
+              className="gd-context-item danger"
+              onClick={close(() => onSoftDelete(item))}
+            >
+              <IconTrash size={18} /> Move to trash
+            </button>
           )}
         </div>
       )}
@@ -268,16 +326,19 @@ function ContextMenuContent({
 
 export default function ContextMenu({ open, item, position, ...rest }) {
   const [mounted, setMounted] = useState(false);
-  const [render, setRender] = useState({ item: null, position: null, key: null });
+  const [render, setRender] = useState({
+    item: null,
+    position: null,
+    key: null,
+  });
 
   useEffect(() => {
-
     if (!open || !item) return;
     const instanceKey = `${position.x},${position.y},${item?._id ?? ""},${
       item?.isDirectory ? "dir" : "file"
     }`;
     setRender((prev) =>
-      prev.key === instanceKey ? prev : { item, position, key: instanceKey }
+      prev.key === instanceKey ? prev : { item, position, key: instanceKey },
     );
     setMounted(true);
   }, [open, item, position]);
@@ -293,6 +354,6 @@ export default function ContextMenu({ open, item, position, ...rest }) {
       onExited={() => setMounted(false)}
       {...rest}
     />,
-    document.body
+    document.body,
   );
 }

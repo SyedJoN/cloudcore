@@ -29,9 +29,11 @@ export default function ListRow({
 
   return (
     <div
-      className={`gd-list-row${selected ? " selected" : ""}`}
-      onClick={() => onRowClick(type, itemId)}
-      onDoubleClick={() => onDoubleClick?.(type, itemId)}
+      className={`gd-list-row ${selected ? "selected" : ""}`}
+      data-id={itemId}
+      onClick={() => onRowClick(itemId)}
+            onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
+
       onContextMenu={(e) => {
         e.preventDefault();
         onSelect?.(itemId);
