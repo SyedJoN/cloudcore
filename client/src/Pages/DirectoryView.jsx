@@ -73,6 +73,7 @@ export default function DirectoryView({ route }) {
     route === "shared" || params.get("usp") === "drive_link";
   const isTrashRoute = route === "trash";
   const isGoogleDriveRoute = location.pathname.endsWith("/google-drive");
+  const isRecentRoute = route === "recent";
   // const [dirContext, setDirContext] = useState("home");
 
   const navigate = useNavigate();
@@ -98,10 +99,11 @@ export default function DirectoryView({ route }) {
       ? "trash"
       : isSharedRoute
         ? "shared"
-        : isHomeRoute
-          ? "home"
-          : "root");
-
+        : isRecentRoute
+          ? "recent"
+          : isHomeRoute
+            ? "home"
+            : "root");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
 
@@ -116,12 +118,12 @@ export default function DirectoryView({ route }) {
     previousDirContext.current = dirContext;
   }, [dirContext]);
 
-  useEffect(()=> {
+  useEffect(() => {
     if (!dirId) {
-      console.log('refresh')
+      console.log("refresh");
       refreshUser();
     }
-  }, [dirId])
+  }, [dirId]);
   const {
     directoryName,
     isDeleted,
@@ -140,6 +142,7 @@ export default function DirectoryView({ route }) {
     dirId,
     dirContext,
     isSharedRoute,
+    isRecentRoute,
     isTrashRoute,
     isGoogleDriveRoute,
     setIsGoogleDrive,
@@ -218,6 +221,7 @@ export default function DirectoryView({ route }) {
   useEffect(() => {
     if (dirId === "google-drive") getDirectoryItems("google-drive");
     else if (dirContext === "trash" || isTrashRoute) getDirectoryItems("trash");
+    else if (isRecentRoute) getDirectoryItems("recent");
     else if (isSharedRoute) getDirectoryItems("shared");
     else {
       getDirectoryItems("root");
@@ -522,6 +526,7 @@ export default function DirectoryView({ route }) {
             dirId={dirId}
             isHomeRoute={isHomeRoute}
             isSharedRoute={isSharedRoute}
+            isRecentRoute={isRecentRoute}
             isTrashRoute={isTrashRoute}
             onCreateFolder={() => setShowCreateDir(true)}
             onUploadFiles={() => fileInputRef.current?.click()}
@@ -597,8 +602,8 @@ export default function DirectoryView({ route }) {
                 {combinedItems.length === 0 && !dirId && (
                   <DirectoryEmptyState />
                 )}
-
-                <DirectoryItemCollection
+                {!isRecentRoute && 
+                  <DirectoryItemCollection
                   items={filteredDirs}
                   label="Folders"
                   viewMode={viewMode}
@@ -610,21 +615,23 @@ export default function DirectoryView({ route }) {
                   onContextMenu={handleContextMenu}
                   listHeaderRow={listHeaderRow}
                 />
-
-                <DirectoryItemCollection
-                  items={filteredFiles}
-                  label="Files"
-                  viewMode={viewMode}
-                  dirId={dirId}
-                  selectedItems={selectedItems}
-                  onSelect={handleSelect}
-                  onRowClick={handleRowClick}
-                  onDoubleClick={handleRowDoubleClick}
-                  onContextMenu={handleContextMenu}
-                  listHeaderRow={listHeaderRow}
-                  showListHeader={!filteredDirs.length}
-                  sectionStyle={{ marginTop: filteredDirs.length ? 16 : 0 }}
-                />
+                }
+           
+                  <DirectoryItemCollection
+                    items={filteredFiles}
+                    label="Files"
+                    viewMode={viewMode}
+                    dirId={dirId}
+                    selectedItems={selectedItems}
+                    onSelect={handleSelect}
+                    onRowClick={handleRowClick}
+                    onDoubleClick={handleRowDoubleClick}
+                    onContextMenu={handleContextMenu}
+                    listHeaderRow={listHeaderRow}
+                    showListHeader={!filteredDirs.length}
+                    sectionStyle={{ marginTop: filteredDirs.length ? 16 : 0 }}
+                  />
+             
               </>
             )}
           </main>

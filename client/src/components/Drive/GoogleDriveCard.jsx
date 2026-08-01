@@ -7,7 +7,7 @@ export default function GoogleDriveCard({ onOpen }) {
 
       <div className="gd-grid" style={{ marginBottom: 8 }}>
         <div className="gd-grid-item" onClick={onOpen} style={{ cursor: "pointer" }}>
-          <div className="gd-grid-item-preview">
+          <div className="gd-grid-item-preview h-41.75">
             <GoogleDriveSVG size={48} />
           </div>
           <div style={{ display: "flex", alignItems: "center", padding: "10px 8px 10px 12px", gap: 8 }}>

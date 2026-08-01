@@ -70,7 +70,10 @@ export async function revokeFileAccess(type, fileId, userId, relation) {
   return data.message;
 }
 
-
+export async function getRecentFiles() {
+  const response = await axiosWithCreds.get(`/file/recent-files`);
+  return response;
+}
 export async function fetchUserFiles() {
   const { data } = await axiosWithCreds.get(`/file/user-files`);
 

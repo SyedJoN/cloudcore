@@ -31,7 +31,7 @@ export default function SelectionBar({
   const item = combinedItems.find((item) =>
     selectedItems.has(item.id ?? item._id),
   );
-  const type = item?.webViewLink ? "google" : "";
+  const type = item?.webViewLink ? "google" : "local";
   const userRole = item?.userRole;
   const isFile = !item?.isDirectory;
   const publicRole = item?.publicRole;

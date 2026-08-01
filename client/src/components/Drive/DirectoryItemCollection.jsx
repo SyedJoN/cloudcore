@@ -29,21 +29,26 @@ export default function DirectoryItemCollection({
       {viewMode === "list" && showListHeader && listHeaderRow}
 
       <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
-        {items.map((item) => (
-          <ItemComponent
-            key={item.id || item._id}
-            item={item}
-            dirId={dirId}
-            avatar={item.userId?.avatar}
-            owner={item.userId?.name}
-            selected={selectedItems.has(item.id ?? item._id)}
-            onSelect={onSelect}
-            selectionActive={selectedItems.size > 0}
-            onRowClick={onRowClick}
-            onDoubleClick={onDoubleClick}
-            onContextMenu={onContextMenu}
-          />
-        ))}
+        {[...items]
+          .sort(
+            (a, b) =>
+              new Date(b.viewedByMeTime || 0) - new Date(a.viewedByMeTime || 0),
+          )
+          .map((item) => (
+            <ItemComponent
+              key={item.id ?? item._id}
+              item={item}
+              dirId={dirId}
+              avatar={item.userId?.avatar}
+              owner={item.userId?.name}
+              selected={selectedItems.has(item.id ?? item._id)}
+              onSelect={onSelect}
+              selectionActive={selectedItems.size > 0}
+              onRowClick={onRowClick}
+              onDoubleClick={onDoubleClick}
+              onContextMenu={onContextMenu}
+            />
+          ))}
       </div>
     </>
   );

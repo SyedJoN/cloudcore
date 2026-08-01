@@ -1,11 +1,11 @@
 import {
   getDirectory,
   getGoogleDrive,
-  getRecent,
   getRootDirectory,
   getSharedItems,
   getTrash,
 } from "../apis/directoryApi2";
+import { getRecentFiles } from "../apis/fileApi";
 
 export const driveConfig = {
   root: {
@@ -18,7 +18,7 @@ export const driveConfig = {
     fetch: getSharedItems,
   },
   recent: {
-    fetch: getRecent,
+    fetch: getRecentFiles,
   },
   trash: {
     fetch: getTrash,

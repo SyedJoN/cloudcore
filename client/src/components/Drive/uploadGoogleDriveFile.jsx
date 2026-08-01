@@ -31,7 +31,7 @@ export async function uploadGoogleDriveFile(
 
       xhr.onload = async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          await notifyBackend(fileId);
+          await notifyBackend(S3fileId);
           await refreshUser();
           completeItem(id);
           onUploadComplete?.();
@@ -45,7 +45,7 @@ export async function uploadGoogleDriveFile(
 
       xhr.addEventListener("error", async () => {
         console.error("Network error during upload");
-        await handleCancelUpload(id, fileId);
+        await handleCancelUpload(id, S3fileId);
         reject(new Error("Network error during upload"));
       });
 
@@ -63,7 +63,7 @@ export async function uploadGoogleDriveFile(
       throw error;
     }
     console.error("Drive upload error:", error);
-    await handleCancelUpload(id, fileId);
+    await handleCancelUpload(id, S3fileId);
     throw error;
   }
 }

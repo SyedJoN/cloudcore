@@ -115,7 +115,7 @@ function ContextMenuContent({
   );
   const { toast } = useToast();
 
-  const type = item?.webViewLink ? "google" : "";
+  const type = item?.webViewLink ? "google" : "local";
   const isOwner = item?.userRole === "owner";
   const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
   const canEdit = isOwner || !isViewer;

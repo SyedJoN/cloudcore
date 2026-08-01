@@ -270,7 +270,6 @@ export const getFileById = async (req, res, next) => {
     }
 
     res.setHeader("Content-Type", s3Response.ContentType || "text/plain");
-    file.lastInteractedAt = new Date();
     await file.save();
     return s3Response.Body.pipe(res);
   } catch (error) {
@@ -395,12 +394,11 @@ export const getRecentFiles = async (req, res, next) => {
       isDeleted: false,
     })
       .sort({ lastInteractedAt: -1 })
-      .limit(20);
-    if (!recentFiles) {
+    if (!recentFiles.length) {
       return res.status(400).json({ message: "No Files found", files: [] });
     }
     return res.status(200).json({
-      files: [...recentFiles],
+      files: recentFiles,
     });
   } catch (error) {
     next(error);
@@ -512,7 +510,6 @@ export const updateFile = async (req, res, next) => {
 // ── helper ────────────────────────────────────────────────────────────────────
 const performRename = async (file, fileId, fileName, res) => {
   console.log("fileName", fileName);
-  file.lastInteractedAt = new Date();
   await file.save();
   const ext = file.extension;
 

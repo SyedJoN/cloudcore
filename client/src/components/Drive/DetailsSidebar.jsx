@@ -1,5 +1,6 @@
 // components/DetailsSidebar.jsx
 import { formatSize } from "../../../Utils/formatHelpers";
+import { useAuth } from "../../Contexts";
 import FilePreview from "../File/FilePreview";
 import { IconClose, IconFolder, IconShare } from "../Icons/Icons";
 
@@ -19,6 +20,7 @@ export default function DetailsSidebar({
   selectedItemSize,
   userEmail,
 }) {
+  const {user} = useAuth();
   if (!item && selectedItemSize < 1)
     return (
       <aside className="gd-details-sidebar gd-details-empty">
@@ -75,7 +77,7 @@ export default function DetailsSidebar({
   }
   const isDir = item.isDirectory;
   const owner =
-    userEmail === item.userId?.email || item.owners[0]?.emailAddress ? "Me" : item.userId?.name || item.owners[0].displayName || "—";
+    userEmail === item.userId?.email || (item.owners[0]?.emailAddress === user.email) ? "Me" : item.userId?.name || item.owners[0].displayName || "—";
   const size = formatSize(item.size);
   const modified = formatDate(item.updatedAt || item.modifiedTime);
   const created = formatDate(item.createdAt || item.createdTime);

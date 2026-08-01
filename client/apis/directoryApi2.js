@@ -14,10 +14,7 @@ export async function getTrash(dirId) {
   const response = await axiosWithCreds.get(`/trash/${dirId || ""}`)
   return response;
 }
-export async function getRecent() {
-  const response = await axiosWithCreds.get('/directory/recent');
-  return response;
-}
+
 export async function getGoogleDrive() {
   const response = await axiosWithCreds.get('/auth/google-drive/files');
   return response;

@@ -152,6 +152,7 @@ function GDrivePicker({
 export default function DriveSidebar({
   dirId,
   isHomeRoute,
+  isRecentRoute,
   isSharedRoute,
   isTrashRoute,
   disabled,
@@ -177,7 +178,7 @@ export default function DriveSidebar({
   const isMyDriveActive =
     !isHomeRoute &&
     !isSharedRoute &&
-    !isTrashRoute &&
+    !isTrashRoute && !isRecentRoute &&
     dirId !== "google-drive" &&
     !dirId;
 
@@ -199,7 +200,7 @@ export default function DriveSidebar({
           </svg>
           New
         </button>
-    
+
         {showNewMenu && (
           <NewMenu
             anchorRef={newBtnRef}
@@ -272,7 +273,10 @@ export default function DriveSidebar({
           Shared with me
         </button>
 
-        <button className="gd-nav-item">
+        <button
+          className={`gd-nav-item ${isRecentRoute ? "active" : ""}`}
+          onClick={() => navigate("/recent")}
+        >
           <History size={20} /> Recent
         </button>
 

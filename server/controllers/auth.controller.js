@@ -737,7 +737,8 @@ export const fetchGoogleDriveFiles = async (req, res, next) => {
     const drive = getDriveClient(drive_access_token);
 
     const response = await drive.files.list({
-      pageSize: 10,
+      
+      pageSize: 1000,
       fields:
         "files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,permissions(type,role,allowFileDiscovery))",
     });

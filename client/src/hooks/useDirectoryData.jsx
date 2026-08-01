@@ -7,15 +7,16 @@ import { useGDrive } from "../Contexts";
 const isRootName = (n) => (n ?? "").startsWith("root");
 
 export function useDirectoryData({
-  route = "",
-  dirId = "",
-  dirContext = "",
-  isSharedRoute = "",
-  isTrashRoute = "",
-  isGoogleDriveRoute = "",
-  setIsGoogleDrive = "",
-  navigate = "",
-  searchQuery = "",
+  route,
+  dirId,
+  dirContext,
+  isSharedRoute,
+  isRecentRoute,
+  isTrashRoute,
+  isGoogleDriveRoute,
+  setIsGoogleDrive,
+  navigate,
+  searchQuery,
 }) {
   const { isGoogleDrive } = useGDrive();
   const [directoryName, setDirectoryName] = useState("My Drive");
@@ -45,7 +46,7 @@ export function useDirectoryData({
             ? "Shared with me"
             : dirId === "google-drive"
               ? "Google Drive"
-              : data.name;
+              : data?.name;
 
         setDirectoryName(name);
 
@@ -61,22 +62,19 @@ export function useDirectoryData({
           : {};
         setCrumbs([...cleanPath, currentCrumb]);
 
-        if (!data?.directories || !data?.files) return;
+        if (!isRecentRoute ? !data?.directories || !data?.files : !data?.files)
+          return;
 
         if (isGoogleDrive && isGoogleDriveRoute) {
           const directories = data.directories?.map((directory) => {
             const publicPermission = directory.permissions?.find(
               (p) => p.type === "anyone" && p.allowFileDiscovery === false,
             );
-            const directoryOwnerData = {
-              name: directory.owners[0].displayName,
-              avatar: directory.owners[0].photoLink,
-            };
+ 
             return {
               ...directory,
               isPublic: !!publicPermission,
               publicRole: publicPermission?.role || null,
-              userId: directoryOwnerData,
             };
           });
 
@@ -84,15 +82,11 @@ export function useDirectoryData({
             const publicPermission = file.permissions?.find(
               (p) => p.type === "anyone" && p.allowFileDiscovery === false,
             );
-            const fileOwnerData = {
-              name: file.owners[0].displayName,
-              avatar: file.owners[0].photoLink,
-            };
+      
             return {
               ...file,
               isPublic: !!publicPermission,
               publicRole: publicPermission?.role || null,
-              userId: fileOwnerData,
             };
           });
 
@@ -101,10 +95,14 @@ export function useDirectoryData({
           return;
         }
         setIsDeleted(
-          data.directories.some((d) => d.isDeleted) ||
-            data.files.some((f) => f.isDeleted),
+          !isRecentRoute
+            ? data.directories.some((d) => d.isDeleted) ||
+                data.files.some((f) => f.isDeleted)
+            : data.files.some((f) => f.isDeleted),
         );
-        setDirectoriesList([...data.directories].reverse());
+        if (!isRecentRoute) {
+          setDirectoriesList([...data.directories].reverse());
+        }
         setFilesList([...data.files].reverse());
       } catch (err) {
         if (isGoogleDrive) setIsGoogleDrive(false);
