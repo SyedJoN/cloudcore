@@ -3,6 +3,7 @@ import FileBadge from "../File/FileBadge";
 import { getFileType } from "../../../Utils/displayUtils";
 import { formatDate } from "../../../Utils/formatDate";
 import { formatSize } from "../../../Utils/formatHelpers";
+import { useGDrive } from "../../Contexts";
 
 export default function ListRow({
   item,
@@ -14,12 +15,14 @@ export default function ListRow({
   onSelect,
   onContextMenu,
 }) {
-  const isGDrive = dirId === "google-drive";
+  const { isGoogleDrive } = useGDrive();
+  const isGoogleDriveRoute = location.pathname.endsWith("/google-drive");
+
   const type = item.isDirectory
-    ? isGDrive
+    ? isGoogleDrive && isGoogleDriveRoute
       ? "google-directory"
       : "directory"
-    : isGDrive
+    : isGoogleDrive && isGoogleDriveRoute
       ? "google-file"
       : "file";
   const iconType = item.isDirectory ? null : getFileType(item.name);
@@ -32,8 +35,7 @@ export default function ListRow({
       className={`gd-list-row ${selected ? "selected" : ""}`}
       data-id={itemId}
       onClick={() => onRowClick(itemId)}
-            onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
-
+      onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
       onContextMenu={(e) => {
         e.preventDefault();
         onSelect?.(itemId);

@@ -1,4 +1,4 @@
-export default function DirectoryEmptyState() {
+export default function DriveEmptyState() {
   return (
     <div className="gd-empty">
       <svg width="120" height="120" viewBox="0 0 200 200" fill="none">

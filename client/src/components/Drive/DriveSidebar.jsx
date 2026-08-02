@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   HomeIcon,
   InboxStackIcon,
@@ -26,6 +26,57 @@ import { useAuth, useGDrive } from "../../Contexts";
 import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import GoogleDriveBrowser from "./GoogleDriveBrowser";
 import CircularLoader from "../Loaders/CircularLoader";
+
+const NAV_ITEMS = [
+  {
+    key: "google-drive",
+    label: "Google Drive",
+    path: "/google-drive",
+    Icon: GoogleDriveSVG,
+    IconSolid: GoogleDriveSVG,
+    isActive: ({ dirContext, dirId }) => dirContext === "google-drive",
+  },
+  {
+    key: "home",
+    label: "Home",
+    path: "/home",
+    Icon: HomeIcon,
+    IconSolid: HomeIconSolid,
+    isActive: ({ dirContext }) => dirContext === "home",
+  },
+  {
+    key: "root",
+    label: "My Drive",
+    path: "/",
+    Icon: InboxStackIcon,
+    IconSolid: InboxStackIconSolid,
+    isActive: ({ dirContext, dirId }) => dirContext === "root" && !dirId,
+  },
+  {
+    key: "shared",
+    label: "Shared with me",
+    path: "/shared",
+    Icon: ShareIcon,
+    IconSolid: ShareIconSolid,
+    isActive: ({ dirContext, dirId }) => dirContext === "shared" && !dirId,
+  },
+  {
+    key: "recent",
+    label: "Recent",
+    path: "/recent",
+    Icon: History,
+    IconSolid: History,
+    isActive: ({ dirContext }) => dirContext === "recent",
+  },
+  {
+    key: "trash",
+    label: "Trash",
+    path: "/trash",
+    Icon: TrashIcon,
+    IconSolid: TrashIconSolid,
+    isActive: ({ dirContext, dirId }) => dirContext === "trash" && !dirId,
+  },
+];
 
 function NewMenu({
   anchorRef,
@@ -118,6 +169,7 @@ function NewMenu({
     document.body,
   );
 }
+
 function GDrivePicker({
   onClose,
   open,
@@ -149,12 +201,10 @@ function GDrivePicker({
     document.body,
   );
 }
+
 export default function DriveSidebar({
   dirId,
-  isHomeRoute,
-  isRecentRoute,
-  isSharedRoute,
-  isTrashRoute,
+  dirContext,
   disabled,
   onCreateFolder,
   refreshCurrentDirectory,
@@ -169,18 +219,10 @@ export default function DriveSidebar({
   const { isGoogleDrive } = useGDrive();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const newBtnRef = useRef(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const isMyDriveActive =
-    !isHomeRoute &&
-    !isSharedRoute &&
-    !isTrashRoute && !isRecentRoute &&
-    dirId !== "google-drive" &&
-    !dirId;
 
   const usagePercent = Math.max(
     0,
@@ -230,70 +272,32 @@ export default function DriveSidebar({
 
       {/* Nav */}
       <nav className="gd-nav-section">
-        {isGoogleDrive && (
+        {/* {isGoogleDrive && (
           <button
-            className={`gd-nav-item ${dirId === "google-drive" ? "active" : ""}`}
-            onClick={() => navigate("/directory/google-drive")}
+            className={`gd-nav-item ${dirContext === "google-drive" ? "active" : ""}`}
+            onClick={() => navigate("/google-drive")}
           >
             <IconDrive size={20} /> Google Drive
           </button>
-        )}
-        <button
-          className={`gd-nav-item ${isHomeRoute ? "active" : ""}`}
-          onClick={() => navigate("/home")}
-        >
-          {isHomeRoute ? (
-            <HomeIconSolid className="w-5 h-5" size={20} />
-          ) : (
-            <HomeIcon className="w-5 h-5" size={20} />
-          )}{" "}
-          Home
-        </button>
-        <button
-          className={`gd-nav-item ${isMyDriveActive ? "active" : ""}`}
-          onClick={() => navigate("/")}
-        >
-          {isMyDriveActive ? (
-            <InboxStackIconSolid className="w-5 h-5" />
-          ) : (
-            <InboxStackIcon className="w-5 h-5" />
-          )}{" "}
-          My Drive
-        </button>
+        )} */}
 
-        <button
-          className={`gd-nav-item ${isSharedRoute && !dirId ? "active" : ""}`}
-          onClick={() => navigate("/shared")}
-        >
-          {isSharedRoute ? (
-            <ShareIconSolid className="w-5 h-5" />
-          ) : (
-            <ShareIcon className="w-5 h-5" />
-          )}
-          Shared with me
-        </button>
-
-        <button
-          className={`gd-nav-item ${isRecentRoute ? "active" : ""}`}
-          onClick={() => navigate("/recent")}
-        >
-          <History size={20} /> Recent
-        </button>
+        {NAV_ITEMS.map(({ key, label, path, Icon, IconSolid, isActive }) => {
+          const active = isActive({ dirContext, dirId });
+          const DisplayIcon = active ? IconSolid : Icon;
+          if (!isGoogleDrive && key === "google-drive") return;
+          return (
+            <button
+              key={key}
+              className={`gd-nav-item ${active ? "active" : ""}`}
+              onClick={() => navigate(path)}
+            >
+              <DisplayIcon className="w-5 h-5" size={20} /> {label}
+            </button>
+          );
+        })}
 
         <button className="gd-nav-item">
           <IconStarred size={20} /> Starred
-        </button>
-
-        <button
-          className={`gd-nav-item ${isTrashRoute && !dirId ? "active" : ""}`}
-          onClick={() => navigate("/trash")}
-        >
-          {isTrashRoute ? (
-            <TrashIconSolid className="w-5 h-5" />
-          ) : (
-            <TrashIcon className="w-5 h-5" />
-          )}{" "}
-          Trash
         </button>
       </nav>
 

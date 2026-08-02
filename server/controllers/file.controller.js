@@ -60,11 +60,11 @@ export const generateSignedUploadUrl = async (req, res, next) => {
   const totalStorage = req.user.totalStorage;
   const uploadLimit = req.user.uploadLimit;
 
-  const fileName = sanitizeFilename(name) || "untitled";
+  let fileName = sanitizeFilename(name) || "untitled";
   const fileExt = path.extname(fileName);
   const fileType = contentType || "application/octet-stream";
   const fileSize = Number(size || 0);
-
+  const derivedExtension = "." + contentType.split("/")[1];
   let responded;
   let uploadedFile;
 
@@ -73,17 +73,20 @@ export const generateSignedUploadUrl = async (req, res, next) => {
     responded = true;
     return res.status(status).json(payload);
   };
+  if (!derivedExtension) {
+    return safeResponse(400, {
+      message: "Unsupported or missing content type!",
+    });
+  }
+  if (!fileExt.trim()) {
+    fileName += derivedExtension;
+  }
+  if (!fileSize || fileSize > uploadLimit) {
+    return res.status(413).json({
+      message: "File too large",
+    });
+  }
   try {
-    if (!fileExt.trim()) {
-      return safeResponse(400, {
-        message: "File without extension is not allowed!",
-      });
-    }
-    if (!fileSize || fileSize > uploadLimit) {
-      return res.status(413).json({
-        message: "File too large",
-      });
-    }
     const parentDir = await Directory.findOne({
       _id: parentDirId,
       userId,
@@ -127,7 +130,7 @@ export const generateSignedUploadUrl = async (req, res, next) => {
 
     uploadedFile = await File.insertOne({
       name: fileName,
-      extension: fileExt,
+      extension: fileExt || derivedExtension,
       size: fileSize,
       isUploading: true,
       parentDirId: parentDir._id,
@@ -373,7 +376,7 @@ export const getFileMetaById = async (req, res, next) => {
         userRole: fgaRole || publicRole,
       });
     }
-    file.lastInteractedAt = new Date();
+    file.viewedByMeTime = new Date();
     await file.save();
     // 5b. Anonymous user — honour publicRole directly
     return res.status(200).json({
@@ -386,20 +389,68 @@ export const getFileMetaById = async (req, res, next) => {
 };
 
 export const getRecentFiles = async (req, res, next) => {
-  const userId = req.user?._id;
-
   try {
-    const recentFiles = await File.find({
-      userId,
-      isDeleted: false,
-    })
-      .sort({ lastInteractedAt: -1 })
-    if (!recentFiles.length) {
-      return res.status(400).json({ message: "No Files found", files: [] });
-    }
-    return res.status(200).json({
-      files: recentFiles,
+    const userId = req.user?._id;
+    if (!userId) return res.status(403).json({ message: "Access denied" });
+
+    // Files shared with this user (mirrors getSharedWithMe's pattern)
+    const allowedFiles = await fgaClient.listObjects({
+      user: `user:${userId.toString()}`,
+      relation: "can_view",
+      type: "file",
     });
+
+    const sharedFileIds = allowedFiles.objects
+      .map((obj) => obj.split(":")[1])
+      .filter(Boolean);
+
+    const [ownFiles, sharedFiles] = await Promise.all([
+      File.find({ userId, isDeleted: false })
+        .populate("userId", "name email avatar")
+        .populate("path", "name")
+        .lean(),
+      sharedFileIds.length
+        ? File.find({
+            _id: { $in: sharedFileIds },
+            userId: { $ne: userId },
+            isDeleted: false,
+          })
+            .populate("userId", "name email avatar")
+            .populate("path", "name")
+            .lean()
+        : [],
+    ]);
+
+    const sharedFilesWithRoles = await Promise.all(
+      sharedFiles.map(async (file) => {
+        const canEdit = await fgaClient.check({
+          user: `user:${userId.toString()}`,
+          relation: "can_edit",
+          object: `file:${file._id.toString()}`,
+        });
+        return { ...file, userRole: canEdit.allowed ? "editor" : "viewer" };
+      }),
+    );
+
+    const ownFilesWithRoles = ownFiles.map((file) => ({
+      ...file,
+      userRole: "owner",
+    }));
+
+    const allFiles = [...ownFilesWithRoles, ...sharedFilesWithRoles];
+
+    const getActivityTime = (file) => {
+      const viewed = file.viewedByMeTime ? new Date(file.viewedByMeTime).getTime() : 0;
+      const modified = file.updatedAt ? new Date(file.updatedAt).getTime() : 0;
+      return Math.max(viewed, modified);
+    };
+
+    allFiles.sort((a, b) => getActivityTime(b) - getActivityTime(a));
+
+    const RECENT_LIMIT = 100;
+    const recentFiles = allFiles.slice(0, RECENT_LIMIT);
+
+    return res.status(200).json({ files: recentFiles });
   } catch (error) {
     next(error);
   }
@@ -509,13 +560,11 @@ export const updateFile = async (req, res, next) => {
 
 // ── helper ────────────────────────────────────────────────────────────────────
 const performRename = async (file, fileId, fileName, res) => {
-  console.log("fileName", fileName);
-  await file.save();
   const ext = file.extension;
 
   file.name = fileName;
   file.extension = ext;
-
+  file.modifiedTime = new Date();
   await file.save();
 
   return res.status(200).json({ message: "File renamed successfully" });
@@ -1055,6 +1104,26 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Update permission error:", error);
+    next(error);
+  }
+};
+
+export const updateFileViewTime = async (req, res, next) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: "File Id is required!" });
+  }
+  try {
+    const file = await File.findById(id);
+    if (!file) {
+      return res.status(404).json({ message: "File not found" });
+    }
+    file.viewedByMeTime = Date.now();
+    await file.save();
+    return res.status(200).json({ message: "View record updated!" });
+  } catch (error) {
+    console.log(error);
     next(error);
   }
 };

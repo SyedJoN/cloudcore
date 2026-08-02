@@ -1,3 +1,6 @@
+import getExt from "../../../Utils/getExtension";
+import { IconDownload } from "../Icons/Icons";
+
 function UnknownViewer({ item }) {
   const ext = getExt(item.name);
   return (
@@ -10,7 +13,7 @@ function UnknownViewer({ item }) {
         No preview available for this file type.
       </p>
       <a
-        href={`${BASE_URL}/file/${item._id}`}
+        href={`${import.meta.env.VITE_BACKEND_BASE_URL}/file/${item._id}`}
         download={item.name}
         className="fv-unknown-download-btn"
       >

@@ -91,3 +91,8 @@ export async function restoreFile(url) {
   const response = await axiosWithCreds.patch(url);
   return response;
 }
+
+export async function updateFileViewTime(id) {
+  const response = await axiosWithCreds.patch(`/file/${id}/activity/view`);
+  return response;
+}

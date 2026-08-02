@@ -32,10 +32,10 @@ const fileSchema = new Schema(
       ref: "User",
       required: true,
     },
-   currentPlan: {
+    currentPlan: {
       type: String,
-      enum: ['free', 'pro', 'business'],
-      default: 'free',
+      enum: ["free", "pro", "business"],
+      default: "free",
     },
     isPublic: {
       type: Boolean,
@@ -54,19 +54,23 @@ const fileSchema = new Schema(
     },
     isUploading: {
       type: Boolean,
-      required: true
+      required: true,
     },
-    lastInteractedAt: {
-    type: Date,
-    default: Date.now,
-    index: true
-}
+    viewedByMeTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
+    modifiedTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
   },
   {
     timestamps: true,
     strict: "throw",
   },
-  
 );
 const File = mongoose.model("File", fileSchema);
 export default File;

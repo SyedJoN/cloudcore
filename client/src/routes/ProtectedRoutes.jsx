@@ -11,6 +11,10 @@ export const protectedRoutes = [
         element: <DirectoryView />,
       },
       {
+        path: "/google-drive",
+        element: <DirectoryView route="google-drive" />,
+      },
+      {
         path: "/directory/:dirId",
         element: <DirectoryView />,
       },
@@ -26,7 +30,7 @@ export const protectedRoutes = [
         path: "/shared",
         element: <DirectoryView route="shared" />,
       },
-       {
+      {
         path: "/recent",
         element: <DirectoryView route="recent" />,
       },

@@ -6,7 +6,7 @@ import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
 import { formatDate } from "../../../Utils/formatDate";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../../Contexts";
+import { useAuth, useGDrive } from "../../Contexts";
 
 export default function GridItem({
   item,
@@ -21,17 +21,23 @@ export default function GridItem({
 }) {
   const { user } = useAuth();
   const [hasImgError, setHasImgError] = useState(false);
-  const isGDrive = dirId === "google-drive";
-  const location = useLocation();
+  const {isGoogleDrive} = useGDrive();
 
+  const location = useLocation();
   const isDriveRoute = location.pathname.endsWith("/");
+  const isRecentRoute = location.pathname.endsWith("/recent");
+  const isSharedRoute = location.pathname.endsWith('/shared')
+  const isTrashRoute = location.pathname.endsWith('/trash')
+  const isGoogleDriveRoute = location.pathname.endsWith('/google-drive')
+  const showActiviyBar = (isDriveRoute || isRecentRoute || isSharedRoute || isTrashRoute)
   const type = item.isDirectory
-    ? isGDrive
+    ? isGoogleDrive && isGoogleDriveRoute
       ? "google-directory"
       : "directory"
-    : isGDrive
+    : isGoogleDrive && isGoogleDriveRoute
       ? "google-file"
       : "file";
+
   const iconType = item.isDirectory ? null : getFileType(item.name);
   const itemId = item.id ?? item._id;
 
@@ -74,10 +80,10 @@ export default function GridItem({
 
   return (
     <div
-      className={`gd-grid-item ${selected ? "selected" : ""} ${isDriveRoute ? "h-[260.5px]" : ""}`}
+      className={`gd-grid-item ${selected ? "selected" : ""} ${showActiviyBar ? "h-[260.5px]" : ""}`}
       data-id={itemId}
       onClick={() => onRowClick(itemId)}
-      onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
+      onDoubleClick={async () => await onDoubleClick?.(type, itemId, item.isDeleted)}
       onContextMenu={(e) => {
         e.preventDefault();
         onSelect?.(itemId);
@@ -114,7 +120,7 @@ export default function GridItem({
       </div>
 
       <div
-        className={`gd-grid-item-preview ${isDriveRoute ? "h-50.25" : "h-41.75"}`}
+        className={`gd-grid-item-preview ${showActiviyBar ? "h-50.25" : "h-41.75"}`}
       >
         {item.isDirectory ? (
           <IconFolder size={48} style={{ color: "#5f6368" }} />
@@ -125,7 +131,7 @@ export default function GridItem({
 
       <div
         style={{
-          display: isDriveRoute ? "none" : "flex",
+          display: showActiviyBar ? "none" : "flex",
           alignItems: "center",
           padding: "0px 8px 0px 12px",
           gap: 8,

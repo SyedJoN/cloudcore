@@ -1,40 +1,25 @@
 import { useNavigate } from "react-router-dom";
 import { IconGrid, IconList, IconInfo } from "../Icons/Icons";
 import { useAuth } from "../../Contexts/AuthContext";
+import { getRouteConfig } from "../../../Utils/routeConfig"; 
 
 export default function DriveToolbar({
   dirContext,
   crumbs,
   setCrumbs,
-  isTrashRoute,
   disabled,
   viewMode,
   onToggleView,
   toggleDetailsBar,
 }) {
   const navigate = useNavigate();
-  
-const {loggedIn} = useAuth();
-  const rootLabel =
-    dirContext === "trash"
-      ? "Trash"
-      : dirContext === "shared"
-        ? "Shared with me"
-        : dirContext === "home"
-          ? "Home"
-          : "My Drive";
-  const rootPath =
-    dirContext === "trash"
-      ? "/trash"
-      : dirContext === "shared"
-        ? "/shared"
-        : dirContext === "home"
-          ? "/home"
-          : "/";
+  const { loggedIn } = useAuth();
+
+  const { label: rootLabel, path: rootPath, flatBreadcrumb } = getRouteConfig(dirContext);
 
   return (
-    <div className="gd-toolbar" onMouseDown={(e)=> e.stopPropagation()}>
-      {dirContext !== "trash" && dirContext !== "shared" ? (
+    <div className="gd-toolbar" onMouseDown={(e) => e.stopPropagation()}>
+      {!flatBreadcrumb ? (
         <div className="gd-breadcrumb">
           <button
             disabled={disabled}
@@ -80,8 +65,6 @@ const {loggedIn} = useAuth();
               )}
             </span>
           ))}
-
-     
         </div>
       ) : (
         <div className="gd-breadcrumb">
@@ -105,6 +88,7 @@ const {loggedIn} = useAuth();
           </span>
         </div>
       )}
+
       <div className="gd-toolbar-actions">
         <button
           className="gd-icon-btn"

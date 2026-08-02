@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from "react";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { getDirectory } from "../../apis/directoryApi";
-import { driveConfig } from "../../Utils/driveConfig";
 import { useGDrive } from "../Contexts";
+import { ROUTE_CONFIG } from "../../Utils/routeConfig";
 
 const isRootName = (n) => (n ?? "").startsWith("root");
 
@@ -30,22 +30,21 @@ export function useDirectoryData({
   const getDirectoryItems = useCallback(
     async (dirType) => {
       setIsLoading(true);
-
-      if (!driveConfig[dirType]) {
+      if (!ROUTE_CONFIG[dirType]) {
         console.log("Invalid Directory Type");
         return;
       }
 
       try {
-        const { fetch } = driveConfig[dirType];
+        const { fetch } = ROUTE_CONFIG[dirType];
 
         const { data } = await fetch(dirId || "");
 
         const name =
           isSharedRoute && !dirId
-            ? "Shared with me"
-            : dirId === "google-drive"
-              ? "Google Drive"
+            ? ROUTE_CONFIG['shared'].label
+            : route === "google-drive"
+              ? ROUTE_CONFIG[route].label
               : data?.name;
 
         setDirectoryName(name);
@@ -70,7 +69,7 @@ export function useDirectoryData({
             const publicPermission = directory.permissions?.find(
               (p) => p.type === "anyone" && p.allowFileDiscovery === false,
             );
- 
+
             return {
               ...directory,
               isPublic: !!publicPermission,
@@ -82,7 +81,7 @@ export function useDirectoryData({
             const publicPermission = file.permissions?.find(
               (p) => p.type === "anyone" && p.allowFileDiscovery === false,
             );
-      
+
             return {
               ...file,
               isPublic: !!publicPermission,
@@ -90,8 +89,8 @@ export function useDirectoryData({
             };
           });
 
-          setDirectoriesList(directories.reverse());
-          setFilesList(files.reverse());
+          setDirectoriesList(directories);
+          setFilesList(files);
           return;
         }
         setIsDeleted(
@@ -169,13 +168,6 @@ export function useDirectoryData({
 
   const q = searchQuery.trim().toLowerCase();
 
-  const filteredDirs = useMemo(
-    () =>
-      combinedItems.filter(
-        (i) => i.isDirectory && (!q || i.name?.toLowerCase().includes(q)),
-      ),
-    [combinedItems, q],
-  );
 
   const filteredFiles = useMemo(
     () =>
@@ -199,7 +191,6 @@ export function useDirectoryData({
     getDirectoryItems,
     getTrashItems,
     combinedItems,
-    filteredDirs,
     filteredFiles,
   };
 }

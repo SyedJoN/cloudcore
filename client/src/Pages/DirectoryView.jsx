@@ -11,12 +11,12 @@ import {
   UploadTray,
   DetailsSidebar,
   RequestAccess,
-  DirectoryItemCollection,
-  DirectoryEmptyState,
+  DriveEmptyState,
   GoogleDriveCard,
   CreateDirectoryModal,
   RenameModal,
   SelectionBar,
+  DefaultView
 } from "../Components/Drive";
 
 import { IconInfo } from "../Components/Icons/Icons";
@@ -29,6 +29,7 @@ import {
   softDeleteFile,
   toggleDriveFilePermission,
   toggleFilePublic,
+  updateFileViewTime,
 } from "../../apis/fileApi";
 import { useAuth, useGDrive, useBreadcrumb, useToast } from "../Contexts";
 import { axiosWithCreds } from "../../apis/axiosInstances";
@@ -44,6 +45,11 @@ import {
   getPendingDriveFile,
 } from "../Components/Drive/PendingGoogleDriveFile";
 import { uploadGoogleDriveFile } from "../Components/Drive/uploadGoogleDriveFile";
+import RecentView from "../Components/Drive/Recent/RecentView";
+import {
+  applyRecentFilters,
+  DEFAULT_RECENT_FILTERS,
+} from "../Components/Drive/Recent/ApplyRecentFilters";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -72,9 +78,8 @@ export default function DirectoryView({ route }) {
   const isSharedRoute =
     route === "shared" || params.get("usp") === "drive_link";
   const isTrashRoute = route === "trash";
-  const isGoogleDriveRoute = location.pathname.endsWith("/google-drive");
+  const isGoogleDriveRoute = route === "google-drive";
   const isRecentRoute = route === "recent";
-  // const [dirContext, setDirContext] = useState("home");
 
   const navigate = useNavigate();
 
@@ -101,9 +106,11 @@ export default function DirectoryView({ route }) {
         ? "shared"
         : isRecentRoute
           ? "recent"
-          : isHomeRoute
-            ? "home"
-            : "root");
+          : isGoogleDriveRoute
+            ? "google-drive"
+            : isHomeRoute
+              ? "home"
+              : "root");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
 
@@ -136,7 +143,6 @@ export default function DirectoryView({ route }) {
     getDirectoryItems,
     getTrashItems,
     combinedItems,
-    filteredDirs,
     filteredFiles,
   } = useDirectoryData({
     dirId,
@@ -203,23 +209,30 @@ export default function DirectoryView({ route }) {
     resumedDriveUploadRef.current = true;
     clearPendingDriveFile();
 
-    uploadGoogleDriveFile(pending, {
-      enqueueItem,
-      setItemProgress,
-      completeItem,
-      handleCancelUpload,
-      user,
-      refreshUser,
-      setDbFileId,
-      onUploadComplete: refreshCurrentDirectory,
-    }).catch((err) => {
-      console.error("Resumed Drive upload failed:", err);
-      showError("Couldn't finish uploading the file you picked from Drive.");
-    });
+    (async () => {
+      try {
+        const { dirId: directoryId } = await uploadGoogleDriveFile(pending, {
+          enqueueItem,
+          setItemProgress,
+          completeItem,
+          handleCancelUpload,
+          refreshUser,
+          setDbFileId,
+          onUploadComplete: refreshCurrentDirectory,
+        });
+
+        if (directoryId) {
+          navigate(`/directory/${directoryId}`);
+        }
+      } catch (err) {
+        console.error("Resumed Drive upload failed:", err);
+        showError("Couldn't finish uploading the file you picked from Drive.");
+      }
+    })();
   }, [isGoogleDrive]);
 
   useEffect(() => {
-    if (dirId === "google-drive") getDirectoryItems("google-drive");
+    if (isGoogleDriveRoute) getDirectoryItems("google-drive");
     else if (dirContext === "trash" || isTrashRoute) getDirectoryItems("trash");
     else if (isRecentRoute) getDirectoryItems("recent");
     else if (isSharedRoute) getDirectoryItems("shared");
@@ -277,8 +290,7 @@ export default function DirectoryView({ route }) {
     handleSelect(itemId);
   }
 
-  const handleRowDoubleClick = (type, id) => {
-    // clearSelection();
+  const handleRowDoubleClick = async (type, id) => {
     if (type === "google-directory") {
       window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
       return;
@@ -291,6 +303,12 @@ export default function DirectoryView({ route }) {
     }
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
     if (item) setViewItem(item);
+    if (type === "google-file") return;
+    try {
+      await updateFileViewTime(id);
+    } catch (err) {
+      console.log("err", err.message);
+    }
   };
 
   // Item actions
@@ -524,10 +542,7 @@ export default function DirectoryView({ route }) {
             refreshCurrentDirectory={refreshCurrentDirectory}
             showError={showError}
             dirId={dirId}
-            isHomeRoute={isHomeRoute}
-            isSharedRoute={isSharedRoute}
-            isRecentRoute={isRecentRoute}
-            isTrashRoute={isTrashRoute}
+            dirContext={dirContext}
             onCreateFolder={() => setShowCreateDir(true)}
             onUploadFiles={() => fileInputRef.current?.click()}
           />
@@ -551,7 +566,6 @@ export default function DirectoryView({ route }) {
               dirContext={dirContext}
               directoryName={directoryName}
               isSharedRoute={isSharedRoute}
-              isTrashRoute={isTrashRoute}
               breadcrumbs={breadcrumbs}
               setBreadcrumbs={setBreadcrumbs}
               disabled={isUploading}
@@ -590,37 +604,28 @@ export default function DirectoryView({ route }) {
               </div>
             ) : (
               <>
-                {isGoogleDrive &&
-                  !dirId &&
-                  isHomeRoute &&
-                  viewMode === "grid" && (
-                    <GoogleDriveCard
-                      onOpen={() => navigate("/directory/google-drive")}
-                    />
-                  )}
+              
 
-                {combinedItems.length === 0 && !dirId && (
-                  <DirectoryEmptyState />
-                )}
-                {!isRecentRoute && 
-                  <DirectoryItemCollection
-                  items={filteredDirs}
-                  label="Folders"
-                  viewMode={viewMode}
-                  dirId={dirId}
-                  selectedItems={selectedItems}
-                  onSelect={handleSelect}
-                  onRowClick={handleRowClick}
-                  onDoubleClick={handleRowDoubleClick}
-                  onContextMenu={handleContextMenu}
-                  listHeaderRow={listHeaderRow}
-                />
-                }
-           
-                  <DirectoryItemCollection
+                {combinedItems.length === 0 && !dirId ? (
+                  <DriveEmptyState />
+                ) : isRecentRoute ? (
+                  <RecentView
                     items={filteredFiles}
-                    label="Files"
                     viewMode={viewMode}
+                    selectedItems={selectedItems}
+                    onSelect={handleSelect}
+                    onRowClick={handleRowClick}
+                    onDoubleClick={handleRowDoubleClick}
+                    onContextMenu={handleContextMenu}
+                    listHeaderRow={listHeaderRow}
+                  />
+                ) : (
+                  <DefaultView
+                  isGoogleDrive={isGoogleDrive}
+                  isHomeRoute={isHomeRoute}
+                    items={combinedItems}
+                    viewMode={viewMode}
+                    user={user}
                     dirId={dirId}
                     selectedItems={selectedItems}
                     onSelect={handleSelect}
@@ -628,10 +633,8 @@ export default function DirectoryView({ route }) {
                     onDoubleClick={handleRowDoubleClick}
                     onContextMenu={handleContextMenu}
                     listHeaderRow={listHeaderRow}
-                    showListHeader={!filteredDirs.length}
-                    sectionStyle={{ marginTop: filteredDirs.length ? 16 : 0 }}
                   />
-             
+                )}
               </>
             )}
           </main>

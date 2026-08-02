@@ -1,17 +1,33 @@
-import { getSignedUploadUrl, notifyBackend, uploadDriveFileToS3 } from "../../../apis/fileApi";
-
-
+import {
+  getSignedUploadUrl,
+  notifyBackend,
+  uploadDriveFileToS3,
+} from "../../../apis/fileApi";
 
 export async function uploadGoogleDriveFile(
   pickedFile,
-  { enqueueItem, setItemProgress, completeItem, handleCancelUpload, setDbFileId, onUploadComplete, refreshUser },
+  {
+    enqueueItem,
+    setItemProgress,
+    completeItem,
+    handleCancelUpload,
+    setDbFileId,
+    onUploadComplete,
+    refreshUser,
+  },
 ) {
-  const { id, name, size, contentType } = pickedFile;
+  const { id, name, size, contentType, dirId } = pickedFile;
   enqueueItem({ _id: id, name, size });
 
   let S3fileId;
   try {
-    const signed = await getSignedUploadUrl({ name, size, contentType, type: "google" });
+    const signed = await getSignedUploadUrl({
+      name,
+      size,
+      contentType,
+      parentDirId: dirId,
+      type: "google",
+    });
     S3fileId = signed.fileId;
     setDbFileId(S3fileId);
 
@@ -57,8 +73,8 @@ export async function uploadGoogleDriveFile(
       xhr.setRequestHeader("Content-Type", contentType);
       xhr.send(bytes);
     });
+    return { dirId };
   } catch (error) {
-    
     if (error?.response?.status === 401 || error?.response?.status === 403) {
       throw error;
     }

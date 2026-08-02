@@ -10,6 +10,7 @@
   --surface-container-dark: #e9eef6;
   --surface-container-dark-hover: #f6fafe;
   --btn-bg-medium: rgba(32, 33, 36, 0.08);
+  --border-inverse: #000000;
   --border: #e0e0e0;
   --border-hover: #dadce0;
   --text-primary: #202124;
@@ -50,6 +51,7 @@
   --shadow-1: none;
   --shadow-dynamic:
     0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+    --border-inverse: #cdc9c9;
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
   --btn-bg-medium: #37393b;

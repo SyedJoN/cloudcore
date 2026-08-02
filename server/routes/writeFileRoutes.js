@@ -12,6 +12,7 @@ import {
   completeUpload,
   updateGoogleDrivePermission,
   uploadDriveFileToS3,
+  updateFileViewTime,
 } from "../controllers/file.controller.js";
 
 import { checkAuth } from "../middlewares/authMiddleware.js";
@@ -31,6 +32,7 @@ router.delete("/soft-delete/:id", checkAuth, softDeleteFile);
 router.patch("/:id/restore", checkAuth, restoreFile);
 router.patch("/:id", checkAuth, updateFile);
 router.patch("/:itemId/public/:role", checkAuth, toggleFilePublic);
+router.patch("/:id/activity/view", checkAuth, updateFileViewTime);
 
 // Shareble file
 router.post("/grant-access/:id", checkAuth, giveAccessById);

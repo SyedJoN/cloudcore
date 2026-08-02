@@ -689,7 +689,7 @@ export const githubAuth = async (req, res, next) => {
 };
 
 export const googleDrive = async (req, res) => {
-  const code = req.query.code;
+  const { code, dirId } = req.query;
 
   const { accessToken } = await fetchTokenForDrive(code);
 
@@ -706,8 +706,11 @@ export const googleDrive = async (req, res) => {
     sameSite: "lax",
     maxAge: 60 * 60 * 1000,
   });
-
-  res.redirect("http://localhost:5173");
+  if (dirId) {
+    res.redirect(`http://localhost:5173/directory/${dirId}`);
+  } else {
+    res.redirect("http://localhost:5173/google-drive");
+  }
 };
 
 export const checkDriveAuth = async (req, res) => {
@@ -737,10 +740,10 @@ export const fetchGoogleDriveFiles = async (req, res, next) => {
     const drive = getDriveClient(drive_access_token);
 
     const response = await drive.files.list({
-      
       pageSize: 1000,
       fields:
         "files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,permissions(type,role,allowFileDiscovery))",
+        orderBy: "createdTime desc"
     });
 
     const files = response.data.files || [];
