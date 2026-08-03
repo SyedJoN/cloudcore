@@ -24,4 +24,9 @@ export async function getSharedItems() {
     return response;
 
 } 
+export async function getStarredItems() {
+    const response = await axiosWithCreds.get(`/starred`);
+    return response;
+
+} 
 

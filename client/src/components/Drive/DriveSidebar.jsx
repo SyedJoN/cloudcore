@@ -5,6 +5,7 @@ import {
   HomeIcon,
   InboxStackIcon,
   ShareIcon,
+  StarIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import {
@@ -12,6 +13,7 @@ import {
   InboxStackIcon as InboxStackIconSolid,
   ShareIcon as ShareIconSolid,
   TrashIcon as TrashIconSolid,
+  StarIcon as StarIconSolid
 } from "@heroicons/react/24/solid";
 
 import {
@@ -67,6 +69,14 @@ const NAV_ITEMS = [
     Icon: History,
     IconSolid: History,
     isActive: ({ dirContext }) => dirContext === "recent",
+  },
+   {
+    key: "starred",
+    label: "Starred",
+    path: "/starred",
+    Icon: StarIcon,
+    IconSolid: StarIconSolid,
+    isActive: ({ dirContext }) => dirContext === "starred",
   },
   {
     key: "trash",
@@ -296,9 +306,7 @@ export default function DriveSidebar({
           );
         })}
 
-        <button className="gd-nav-item">
-          <IconStarred size={20} /> Starred
-        </button>
+       
       </nav>
 
       {/* Storage */}

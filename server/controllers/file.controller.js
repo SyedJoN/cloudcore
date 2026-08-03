@@ -392,8 +392,7 @@ export const getRecentFiles = async (req, res, next) => {
   try {
     const userId = req.user?._id;
     if (!userId) return res.status(403).json({ message: "Access denied" });
-
-    // Files shared with this user (mirrors getSharedWithMe's pattern)
+    
     const allowedFiles = await fgaClient.listObjects({
       user: `user:${userId.toString()}`,
       relation: "can_view",

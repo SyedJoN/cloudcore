@@ -48,6 +48,10 @@ const fileSchema = new Schema(
         return this.isPublic === true;
       },
     },
+    isStarred: {
+      type: Boolean,
+      default: false,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

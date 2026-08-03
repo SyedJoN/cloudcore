@@ -1,7 +1,10 @@
-
 export function getLastActivityTime(item) {
-  const modified = item.modifiedTime ? new Date(item.modifiedTime).getTime() : 0;
-  const viewed = item.viewedByMeTime ? new Date(item.viewedByMeTime).getTime() : 0;
+  const modified = item.modifiedTime
+    ? new Date(item.modifiedTime).getTime()
+    : 0;
+  const viewed = item.viewedByMeTime
+    ? new Date(item.viewedByMeTime).getTime()
+    : 0;
   const ts = Math.max(modified, viewed);
   return ts > 0 ? ts : null;
 }
@@ -42,7 +45,13 @@ export function getRecencyBucket(timestamp) {
   return String(date.getFullYear());
 }
 
-const FIXED_ORDER = ["Today", "Yesterday", "Earlier this week", "Last week", "Earlier this year"];
+const FIXED_ORDER = [
+  "Today",
+  "Yesterday",
+  "Earlier this week",
+  "Last week",
+  "Earlier this year",
+];
 
 export function groupItemsByRecency(items) {
   const buckets = new Map();
@@ -59,29 +68,24 @@ export function groupItemsByRecency(items) {
 
   const known = FIXED_ORDER.filter((b) => buckets.has(b));
   const years = [...buckets.keys()]
-    .filter((b) => /^\d{4}$/.test(b))
+    .filter((b) => /^\d{4}$/.test(b)) // Only years i.e 4 digits (2026)
     .sort((a, b) => Number(b) - Number(a));
   const never = buckets.has("Never") ? ["Never"] : [];
 
   return [...known, ...years, ...never].map((label) => ({
     label,
     items: buckets.get(label),
-
   }));
 }
 export function groupItemsByType(items) {
   const buckets = new Map();
-
   for (const item of items) {
     const type = item.isDirectory ? "Folders" : "Files";
-
     if (!buckets.has(type)) {
       buckets.set(type, []);
     }
-
     buckets.get(type).push(item);
   }
-
   return ["Folders", "Files"]
     .filter((label) => buckets.has(label))
     .map((label) => ({

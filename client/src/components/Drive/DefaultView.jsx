@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   applyRecentFilters,
   DEFAULT_RECENT_FILTERS,
@@ -37,6 +37,7 @@ const DefaultView = ({
 
   const ItemComponent = viewMode === "grid" ? GridItem : ListRow;
 
+
   return (
     <>
       <div className="gd-drive">
@@ -45,10 +46,11 @@ const DefaultView = ({
           filters={filters}
           onChange={setFilters}
           user={user}
-        />
+          />
         {isGoogleDrive && !dirId && isHomeRoute && viewMode === "grid" && (
           <GoogleDriveCard onOpen={() => navigate("/google-drive")} />
         )}
+        {viewMode === "list" && listHeaderRow}
         {groups.length === 0 ? (
           <div className="gd-empty">
             <h3>No matching files</h3>
@@ -60,7 +62,6 @@ const DefaultView = ({
             <div key={label} className="gd-drive-group">
               <div className="gd-section-label">{label}</div>
 
-              {viewMode === "list" && listHeaderRow}
 
               <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
                 {groupItems.map((item) => (

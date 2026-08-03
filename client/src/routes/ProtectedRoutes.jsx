@@ -34,6 +34,10 @@ export const protectedRoutes = [
         path: "/recent",
         element: <DirectoryView route="recent" />,
       },
+       {
+        path: "/starred",
+        element: <DirectoryView route="starred" />,
+      },
       {
         path: "/trash",
         element: <DirectoryView route="trash" />,

@@ -95,6 +95,7 @@ export default function GridItem({
           display: "flex",
           alignItems: "center",
           padding: "0px 8px 0px 12px",
+          flex: "0 0 3rem",
           gap: 8,
         }}
       >
@@ -104,7 +105,7 @@ export default function GridItem({
           <FileBadge type={iconType} />
         )}
         <span className="gd-grid-item-name">{item.name}</span>
-        <div className="gd-grid-item-menu">
+        
           <button
             className="gd-icon-btn"
             style={{ width: 28, height: 28 }}
@@ -116,7 +117,7 @@ export default function GridItem({
           >
             <IconDots size={16} />
           </button>
-        </div>
+     
       </div>
 
       <div

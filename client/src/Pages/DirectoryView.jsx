@@ -16,7 +16,7 @@ import {
   CreateDirectoryModal,
   RenameModal,
   SelectionBar,
-  DefaultView
+  DefaultView,
 } from "../Components/Drive";
 
 import { IconInfo } from "../Components/Icons/Icons";
@@ -50,6 +50,7 @@ import {
   applyRecentFilters,
   DEFAULT_RECENT_FILTERS,
 } from "../Components/Drive/Recent/ApplyRecentFilters";
+import { toggleItemStar } from "../../apis/resourceApi";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -80,6 +81,7 @@ export default function DirectoryView({ route }) {
   const isTrashRoute = route === "trash";
   const isGoogleDriveRoute = route === "google-drive";
   const isRecentRoute = route === "recent";
+  const isStarredRoute = route === "starred";
 
   const navigate = useNavigate();
 
@@ -96,6 +98,7 @@ export default function DirectoryView({ route }) {
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
+  const [isStarred, setIsStarred] = useState(false);
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
 
   const dirContext =
@@ -110,7 +113,9 @@ export default function DirectoryView({ route }) {
             ? "google-drive"
             : isHomeRoute
               ? "home"
-              : "root");
+              : isStarredRoute
+                ? "starred"
+                : "root");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
 
@@ -138,6 +143,8 @@ export default function DirectoryView({ route }) {
     needsAccess,
     crumbs,
     setCrumbs,
+    directoriesList,
+    filesList,
     setFilesList,
     setDirectoriesList,
     getDirectoryItems,
@@ -150,6 +157,8 @@ export default function DirectoryView({ route }) {
     isSharedRoute,
     isRecentRoute,
     isTrashRoute,
+    setIsStarred,
+    isStarred,
     isGoogleDriveRoute,
     setIsGoogleDrive,
     navigate,
@@ -197,6 +206,27 @@ export default function DirectoryView({ route }) {
   } = useSelectionAndContextMenu({ combinedItems, mainRef });
 
   useEffect(() => {
+    if (!isStarredRoute) return;
+    setIsStarred((prev) => {
+      const updated = { ...prev };
+      combinedItems.forEach((item) => {
+        updated[item._id] = item.isStarred;
+      });
+      return updated;
+    });
+  }, [isStarredRoute, combinedItems]);
+
+  useEffect(() => {
+    if (!directoriesList.length && !filesList.length) {
+      clearSelection();
+    }
+  }, [directoriesList, filesList]);
+
+  useEffect(() => {
+    console.log(isStarred);
+  }, [isStarred]);
+
+  useEffect(() => {
     checkGoogleDriveAccess();
   }, []);
 
@@ -236,6 +266,7 @@ export default function DirectoryView({ route }) {
     else if (dirContext === "trash" || isTrashRoute) getDirectoryItems("trash");
     else if (isRecentRoute) getDirectoryItems("recent");
     else if (isSharedRoute) getDirectoryItems("shared");
+    else if (isStarredRoute) getDirectoryItems("starred");
     else {
       getDirectoryItems("root");
     }
@@ -248,6 +279,7 @@ export default function DirectoryView({ route }) {
     dirId,
     isSharedRoute,
     isTrashRoute,
+    isStarredRoute,
     location.pathname,
   ]);
 
@@ -414,6 +446,29 @@ export default function DirectoryView({ route }) {
       refreshCurrentDirectory(renameType);
     } catch (err) {
       showError(err.message);
+    }
+  }
+  async function handleToggleStar(item) {
+    try {
+      const type = item.isDirectory ? "folder" : "file";
+
+      const {
+        data: { message },
+      } = await toggleItemStar(item._id, type);
+
+      const newStarredValue = !item.isStarred;
+
+      if (!newStarredValue) {
+        if (item.isDirectory) {
+          setDirectoriesList((prev) => prev.filter((d) => d._id !== item._id));
+        } else {
+          setFilesList((prev) => prev.filter((f) => f._id !== item._id));
+        }
+      }
+
+      toast({ message, type: "success" });
+    } catch (error) {
+      setError(error.message);
     }
   }
 
@@ -604,13 +659,12 @@ export default function DirectoryView({ route }) {
               </div>
             ) : (
               <>
-              
-
                 {combinedItems.length === 0 && !dirId ? (
                   <DriveEmptyState />
-                ) : isRecentRoute ? (
+                ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
                     items={filteredFiles}
+                    isRecentRoute={isRecentRoute}
                     viewMode={viewMode}
                     selectedItems={selectedItems}
                     onSelect={handleSelect}
@@ -621,8 +675,8 @@ export default function DirectoryView({ route }) {
                   />
                 ) : (
                   <DefaultView
-                  isGoogleDrive={isGoogleDrive}
-                  isHomeRoute={isHomeRoute}
+                    isGoogleDrive={isGoogleDrive}
+                    isHomeRoute={isHomeRoute}
                     items={combinedItems}
                     viewMode={viewMode}
                     user={user}
@@ -674,12 +728,20 @@ export default function DirectoryView({ route }) {
         combinedItems={combinedItems}
         selectedItems={selectedItems}
         hasFileSelected={hasFileSelected}
+        isStarred={isStarred}
+        setIsStarred={setIsStarred}
         isDeleted={isDeleted}
         isTrashRoute={isTrashRoute}
         isGoogleDriveRoute={isGoogleDriveRoute}
         onClear={() => {
           clearSelection();
           setContextItem(null);
+        }}
+        onStar={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item) handleToggleStar(item);
+          });
         }}
         onDownload={() => {
           selectedItems.forEach((id) => {

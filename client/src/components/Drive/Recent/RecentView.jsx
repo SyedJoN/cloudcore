@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"; // adjust to your actual barrel export path
+import { useState, useMemo, useEffect } from "react"; // adjust to your actual barrel export path
 import RecentFilters from "./RecentFilters";
 import { groupItemsByRecency } from "./RecencyBuckets";
 import { applyRecentFilters, DEFAULT_RECENT_FILTERS } from "./ApplyRecentFilters";
@@ -9,6 +9,7 @@ import { useAuth } from "../../../Contexts";
 export default function RecentView({
   items,
   viewMode,
+  isRecentRoute,
   dirId,
   selectedItems,
   onSelect,
@@ -31,7 +32,8 @@ export default function RecentView({
 
   return (
     <div className="gd-recent">
-      <RecentFilters items={items} filters={filters} onChange={setFilters} user={user} />
+      <RecentFilters items={items} filters={filters} onChange={setFilters} user={user} isRecentRoute={isRecentRoute} />
+      {viewMode === "list" && listHeaderRow}
 
       {groups.length === 0 ? (
         <div className="gd-empty">
@@ -42,7 +44,6 @@ export default function RecentView({
         groups.map(({ label, items: groupItems }) => (
           <div key={label} className="gd-recency-group">
             <div className="gd-section-label">{label}</div>
-            {viewMode === "list" && listHeaderRow}
             <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
               {groupItems.map((item) => (
                 <ItemComponent

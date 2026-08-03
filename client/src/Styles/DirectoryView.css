@@ -591,13 +591,16 @@ body {
 
 .gd-grid-item-name {
   font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
-  padding: 16px 28px 16px 4px;
 }
 
 .gd-grid-item-menu {
@@ -1465,11 +1468,8 @@ body.gd-overlay-open {
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   transition: background var(--transition);
-}
-.gd-icon-btn {
-  color: var(--text-tertiary);
 }
 .gd-icon-btn:hover {
   background: var(--btn-hover-primary);

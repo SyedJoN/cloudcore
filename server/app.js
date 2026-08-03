@@ -20,8 +20,10 @@ import { LIMITERS } from "./config/limiters.js";
 
 import {
   getSharedWithMe,
+  getStarredItems,
   getTrashItems,
   sendLink,
+  toggleItemStar,
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
@@ -68,10 +70,8 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 app.use((req, res, next) => {
   if (
     req.method === "POST" &&
-    (
-      /^\/file\/[^/]+$/.test(req.path) ||
-      req.originalUrl === "/subscription/stripe/events"
-    )
+    (/^\/file\/[^/]+$/.test(req.path) ||
+      req.originalUrl === "/subscription/stripe/events")
   ) {
     return next();
   }
@@ -111,9 +111,10 @@ app.use("/subscription", subscriptionRoutes);
 app.use("/user", checkAuth, validateDeletedUser, userRoutes);
 app.use("/auth", /*rateLimitMiddleware(LIMITERS.auth)*/ authRoutes);
 app.get("/shared", checkAuth, getSharedWithMe);
+app.get("/starred", checkAuth, getStarredItems);
 app.get("/trash/{:id}", checkAuth, getTrashItems);
-app.post("/resource/send-link", checkAuth, sendLink);
-
+app.patch("/item/:type/:id/toggle-star", checkAuth, toggleItemStar);
+app.post("/item/send-link", checkAuth, sendLink);
 
 app.use((err, req, res, next) => {
   console.log(err);

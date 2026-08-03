@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   IconClose,
   IconDownload,
@@ -6,17 +7,24 @@ import {
   IconShare,
   IconLink,
   IconTrash,
+  IconStarred,
 } from "../../Components/Icons/Icons";
 import { useToast } from "../../Contexts";
+
+import { StarIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 export default function SelectionBar({
   dirId,
   combinedItems,
   selectedItems,
+  isStarred,
+  setIsStarred,
   hasFileSelected,
   isDeleted,
   isTrashRoute,
   isGoogleDriveRoute,
+  onStar,
   onClear,
   onDownload,
   onRename,
@@ -85,6 +93,24 @@ export default function SelectionBar({
               onClick={onShare}
             >
               <IconShare size={18} />
+            </button>
+            <button
+              className="gd-sel-action-btn"
+              title="Star"
+              onClick={() => {
+                setIsStarred((prev) => ({
+                  ...prev,
+                  [item._id]: !prev[item._id],
+                }));
+
+                onStar();
+              }}
+            >
+              {isStarred[item?._id] ? (
+                <StarIconSolid className="w-5 h-5" />
+              ) : (
+                <StarIcon className="w-5 h-5" />
+              )}
             </button>
           </>
         )}

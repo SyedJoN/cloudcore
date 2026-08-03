@@ -41,7 +41,10 @@ const directorySchema = new Schema(
         return this.isPublic;
       },
     },
-
+   isStarred: {
+      type: Boolean,
+      default: false,
+    },
     isDeleted: {
       type: Boolean,
       default: false,

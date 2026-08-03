@@ -4,6 +4,7 @@ import {
   getSharedItems,
   getTrash,
   getGoogleDrive,
+  getStarredItems,
 } from "../apis/directoryApi";
 import { getRecentFiles } from "../apis/fileApi";
 
@@ -37,6 +38,12 @@ export const ROUTE_CONFIG = {
     path: "/recent",
     flatBreadcrumb: true,
     fetch: getRecentFiles,
+  },
+  starred: {
+    label: "Starred",
+    path: "/starred",
+    flatBreadcrumb: true,
+    fetch: getStarredItems
   },
   trash: {
     label: "Trash",

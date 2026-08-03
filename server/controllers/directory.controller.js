@@ -19,6 +19,19 @@ import { deleteFileArray } from "../services/s3/deleteArray.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
+async function addRole(item, type, userId) {
+  const canEdit = await fgaClient.check({
+    user: `user:${userId}`,
+    relation: "can_edit",
+    object: `${type}:${item._id}`,
+  });
+
+  return {
+    ...item,
+    userRole: canEdit.allowed ? "editor" : "viewer",
+  };
+}
+
 export const getDirectory = async (req, res, next) => {
   try {
     const _id = req.params.id || req.user?.parentDirId;
@@ -364,7 +377,102 @@ export const getSharedWithMe = async (req, res, next) => {
     next(error);
   }
 };
+export const getStarredItems = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(403).json({ message: "Access denied" });
 
+    const [allowedFiles, allowedFolders] = await Promise.all([
+      fgaClient.listObjects({
+        user: `user:${userId.toString()}`,
+        relation: "can_view",
+        type: "file",
+      }),
+      fgaClient.listObjects({
+        user: `user:${userId.toString()}`,
+        relation: "can_view",
+        type: "folder",
+      }),
+    ]);
+
+    const allowedFilesIds = allowedFiles.objects
+      .map((obj) => obj.split(":")[1])
+      .filter(Boolean);
+
+    const allowedFolderIds = allowedFolders.objects
+      .map((obj) => obj.split(":")[1])
+      .filter(Boolean);
+
+    const [sharedFiles, sharedDirectories, files, directories] =
+      await Promise.all([
+        allowedFilesIds.length
+          ? File.find({
+              _id: { $in: allowedFilesIds },
+              userId: { $ne: userId },
+              isStarred: true,
+            })
+              .populate("userId", "name email avatar")
+              .populate("path", "name")
+              .lean()
+          : [],
+        allowedFolderIds.length
+          ? Directory.find({
+              _id: { $in: allowedFolderIds },
+              userId: { $ne: userId },
+              isStarred: true,
+            })
+              .populate("userId", "name email avatar")
+              .populate("path", "name")
+              .lean()
+          : [],
+        File.find({ userId, isDeleted: false, isStarred: true })
+          .populate("userId", "name email avatar")
+          .populate("path", "name")
+          .lean(),
+        Directory.find({ userId, isDeleted: false, isStarred: true })
+          .populate("userId", "name email avatar")
+          .populate("path", "name")
+          .lean(),
+      ]);
+
+    // ✅ only show top-level shared items, not children of shared folders
+    const topLevelSharedFiles = sharedFiles.filter(
+      (file) => !allowedFilesIds.includes(file.parentDirId?.toString()),
+    );
+
+    const topLevelSharedDirs = sharedDirectories.filter(
+      (dir) => !allowedFolderIds.includes(dir.parentDirId?.toString()),
+    );
+
+    const topLevelFiles = files
+
+    const topLevelDirs = directories
+
+    const sharedFilesWithRoles = await Promise.all(
+      topLevelSharedFiles.map(async (file) => addRole(file, "file", userId)),
+    );
+
+    const sharedDirectoriesWithRoles = await Promise.all(
+      topLevelSharedDirs.map(async (dir) => addRole(dir, "folder", userId)),
+    );
+
+    const filesWithRoles = await Promise.all(
+      topLevelFiles.map(async (file) => addRole(file, "file", userId)),
+    );
+
+    const directoriesWithRoles = await Promise.all(
+      topLevelDirs.map(async (dir) => addRole(dir, "folder", userId)),
+    );
+
+
+    return res.status(200).json({
+      files: [...sharedFilesWithRoles, ...filesWithRoles],
+      directories: [...sharedDirectoriesWithRoles, ...directoriesWithRoles],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 export const addDirectory = async (req, res, next) => {
   const userId = req.user._id;
   const parentDirId = req.params.parentDirId || req.user.parentDirId;
@@ -764,6 +872,44 @@ export const sendLink = async (req, res, next) => {
     });
 
     return res.status(200).json({ message: "Link sent" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const toggleItemStar = async (req, res, next) => {
+  try {
+    const { id, type } = req.params;
+    const allowedTypes = ["file", "folder"];
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        message: "Invalid item type",
+      });
+    }
+    if (!id || !type) {
+      return res.status(400).json({
+        message: "Item id and type are required",
+      });
+    }
+
+    const Model = type === "folder" ? Directory : File;
+
+    const item = await Model.findById(id);
+    if (!item) {
+      return res.status(404).json({
+        message: "Item not found",
+      });
+    }
+
+    item.isStarred = !item.isStarred;
+    await item.save();
+
+    return res.status(200).json({
+      message: item.isStarred
+        ? "Item starred successfully"
+        : "Item unstarred successfully",
+    });
   } catch (error) {
     next(error);
   }

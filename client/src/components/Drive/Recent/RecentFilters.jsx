@@ -6,7 +6,6 @@ const TYPE_OPTIONS = Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
   key,
   label,
 }));
-
 const MODIFIED_OPTIONS = [
   { key: "anytime", label: "Anytime" },
   { key: "today", label: "Today" },
@@ -43,7 +42,13 @@ function FilterDropdown({ label, active, children }) {
   );
 }
 
-export default function RecentFilters({ items, filters, onChange, user }) {
+export default function RecentFilters({
+  items,
+  filters,
+  onChange,
+  isRecentRoute = false,
+  user,
+}) {
   const owners = Array.from(
     new Map(
       items
@@ -82,16 +87,19 @@ export default function RecentFilters({ items, filters, onChange, user }) {
   return (
     <div className="gd-recent-filters">
       <FilterDropdown label="Type" active={filters.types.size > 0}>
-        {TYPE_OPTIONS.map((opt) => (
-          <label key={opt.key} className="gd-filter-option">
-            <input
-              type="checkbox"
-              checked={filters.types.has(opt.key)}
-              onChange={() => toggleSetValue("types", opt.key)}
-            />
-            {opt.label}
-          </label>
-        ))}
+        {TYPE_OPTIONS.map((opt) => {
+          if (isRecentRoute && opt.label === "Folders") return;
+          return (
+            <label key={opt.key} className="gd-filter-option">
+              <input
+                type="checkbox"
+                checked={filters.types.has(opt.key)}
+                onChange={() => toggleSetValue("types", opt.key)}
+              />
+              {opt.label}
+            </label>
+          );
+        })}
       </FilterDropdown>
 
       <FilterDropdown label="People" active={filters.people.size > 0}>

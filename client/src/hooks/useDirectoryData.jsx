@@ -42,9 +42,10 @@ export function useDirectoryData({
 
         const name =
           isSharedRoute && !dirId
-            ? ROUTE_CONFIG['shared'].label
+            ? ROUTE_CONFIG["shared"].label
             : route === "google-drive"
-              ? ROUTE_CONFIG[route].label
+              ? ROUTE_CONFIG[route].label :
+              route === "starred" ? ROUTE_CONFIG[route].label
               : data?.name;
 
         setDirectoryName(name);
@@ -167,7 +168,6 @@ export function useDirectoryData({
   );
 
   const q = searchQuery.trim().toLowerCase();
-
 
   const filteredFiles = useMemo(
     () =>
