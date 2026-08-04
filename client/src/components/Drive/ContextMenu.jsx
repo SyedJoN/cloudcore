@@ -13,6 +13,7 @@ import {
   IconRestore,
 } from "../Icons/Icons";
 import { useToast } from "../../Contexts/ToastContext";
+import { useAuth } from "../../Contexts";
 
 function useTransitionClass(open, onExited) {
   const [animate, setAnimate] = useState(false);
@@ -105,20 +106,26 @@ function ContextMenuContent({
   onPreview,
   isDeleted,
 }) {
-  const [showOpenWith, setShowOpenWith] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const openWithHover = useHoverIntent(setShowOpenWith);
-  const shareHover = useHoverIntent(setShowShare);
   const { animate, nodeRef, onTransitionEnd } = useTransitionClass(
     open,
     onExited,
   );
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [showOpenWith, setShowOpenWith] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const openWithHover = useHoverIntent(setShowOpenWith);
+  const shareHover = useHoverIntent(setShowShare);
 
   const type = item?.webViewLink ? "google" : "local";
-  const isOwner = item?.userRole === "owner";
+  const isOwner = item?.userId?._id === user.id || item.owners?.[0].me === true;
+
   const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
-  const canEdit = isOwner || !isViewer;
+  const canEdit =
+    type === "google"
+      ? isOwner || item.capabilities?.canEdit
+      : isOwner || !isViewer;
+  const canDelete = type === "google" && item.capabilities?.canDelete === true;
 
   const showDeleteActions = isTrashRoute && isDeleted && !dirId;
   const showFileActions = Boolean(item) && !item?.isDirectory;
@@ -271,7 +278,7 @@ function ContextMenuContent({
           )}
 
           {/* Rename / trash */}
-          {canEdit && item && !isDeleted && (
+          {canEdit && item && !isDeleted && !isGoogleDriveRoute && (
             <>
               <button
                 className="gd-context-item"
@@ -301,15 +308,26 @@ function ContextMenuContent({
               </button>
             </>
           )}
-          {isGoogleDriveRoute &&
-               <button
-                className="gd-context-item danger"
-                onClick={close(() => onDelete(item, type))}
-                
-              >
-                <IconTrash size={18} /> Delete Forever
-              </button>
-          }
+          {isGoogleDriveRoute && (
+            <>
+              {canEdit && (
+                <button
+                  className="gd-context-item"
+                  onClick={close(() => onRename(item))}
+                >
+                  <IconRename size={18} /> Rename
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="gd-context-item danger"
+                  onClick={close(() => onDelete(item, type))}
+                >
+                  <IconTrash size={18} /> Delete Forever
+                </button>
+              )}
+            </>
+          )}
           {canEdit && item && !isDeleted && !isGoogleDriveRoute && (
             <button
               className="gd-context-item danger"

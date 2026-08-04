@@ -87,7 +87,9 @@ body {
   height: 0;
   width: 0;
 }
-
+.disabled {
+  opacity: 0.6
+}
 /* ===================== APP SHELL ===================== */
 .directory-view {
   display: flex;
@@ -286,14 +288,14 @@ body {
   color: #1a73e8;
   padding: 8px 12px;
 }
-.gd-btn-text:hover {
+.gd-btn-text:hover:not(.disabled) {
   background: var(--accent-blue-light);
 }
 .gd-btn-primary {
   background: #1a73e8;
   color: white;
 }
-.gd-btn-primary:hover {
+.gd-btn-primary:hover:not(.disabled) {
   background: var(--accent-blue-hover);
   box-shadow: var(--shadow-1);
 }

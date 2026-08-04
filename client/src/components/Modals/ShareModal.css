@@ -190,7 +190,7 @@
   transition: background var(--transition);
 }
 .gd-role-option:hover {
-  background: rgba(32, 33, 36, 0.08);
+  background: var(--btn-bg-medium);
 }
 .gd-role-option .role-desc {
   font-size: 11px;
@@ -382,8 +382,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  background: var(--accent-blue-light);
-  color: var(--accent-blue);
+  background: var(--btn-bg-medium);
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -394,10 +394,10 @@
   white-space: nowrap;
 }
 .gd-copy-link-btn:hover {
-  background: var(--accent-blue-light-hover);
+  background: var(--accent-blue-light);
 }
 .gd-copy-link-btn.copied {
-  background: #e6f4ea;
+  background: var(--surface-white);
   color: #1e8e3e;
 }
 .gd-share-footer {

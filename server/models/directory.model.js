@@ -33,7 +33,16 @@ const directorySchema = new Schema(
       type: Boolean,
       default: false,
     },
-
+ viewedByMeTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
+    modifiedTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
+    },
     publicRole: {
       type: String,
       enum: ["viewer", "editor"],

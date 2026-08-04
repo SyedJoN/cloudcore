@@ -25,7 +25,9 @@ import FileViewer from "../Components/File/FileViewer";
 import TopBanner from "../Components/Banners/TopBanner";
 import {
   deleteFile,
+  grantAccessById,
   restoreFile,
+  revokeFileAccess,
   softDeleteFile,
   toggleDriveFilePermission,
   toggleFilePublic,
@@ -132,7 +134,6 @@ export default function DirectoryView({ route }) {
 
   useEffect(() => {
     if (!dirId) {
-      console.log("refresh");
       refreshUser();
     }
   }, [dirId]);
@@ -221,10 +222,6 @@ export default function DirectoryView({ route }) {
       clearSelection();
     }
   }, [directoriesList, filesList]);
-
-  useEffect(() => {
-    console.log(isStarred);
-  }, [isStarred]);
 
   useEffect(() => {
     checkGoogleDriveAccess();
@@ -390,11 +387,12 @@ export default function DirectoryView({ route }) {
         item?.isDirectory && type === "local"
           ? `/directory/${item._id}`
           : `/file/${item._id ?? item.id}?type=${type}`;
-      await deleteFile(url);
+      const { data } = await deleteFile(url);
       type === "google"
         ? refreshCurrentDirectory("google")
         : getTrashItems(showError);
       clearSelection();
+      toast({ message: data.message, type: "success" });
     } catch (err) {
       showError(err.message);
     }
@@ -425,13 +423,14 @@ export default function DirectoryView({ route }) {
     setRenameValue(item.name);
     setShowRename(true);
   }
-
+const [isRenameLoading, setIsRenameLoading] = useState(false);
   async function handleRenameSubmit(e) {
     e.preventDefault();
     showError("");
     try {
+      setIsRenameLoading(true);
       const url =
-        renameType === "file" || "google"
+        renameType === "file" || renameType === "google"
           ? `/file/${renameId}?type=${renameType}`
           : `/directory/${renameId}`;
       const body =
@@ -441,11 +440,14 @@ export default function DirectoryView({ route }) {
             ? { fileName: renameValue }
             : { newDirName: renameValue };
 
-      await axiosWithCreds.patch(url, body);
+      const { data } = await axiosWithCreds.patch(url, body);
       setShowRename(false);
+      toast({ message: data.message, type: "success" });
       refreshCurrentDirectory(renameType);
     } catch (err) {
       showError(err.message);
+    } finally {
+      setIsRenameLoading(false);
     }
   }
   async function handleToggleStar(item) {
@@ -498,10 +500,8 @@ export default function DirectoryView({ route }) {
       const type = getResourceType(item);
       if (type.startsWith("google-drive")) {
         const userRole = DRIVE_ROLES[role] ?? "reader";
-
         const message = await toggleDriveFilePermission(id, userRole);
         toast({ message, type: "success" });
-
         return;
       }
       await toggleFilePublic(id, role, access, type);
@@ -518,16 +518,46 @@ export default function DirectoryView({ route }) {
         );
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
-      toast({ message: "Access updated", type: "success" });
+      toast({ message: "Public Access updated", type: "success" });
     } catch (error) {
       toast({ message: error.message, type: "error" });
-
       throw new Error(error || "Something went wrong!");
     } finally {
       setIsShareLoading(false);
     }
   };
 
+  async function handleSharedRoleUpdate(item, type, updatedPerson, message) {
+    try {
+      setIsShareLoading(true);
+      const { id, relation, role } = updatedPerson;
+
+      if (updatedPerson.role === "remove") {
+        await revokeFileAccess(type, item._id, id, relation);
+      } else {
+        const personArray = [{ ...updatedPerson, relation: role }];
+        await grantAccessById(type, item._id, personArray, message);
+      }
+      const update = (list) =>
+        list.map((f) =>
+          (f.id ?? f._id) === (item._id ?? item.id)
+            ? {
+                ...f,
+                userRole: updatedPerson.role === "remove" ? undefined : role,
+              }
+            : f,
+        );
+      setFilesList((prev) => update(prev));
+      setDirectoriesList((prev) => update(prev));
+      setShareItem(null);
+      toast({ message: "Access updated", type: "success" });
+    } catch (error) {
+      toast({ message: error.message ?? "Error", type: "error" });
+      throw new Error(error || "Something went wrong!");
+    } finally {
+      setIsShareLoading(false);
+    }
+  }
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -663,7 +693,7 @@ export default function DirectoryView({ route }) {
                   <DriveEmptyState />
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
-                    items={filteredFiles}
+                    items={isSharedRoute ? combinedItems : filteredFiles}
                     isRecentRoute={isRecentRoute}
                     viewMode={viewMode}
                     selectedItems={selectedItems}
@@ -716,6 +746,7 @@ export default function DirectoryView({ route }) {
 
       {showRename && (
         <RenameModal
+        isRenameLoading={isRenameLoading}
           renameValue={renameValue}
           setRenameValue={setRenameValue}
           onRenameSubmit={handleRenameSubmit}
@@ -731,8 +762,7 @@ export default function DirectoryView({ route }) {
         isStarred={isStarred}
         setIsStarred={setIsStarred}
         isDeleted={isDeleted}
-        isTrashRoute={isTrashRoute}
-        isGoogleDriveRoute={isGoogleDriveRoute}
+        route={route}
         onClear={() => {
           clearSelection();
           setContextItem(null);
@@ -847,6 +877,7 @@ export default function DirectoryView({ route }) {
       {shareItem && (
         <ShareModal
           item={shareItem}
+          onUpdateRoleAfterSave={handleSharedRoleUpdate}
           onClose={handleShareItem}
           setShareItem={setShareItem}
           isShareLoading={isShareLoading}

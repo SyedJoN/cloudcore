@@ -928,18 +928,32 @@ export const fetchItemPermissions = async (req, res, next) => {
     const { id } = req.params;
     const { type = "file" } = req.query;
 
-    if (!id) return res.status(404).json({ message: "Id missing" });
+    if (!id) {
+      return res.status(404).json({ message: "Id missing" });
+    }
 
     const object = `${type === "folder" ? "folder" : "file"}:${id}`;
 
-    const tuples = await fgaClient.read({ tuple_key: { object } });
+    // ── read all pages ──────────────────────────────────────────
+    let allTuples = [];
+    let continuationToken = undefined;
 
-    const collaborators = tuples.tuples
+    do {
+      const response = await fgaClient.read(
+        { tuple_key: { object } },
+        { continuationToken },
+      );
+      allTuples = allTuples.concat(response.tuples);
+      continuationToken = response.continuation_token;
+    } while (continuationToken);
+    // ────────────────────────────────────────────────────────────
+
+    const collaborators = allTuples
       .filter(
         (t) =>
-          t.key.object === object && // ✅ manual filter since fgaClient.read ignores object filter
+          t.key.object === object &&
           t.key.user.startsWith("user:") &&
-          (t.key.relation === "viewer" || t.key.relation === "editor"),
+          ["viewer", "editor"].includes(t.key.relation),
       )
       .map((t) => ({
         userId: t.key.user.split(":")[1],
@@ -957,15 +971,16 @@ export const fetchItemPermissions = async (req, res, next) => {
       .lean();
 
     const result = users.map((user) => {
-      const collab = collaborators.find(
-        (c) => c.userId === user._id.toString(),
-      );
+      const permissions = collaborators
+        .filter((c) => c.userId === user._id.toString())
+        .map((c) => c.relation);
+
       return {
         id: user._id,
         name: user.name,
         email: user.email,
         avatar: user.avatar,
-        relation: collab?.relation,
+        permissions,
       };
     });
 
@@ -1044,7 +1059,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     // Get current file permissions
     const permissions = await drive.permissions.list({
       fileId,
-      fields: "permissions(id,type,role,allowFileDiscovery)",
+      fields: "permissions(id,type,role,photoLink,allowFileDiscovery)",
     });
 
     const publicPermission = permissions.data.permissions.find(

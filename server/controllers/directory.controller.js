@@ -19,6 +19,17 @@ import { deleteFileArray } from "../services/s3/deleteArray.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
+const resolveRole = async (item, type, userId, parentDir) => {
+  if (!userId) return parentDir.publicRole || "viewer";
+  if (item.userId?._id?.toString() === userId.toString()) return "owner";
+  const canEdit = await fgaClient.check({
+    user: `user:${userId}`,
+    relation: "can_edit",
+    object: `${type}:${item._id}`,
+  });
+  return canEdit.allowed ? "editor" : parentDir.publicRole || "viewer";
+};
+
 async function addRole(item, type, userId) {
   const canEdit = await fgaClient.check({
     user: `user:${userId}`,
@@ -30,6 +41,16 @@ async function addRole(item, type, userId) {
     ...item,
     userRole: canEdit.allowed ? "editor" : "viewer",
   };
+}
+
+async function listObjects(userId, type) {
+  const canView = await fgaClient.listObjects({
+    user: `user:${userId.toString()}`,
+    relation: "can_view",
+    type,
+  });
+
+  return canView.objects.map((o) => o.split(":").pop()).filter(Boolean);
 }
 
 export const getDirectory = async (req, res, next) => {
@@ -45,6 +66,7 @@ export const getDirectory = async (req, res, next) => {
     if (!parentDir)
       return res.status(404).json({ message: "Directory not found" });
 
+    // fetching children
     if (parentDir.isPublic) {
       const [files, directories] = await Promise.all([
         File.find({ parentDirId: parentDir._id, isDeleted: false })
@@ -57,48 +79,43 @@ export const getDirectory = async (req, res, next) => {
           .lean(),
       ]);
 
-      if (userId && parentDir.userId.toString() !== userId.toString()) {
+      if (
+        userId &&
+        parentDir &&
+        parentDir.userId.toString() !== userId.toString()
+      ) {
         const relation = parentDir.publicRole || "viewer";
-        Promise.allSettled([
-          fgaClient.write({
-            writes: {
-              tuple_keys: [
-                {
-                  user: `user:${userId}`,
-                  relation,
-                  object: `folder:${parentDir._id}`,
-                },
-              ],
-              on_duplicate: "skip",
+        await fgaClient.write(
+          {
+            writes: [
+              {
+                user: `user:${userId}`,
+                relation,
+                object: `folder:${parentDir._id}`,
+              },
+            ],
+          },
+          {
+            transaction: {
+              disable: true,
             },
-          }),
-        ]);
+          },
+        );
       }
 
       const { files: _, directories: __, ...parentDirData } = parentDir;
-
-      const resolveRole = async (item, type) => {
-        if (!userId) return parentDir.publicRole || "viewer";
-        if (item.userId?._id?.toString() === userId.toString()) return "owner";
-        const canEdit = await fgaClient.check({
-          user: `user:${userId}`,
-          relation: "can_edit",
-          object: `${type}:${item._id}`,
-        });
-        return canEdit.allowed ? "editor" : parentDir.publicRole || "viewer";
-      };
 
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
           files.map(async (f) => ({
             ...f,
-            userRole: await resolveRole(f, "file"),
+            userRole: await resolveRole(f, "file", userId, parentDir),
           })),
         ),
         Promise.all(
           directories.map(async (d) => ({
             ...d,
-            userRole: await resolveRole(d, "folder"),
+            userRole: await resolveRole(d, "folder", userId, parentDir),
           })),
         ),
       ]);
@@ -124,7 +141,7 @@ export const getDirectory = async (req, res, next) => {
         userId: req.user?._id,
       });
 
-    // ✅ check if user can view this currentDirectory
+    // checking if user can view this currentDirectory
     const canView = await fgaClient.check({
       user: `user:${userId}`,
       relation: "can_view",
@@ -138,29 +155,14 @@ export const getDirectory = async (req, res, next) => {
         name: parentDir.name,
       });
 
-    const [allowedFiles, allowedFolders] = await Promise.all([
-      fgaClient.listObjects({
-        user: `user:${userId}`,
-        relation: "can_view",
-        type: "file",
-      }),
-      fgaClient.listObjects({
-        user: `user:${userId}`,
-        relation: "can_view",
-        type: "folder",
-      }),
+    const [allowedFileIds, allowedFolderIds] = await Promise.all([
+      listObjects(userId, "file"),
+      listObjects(userId, "folder"),
     ]);
-
-    const allowedFilesIds = allowedFiles.objects
-      .map((o) => o.split(":")[1])
-      .filter(Boolean);
-    const allowedFolderIds = allowedFolders.objects
-      .map((o) => o.split(":")[1])
-      .filter(Boolean);
 
     const [files, directories] = await Promise.all([
       File.find({
-        _id: { $in: allowedFilesIds },
+        _id: { $in: allowedFileIds },
         parentDirId: parentDir._id,
         isDeleted: false,
       })
@@ -248,7 +250,7 @@ export const getTrashItems = async (req, res, next) => {
       .lean();
     if (id) {
       const dir = await Directory.findById(id).populate("path", "name").lean();
-      // ✅ inside a deleted currentDirectory — show its undeleted children
+      // inside a deleted currentDirectory show its undeleted children
       const [files, directories] = await Promise.all([
         File.find({ userId, parentDirId: id, isDeleted: true })
           .populate("userId", "name email avatar")
@@ -262,7 +264,7 @@ export const getTrashItems = async (req, res, next) => {
       return res.status(200).json({ ...dir, files, directories });
     }
 
-    // ✅ trash currentDirectory — show only top level deleted items
+    // Show only top level deleted items
     const [files, directories] = await Promise.all([
       File.find({ userId, isDeleted: true })
         .populate("userId", "name email avatar")
@@ -297,31 +299,15 @@ export const getSharedWithMe = async (req, res, next) => {
     const userId = req.user?._id;
     if (!userId) return res.status(403).json({ message: "Access denied" });
 
-    const [allowedFiles, allowedFolders] = await Promise.all([
-      fgaClient.listObjects({
-        user: `user:${userId.toString()}`,
-        relation: "can_view",
-        type: "file",
-      }),
-      fgaClient.listObjects({
-        user: `user:${userId.toString()}`,
-        relation: "can_view",
-        type: "folder",
-      }),
+    const [allowedFileIds, allowedFolderIds] = await Promise.all([
+      listObjects(userId, "file"),
+      listObjects(userId, "folder"),
     ]);
 
-    const allowedFilesIds = allowedFiles.objects
-      .map((obj) => obj.split(":")[1])
-      .filter(Boolean);
-
-    const allowedFolderIds = allowedFolders.objects
-      .map((obj) => obj.split(":")[1])
-      .filter(Boolean);
-
     const [files, directories] = await Promise.all([
-      allowedFilesIds.length
+      allowedFileIds.length
         ? File.find({
-            _id: { $in: allowedFilesIds },
+            _id: { $in: allowedFileIds },
             userId: { $ne: userId },
           })
             .populate("userId", "name email avatar")
@@ -339,7 +325,7 @@ export const getSharedWithMe = async (req, res, next) => {
         : [],
     ]);
 
-    // ✅ only show top-level shared items, not children of shared folders
+    // only show top-level shared items, not children of shared folders
     const topLevelFiles = files.filter(
       (file) => !allowedFolderIds.includes(file.parentDirId?.toString()),
     );
@@ -349,25 +335,11 @@ export const getSharedWithMe = async (req, res, next) => {
     );
 
     const filesWithRoles = await Promise.all(
-      topLevelFiles.map(async (file) => {
-        const canEdit = await fgaClient.check({
-          user: `user:${userId.toString()}`,
-          relation: "can_edit",
-          object: `file:${file._id.toString()}`,
-        });
-        return { ...file, userRole: canEdit.allowed ? "editor" : "viewer" };
-      }),
+      topLevelFiles.map(async (file) => addRole(file, "file", userId)),
     );
 
     const directoriesWithRoles = await Promise.all(
-      topLevelDirs.map(async (dir) => {
-        const canEdit = await fgaClient.check({
-          user: `user:${userId.toString()}`,
-          relation: "can_edit",
-          object: `folder:${dir._id.toString()}`,
-        });
-        return { ...dir, userRole: canEdit.allowed ? "editor" : "viewer" };
-      }),
+      topLevelDirs.map(async (dir) => addRole(dir, "folder", userId)),
     );
 
     return res
@@ -382,32 +354,16 @@ export const getStarredItems = async (req, res, next) => {
     const userId = req.user?._id;
     if (!userId) return res.status(403).json({ message: "Access denied" });
 
-    const [allowedFiles, allowedFolders] = await Promise.all([
-      fgaClient.listObjects({
-        user: `user:${userId.toString()}`,
-        relation: "can_view",
-        type: "file",
-      }),
-      fgaClient.listObjects({
-        user: `user:${userId.toString()}`,
-        relation: "can_view",
-        type: "folder",
-      }),
+    const [allowedFileIds, allowedFolderIds] = await Promise.all([
+      listObjects(userId, "file"),
+      listObjects(userId, "folder"),
     ]);
-
-    const allowedFilesIds = allowedFiles.objects
-      .map((obj) => obj.split(":")[1])
-      .filter(Boolean);
-
-    const allowedFolderIds = allowedFolders.objects
-      .map((obj) => obj.split(":")[1])
-      .filter(Boolean);
 
     const [sharedFiles, sharedDirectories, files, directories] =
       await Promise.all([
-        allowedFilesIds.length
+        allowedFileIds.length
           ? File.find({
-              _id: { $in: allowedFilesIds },
+              _id: { $in: allowedFileIds },
               userId: { $ne: userId },
               isStarred: true,
             })
@@ -435,18 +391,14 @@ export const getStarredItems = async (req, res, next) => {
           .lean(),
       ]);
 
-    // ✅ only show top-level shared items, not children of shared folders
+    // only show top-level shared items, not children of shared folders
     const topLevelSharedFiles = sharedFiles.filter(
-      (file) => !allowedFilesIds.includes(file.parentDirId?.toString()),
+      (file) => !allowedFileIds.includes(file.parentDirId?.toString()),
     );
 
     const topLevelSharedDirs = sharedDirectories.filter(
       (dir) => !allowedFolderIds.includes(dir.parentDirId?.toString()),
     );
-
-    const topLevelFiles = files
-
-    const topLevelDirs = directories
 
     const sharedFilesWithRoles = await Promise.all(
       topLevelSharedFiles.map(async (file) => addRole(file, "file", userId)),
@@ -457,13 +409,12 @@ export const getStarredItems = async (req, res, next) => {
     );
 
     const filesWithRoles = await Promise.all(
-      topLevelFiles.map(async (file) => addRole(file, "file", userId)),
+      files.map(async (file) => addRole(file, "file", userId)),
     );
 
     const directoriesWithRoles = await Promise.all(
-      topLevelDirs.map(async (dir) => addRole(dir, "folder", userId)),
+      directories.map(async (dir) => addRole(dir, "folder", userId)),
     );
-
 
     return res.status(200).json({
       files: [...sharedFilesWithRoles, ...filesWithRoles],
@@ -511,14 +462,14 @@ export const addDirectory = async (req, res, next) => {
     await fgaClient.write({
       writes: [
         {
-          user: `user:${userId.toString()}`,
+          user: `user:${userId}`,
           relation: "owner",
-          object: `folder:${addedDirectory._id.toString()}`,
+          object: `folder:${addedDirectory._id}`,
         },
         {
-          user: `folder:${parentDirId.toString()}`,
+          user: `folder:${parentDirId}`,
           relation: "parentDir",
-          object: `folder:${addedDirectory._id.toString()}`,
+          object: `folder:${addedDirectory._id}`,
         },
       ],
     });
@@ -539,7 +490,7 @@ export const editDirectory = async (req, res, next) => {
     relation: "can_edit",
     object: `folder:${id}`,
   });
-  if (!isEditor) {
+  if (!isEditor.allowed) {
     return res.status(403).json({ message: "Unauthorized" });
   }
   try {
@@ -567,27 +518,6 @@ export const softDeleteDirectory = async (req, res, next) => {
       return res.status(404).json({ message: "Directory not found" });
     const isOwner = currentDirectory.userId.toString() === userId.toString();
 
-    if (!isOwner) {
-      const queue = [id];
-      const allFolderIds = [id];
-      const allFileIds = [];
-
-      while (queue.length) {
-        const currentId = queue.shift();
-        const [childDirs, childFiles] = await Promise.all([
-          Directory.find({ parentDirId: currentId }).select("_id").lean(),
-          File.find({ parentDirId: currentId }).select("_id").lean(),
-        ]);
-        childDirs.forEach((d) => {
-          allFolderIds.push(d._id);
-          queue.push(d._id);
-        });
-        childFiles.forEach((f) => allFileIds.push(f._id));
-      }
-      return res
-        .status(200)
-        .json({ message: "Folder removed from shared view" });
-    }
     const queue = [currentDirectory._id];
     const allDirIds = [id];
     const allFileIds = [];
@@ -681,9 +611,8 @@ export const deleteDirectory = async (req, res, next) => {
       Directory.deleteMany({ _id: { $in: allDirIds.map((d) => d._id) } }),
     ]);
 
-    // Build FGA deletes
     const deletes = [
-      // file tuples
+
       ...files.flatMap((f) => [
         { user: `user:${userId}`, relation: "owner", object: `file:${f._id}` },
         { user: `user:${userId}`, relation: "editor", object: `file:${f._id}` },
@@ -694,7 +623,7 @@ export const deleteDirectory = async (req, res, next) => {
           object: `file:${f._id}`,
         },
       ]),
-      // folder tuples
+   
       ...allDirIds.flatMap((dir) => [
         {
           user: `user:${userId}`,

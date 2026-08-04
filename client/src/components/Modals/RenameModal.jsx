@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 function RenameModal({
   renameValue,
   setRenameValue,
+  isRenameLoading,
   onClose,
   onRenameSubmit,
 }) {
@@ -36,7 +37,6 @@ function RenameModal({
     e.stopPropagation();
   };
 
-
   const handleOverlayClick = () => {
     onClose();
   };
@@ -56,13 +56,18 @@ function RenameModal({
           <div className="gd-modal-actions">
             <button
               type="button"
-              className="gd-btn gd-btn-text"
+              className={`gd-btn gd-btn-text ${isRenameLoading ? "disabled" : ""}`}
               onClick={onClose}
+              disabled={isRenameLoading}
             >
               Cancel
             </button>
-            <button type="submit" className="gd-btn gd-btn-primary">
-              OK
+            <button
+              type="submit"
+              className={`gd-btn gd-btn-primary ${isRenameLoading ? "disabled" : ""}`}
+              disabled={isRenameLoading}
+            >
+              {isRenameLoading ? "Renaming..." : "Rename"}
             </button>
           </div>
         </form>

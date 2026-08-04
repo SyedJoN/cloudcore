@@ -9,7 +9,7 @@ import {
   IconTrash,
   IconStarred,
 } from "../../Components/Icons/Icons";
-import { useToast } from "../../Contexts";
+import { useAuth, useToast } from "../../Contexts";
 
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -22,8 +22,7 @@ export default function SelectionBar({
   setIsStarred,
   hasFileSelected,
   isDeleted,
-  isTrashRoute,
-  isGoogleDriveRoute,
+  route,
   onStar,
   onClear,
   onDownload,
@@ -35,6 +34,7 @@ export default function SelectionBar({
 }) {
   if (selectedItems.size === 0) return null;
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const item = combinedItems.find((item) =>
     selectedItems.has(item.id ?? item._id),
@@ -44,11 +44,17 @@ export default function SelectionBar({
   const isFile = !item?.isDirectory;
   const publicRole = item?.publicRole;
 
-  const isOwner = userRole === "owner";
+  const isOwner = item?.userId?._id === user.id || item.owners?.[0].me === true;
   const isViewer = userRole === "viewer" || publicRole === "viewer";
-  const canEdit = isOwner || !isViewer;
+  const canEdit =
+    type === "google"
+      ? isOwner || item.capabilities?.canEdit
+      : isOwner || !isViewer;
+  const canDelete = type === "google" && item.capabilities?.canDelete === true;
+  const isTrashRoute = route === "trash";
+  const isSharedRoute = route === "shared";
+  const isGoogleDriveRoute = route === "google-drive";
 
-  const trashRoute = isTrashRoute && isDeleted && !dirId;
   const showFileActions = isFile;
 
   function handleCopyLink() {
@@ -94,24 +100,26 @@ export default function SelectionBar({
             >
               <IconShare size={18} />
             </button>
-            <button
-              className="gd-sel-action-btn"
-              title="Star"
-              onClick={() => {
-                setIsStarred((prev) => ({
-                  ...prev,
-                  [item._id]: !prev[item._id],
-                }));
+            {!isGoogleDriveRoute && (
+              <button
+                className="gd-sel-action-btn"
+                title="Star"
+                onClick={() => {
+                  setIsStarred((prev) => ({
+                    ...prev,
+                    [item._id]: !prev[item._id],
+                  }));
 
-                onStar();
-              }}
-            >
-              {isStarred[item?._id] ? (
-                <StarIconSolid className="w-5 h-5" />
-              ) : (
-                <StarIcon className="w-5 h-5" />
-              )}
-            </button>
+                  onStar();
+                }}
+              >
+                {isStarred[item?._id] ? (
+                  <StarIconSolid className="w-5 h-5" />
+                ) : (
+                  <StarIcon className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </>
         )}
         {!isDeleted && (
@@ -151,23 +159,27 @@ export default function SelectionBar({
         )}
         {isGoogleDriveRoute && (
           <>
-            <button
-              className="gd-sel-action-btn"
-              title="Edit"
-              onClick={onRename}
-            >
-              <IconRename size={18} />
-            </button>
-            <button
-              className="gd-sel-action-btn gd-sel-action-danger"
-              title="Delete Forever"
-              onClick={() => onDeleteForever(type)}
-            >
-              <IconTrash size={18} />
-            </button>
+            {canEdit && (
+              <button
+                className="gd-sel-action-btn"
+                title="Edit"
+                onClick={onRename}
+              >
+                <IconRename size={18} />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                className="gd-sel-action-btn gd-sel-action-danger"
+                title="Delete Forever"
+                onClick={() => onDeleteForever(type)}
+              >
+                <IconTrash size={18} />
+              </button>
+            )}
           </>
         )}
-        {!isGoogleDriveRoute && !isDeleted && (isOwner || canEdit) && (
+        {!isGoogleDriveRoute && !isDeleted && !isSharedRoute && isOwner && (
           <button
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Move to trash"
@@ -176,6 +188,19 @@ export default function SelectionBar({
             <IconTrash size={18} />
           </button>
         )}
+        {!isGoogleDriveRoute &&
+          !isDeleted &&
+          !isSharedRoute &&
+          canEdit &&
+          !isOwner && (
+            <button
+              className="gd-sel-action-btn gd-sel-action-danger"
+              title="Remove"
+              onClick={onDeleteForever}
+            >
+              <IconTrash size={18} />
+            </button>
+          )}
       </div>
     </div>
   );
