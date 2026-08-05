@@ -108,10 +108,11 @@
   gap: 8px;
 }
 .gd-share-input-wrap {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-inverse);
   border-radius: var(--radius-sm);
   padding: 0 12px;
   height: 44px;
@@ -385,13 +386,14 @@
   background: var(--btn-bg-medium);
   color: var(--text-primary);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   font-size: 13px;
   font-weight: 500;
   font-family: var();
   cursor: pointer;
   transition: background var(--transition);
   white-space: nowrap;
+  margin-right: auto;
 }
 .gd-copy-link-btn:hover {
   background: var(--accent-blue-light);
@@ -403,8 +405,9 @@
 .gd-share-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   padding: 12px 24px 16px;
-  border-top: 1px solid var(--border);
+  gap: normal 16px;
 }
 .gd-toggle-switch {
   position: relative;
@@ -454,10 +457,6 @@
   align-items: center;
   justify-content: center;
   z-index: 999;
-}
-
-.gd-share-input-wrap {
-  position: relative;
 }
 
 .share-modal {
@@ -564,7 +563,7 @@
   transition:
     opacity 0.03s linear,
     transform 0.12s cubic-bezier(0, 0, 0.2, 1);
-  background: var(--surface-white);
+  background: var(--surface-container-dark);
   pointer-events: none;
 }
 .transition-grow {
@@ -682,7 +681,7 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  background: var(--surface-white);
+  background: var(--surface-container-dark);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   min-width: 220px;
@@ -721,4 +720,11 @@
 }
 .gd-share-link-icon.active {
   background: #a4e0b5;
+}
+.gd-pending-span {
+  display: "flex";
+  flex-direction: column;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-style: italic;
 }

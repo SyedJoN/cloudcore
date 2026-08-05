@@ -43,12 +43,12 @@ export async function toggleFilePublic(itemId, role, access, type) {
   return data.message;
 }
 export async function toggleDriveFilePermission(fileId, role) {
-  const { data } = await axiosWithCreds.patch(
+  const response = await axiosWithCreds.patch(
     `/file/google-drive/permissions/update`,
     {fileId, role}
   );
 
-  return data.message;
+  return response;
 }
 export async function grantAccessById(type, fileId, usersArray, message) {
   const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {
@@ -60,12 +60,20 @@ export async function grantAccessById(type, fileId, usersArray, message) {
   return data.message;
 }
 
-export async function revokeFileAccess(type, fileId, userId, relation) {
-  const { data } = await axiosWithCreds.post(`/file/revoke-access/${fileId}`, {
-    userId,
-    relation,
-    type,
-  });
+export async function revokeFileAccess(
+  type,
+  fileId,
+  targetId,
+  relation
+) {
+  const { data } = await axiosWithCreds.post(
+    `/file/revoke-access/${fileId}`,
+    {
+      targetId,
+      relation,
+      type,
+    }
+  );
 
   return data.message;
 }

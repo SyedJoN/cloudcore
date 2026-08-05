@@ -24,6 +24,12 @@ import { pauseUploads } from "../services/subscription/pauseUploads.js";
 import { updateUserPlan } from "../utils/updateUserPlan.js";
 import { getDriveClient } from "../services/googleDriveClient.js";
 
+const roleMap = {
+  viewer: "reader",
+  editor: "writer",
+  commenter: "commenter",
+};
+
 export const uploadDriveFileToS3 = async (req, res, next) => {
   const { fileId, driveFileId } = req.body;
   const userId = req.user?._id;
@@ -392,7 +398,7 @@ export const getRecentFiles = async (req, res, next) => {
   try {
     const userId = req.user?._id;
     if (!userId) return res.status(403).json({ message: "Access denied" });
-    
+
     const allowedFiles = await fgaClient.listObjects({
       user: `user:${userId.toString()}`,
       relation: "can_view",
@@ -439,7 +445,9 @@ export const getRecentFiles = async (req, res, next) => {
     const allFiles = [...ownFilesWithRoles, ...sharedFilesWithRoles];
 
     const getActivityTime = (file) => {
-      const viewed = file.viewedByMeTime ? new Date(file.viewedByMeTime).getTime() : 0;
+      const viewed = file.viewedByMeTime
+        ? new Date(file.viewedByMeTime).getTime()
+        : 0;
       const modified = file.updatedAt ? new Date(file.updatedAt).getTime() : 0;
       return Math.max(viewed, modified);
     };
@@ -777,10 +785,45 @@ export const toggleFilePublic = async (req, res, next) => {
     next(error);
   }
 };
+
 export const giveAccessById = async (req, res, next) => {
   try {
     const { usersArray, message, type } = req.body;
+    let { role, emailAddress } = usersArray[0];
     const id = req.params.id;
+
+    if (type === "google") {
+      const { drive_access_token } = req.signedCookies;
+
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
+        });
+      }
+      const googleRole = roleMap[role];
+
+      try {
+        const drive = getDriveClient(drive_access_token);
+
+        const response = await drive.permissions.create({
+          fileId: id,
+          requestBody: {
+            type: "user",
+            role: googleRole, // reader | commenter | writer
+            emailAddress,
+          },
+          sendNotificationEmail: true, // Optional
+        });
+
+        return res
+          .status(200)
+          .json({ message: "Permission granted successfully!" });
+        console.log("Permission granted:", response.data);
+      } catch (err) {
+        console.error("Error:", err.response?.data || err.message);
+        return next(err);
+      }
+    }
 
     if (!usersArray?.length) {
       return res.status(400).json({ message: "No users provided" });
@@ -858,6 +901,43 @@ export const revokeFileAccess = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { userId, type } = req.body;
+
+    if (type === "google") {
+      const { drive_access_token } = req.signedCookies;
+
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
+        });
+      }
+      try {
+        const drive = getDriveClient(drive_access_token);
+        const permissions = await drive.permissions.list({
+          fileId: id,
+          fields: "permissions(id,type)",
+        });
+
+        const publicPermission = permissions.data.permissions.find(
+          (p) => p.type === "anyone",
+        );
+
+        if (!publicPermission) {
+          return res.status(404).json({
+            message: "Public permission not found",
+          });
+        }
+        await drive.permissions.delete({
+          fileId: id,
+          permissionId: publicPermission.id,
+        });
+
+        return res
+          .status(200)
+          .json({ message: "Permission revoked successfully" });
+      } catch (err) {
+        return next(err);
+      }
+    }
 
     const item =
       type === "folder"
@@ -1059,18 +1139,12 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     // Get current file permissions
     const permissions = await drive.permissions.list({
       fileId,
-      fields: "permissions(id,type,role,photoLink,allowFileDiscovery)",
+      fields: "permissions(id,type,role,allowFileDiscovery)",
     });
 
     const publicPermission = permissions.data.permissions.find(
       (p) => p.type === "anyone",
     );
-
-    if (!publicPermission) {
-      return res.status(400).json({
-        message: "No public permission found",
-      });
-    }
 
     // Check parent folder
     const file = await drive.files.get({
@@ -1102,17 +1176,32 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
       }
     }
 
-    // Update file permission
-    const response = await drive.permissions.update({
-      fileId,
-      permissionId: publicPermission.id,
-      requestBody: {
-        role,
-      },
-      fields: "id,type,role,emailAddress,allowFileDiscovery",
-    });
+    let response;
 
-    res.status(200).json({
+    if (publicPermission) {
+      // Update existing anyone permission
+      response = await drive.permissions.update({
+        fileId,
+        permissionId: publicPermission.id,
+        requestBody: {
+          role,
+        },
+        fields: "id,type,role,emailAddress,allowFileDiscovery",
+      });
+    } else {
+      // File is restricted. Create a new anyone permission.
+      response = await drive.permissions.create({
+        fileId,
+        requestBody: {
+          type: "anyone",
+          role,
+          allowFileDiscovery: false, // "Anyone with the link"
+        },
+        fields: "id,type,role,emailAddress,allowFileDiscovery",
+      });
+    }
+
+    return res.status(200).json({
       message: "Permission updated successfully",
       permission: response.data,
     });

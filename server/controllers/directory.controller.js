@@ -66,6 +66,7 @@ export const getDirectory = async (req, res, next) => {
     if (!parentDir)
       return res.status(404).json({ message: "Directory not found" });
 
+
     // fetching children
     if (parentDir.isPublic) {
       const [files, directories] = await Promise.all([

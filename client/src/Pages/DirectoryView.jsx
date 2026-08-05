@@ -53,10 +53,12 @@ import {
   DEFAULT_RECENT_FILTERS,
 } from "../Components/Drive/Recent/ApplyRecentFilters";
 import { toggleItemStar } from "../../apis/resourceApi";
+import { searchUsers } from "../../apis/userApi";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function DirectoryView({ route }) {
+  const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
   const { user, refreshUser } = useAuth();
   const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
     useGDrive();
@@ -67,6 +69,7 @@ export default function DirectoryView({ route }) {
   const errorTimeoutRef = useRef(null);
   const grantExecutedRef = useRef(false);
   const mainRef = useRef(null);
+  const usersLoadedRef = useRef(null);
 
   const grantUserId = useMemo(
     () => new URLSearchParams(location.search).get("grant"),
@@ -88,6 +91,8 @@ export default function DirectoryView({ route }) {
   const navigate = useNavigate();
 
   const [error, setError] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState([]);
+
   const [viewMode, setViewMode] = useState("grid");
   const [showCreateDir, setShowCreateDir] = useState(false);
   const [newDirname, setNewDirname] = useState("New Folder");
@@ -101,7 +106,7 @@ export default function DirectoryView({ route }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
-  const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
+  const [allUsers, setAllUsers] = useState([]);
 
   const dirContext =
     location.state?.dirContext ||
@@ -313,6 +318,27 @@ export default function DirectoryView({ route }) {
     }
   }, [dirId, grantUserId, grantRole, navigate, toast]);
 
+  // loading users for search suggestion (ShareModal);
+  useEffect(() => {
+    async function loadAllUsers() {
+      if (usersLoadedRef.current) return;
+      usersLoadedRef.current = true;
+      try {
+        const data = await searchUsers(user.id);
+        setAllUsers(
+          data.users.map((u) => ({
+            id: u._id,
+            name: u.name,
+            email: u.email,
+            relation: u.role,
+            avatar: u.avatar,
+          })),
+        );
+      } catch (_) {}
+    }
+    loadAllUsers();
+  }, []);
+
   // Navigation
   function handleRowClick(itemId) {
     setContextItem(null);
@@ -423,7 +449,7 @@ export default function DirectoryView({ route }) {
     setRenameValue(item.name);
     setShowRename(true);
   }
-const [isRenameLoading, setIsRenameLoading] = useState(false);
+  const [isRenameLoading, setIsRenameLoading] = useState(false);
   async function handleRenameSubmit(e) {
     e.preventDefault();
     showError("");
@@ -476,7 +502,7 @@ const [isRenameLoading, setIsRenameLoading] = useState(false);
 
   function handleDownload(item) {
     try {
-      if (dirId === "google-drive") {
+      if (isGoogleDrive && isGoogleDriveRoute) {
         const url = `http://localhost:4000/auth/google-drive/download?fileId=${item.id}`;
         const a = document.createElement("a");
         a.href = url;
@@ -493,58 +519,135 @@ const [isRenameLoading, setIsRenameLoading] = useState(false);
     }
   }
 
-  const handleShareItem = async (item, role, access) => {
+  const handleToggleResourcePublic = async (item, role, access) => {
     try {
       setIsShareLoading(true);
+
       const id = item.id ?? item._id;
       const type = getResourceType(item);
-      if (type.startsWith("google-drive")) {
-        const userRole = DRIVE_ROLES[role] ?? "reader";
-        const message = await toggleDriveFilePermission(id, userRole);
-        toast({ message, type: "success" });
-        return;
+      const isGoogleDrive = type.startsWith("google-drive");
+
+      let permission;
+
+      if (isGoogleDrive) {
+        if (access === "restricted") {
+          const publicPermission = item.permissions?.find(
+            (p) => p.type === "anyone",
+          );
+          if (publicPermission) {
+            const message = await revokeFileAccess("google", id);
+
+            toast({
+              message,
+              type: "success",
+            });
+          }
+        } else {
+          const userRole = DRIVE_ROLES[role] ?? "reader";
+          const {data} = await toggleDriveFilePermission(id, userRole);
+
+          permission = data.permission;
+
+          toast({
+            message: data.message,
+            type: "success",
+          });
+        }
+      } else {
+        await toggleFilePublic(id, role, access, type);
+
+        toast({
+          message: "Public Access updated",
+          type: "success",
+        });
       }
-      await toggleFilePublic(id, role, access, type);
 
       const update = (list) =>
-        list.map((f) =>
-          f._id === id
-            ? {
-                ...f,
-                isPublic: access !== "restricted",
-                publicRole: access !== "restricted" ? role : undefined,
-              }
-            : f,
-        );
-      setFilesList((prev) => update(prev));
-      setDirectoriesList((prev) => update(prev));
-      toast({ message: "Public Access updated", type: "success" });
+        list.map((f) => {
+          if ((f.id ?? f._id) !== id) return f;
+
+          if (!isGoogleDrive) {
+            return {
+              ...f,
+              isPublic: access !== "restricted",
+              publicRole: access !== "restricted" ? role : undefined,
+            };
+          }
+
+          return {
+            ...f,
+            permissions:
+              access === "restricted"
+                ? (f.permissions ?? []).filter((p) => p?.type !== "anyone")
+                : (f.permissions ?? []).some((p) => p?.type === "anyone")
+                  ? (f.permissions ?? []).map((p) =>
+                      p?.type === "anyone" ? permission : p,
+                    )
+                  : [...(f.permissions ?? []), permission],
+          };
+        });
+
+      setFilesList(update);
+      setDirectoriesList(update);
     } catch (error) {
-      toast({ message: error.message, type: "error" });
-      throw new Error(error || "Something went wrong!");
+      toast({
+        message: error.message || "Something went wrong!",
+        type: "error",
+      });
     } finally {
       setIsShareLoading(false);
     }
   };
 
-  async function handleSharedRoleUpdate(item, type, updatedPerson, message) {
+  async function handleSharedRoleUpdate(
+    item,
+    type,
+    updatedPerson,
+    prevRole,
+    message,
+  ) {
+
+    const updatedRole =
+      type === "google"
+        ? (DRIVE_ROLES[updatedPerson.role] ?? prevRole)
+        : (updatedPerson.role ?? prevRole);
+
+    if (updatedPerson.role !== "remove" && prevRole === updatedRole) {
+      setShareItem(null);
+      return;
+    }
+
     try {
       setIsShareLoading(true);
-      const { id, relation, role } = updatedPerson;
+      const { id, relation, role, emailAddress } = updatedPerson;
 
       if (updatedPerson.role === "remove") {
-        await revokeFileAccess(type, item._id, id, relation);
+        await revokeFileAccess(type, item._id || item.id, id, relation);
       } else {
-        const personArray = [{ ...updatedPerson, relation: role }];
-        await grantAccessById(type, item._id, personArray, message);
+        const personArray = [
+          { ...updatedPerson, relation: role, emailAddress },
+        ];
+        await grantAccessById(type, item._id || item.id, personArray, message);
       }
       const update = (list) =>
         list.map((f) =>
           (f.id ?? f._id) === (item._id ?? item.id)
-            ? {
-                ...f,
-                userRole: updatedPerson.role === "remove" ? undefined : role,
-              }
+            ? type === "google"
+              ? {
+                  ...f,
+                  permissions:
+                    role === "remove"
+                      ? f.permissions?.filter((p) => p.id !== id)
+                      : f.permissions?.map((p) =>
+                          p.id === id && p.role !== "owner"
+                            ? { ...p, role: DRIVE_ROLES[role] }
+                            : p,
+                        ),
+                }
+              : {
+                  ...f,
+                  userRole: updatedPerson.role === "remove" ? undefined : role,
+                }
             : f,
         );
       setFilesList((prev) => update(prev));
@@ -746,7 +849,7 @@ const [isRenameLoading, setIsRenameLoading] = useState(false);
 
       {showRename && (
         <RenameModal
-        isRenameLoading={isRenameLoading}
+          isRenameLoading={isRenameLoading}
           renameValue={renameValue}
           setRenameValue={setRenameValue}
           onRenameSubmit={handleRenameSubmit}
@@ -876,9 +979,12 @@ const [isRenameLoading, setIsRenameLoading] = useState(false);
 
       {shareItem && (
         <ShareModal
+          selectedUsers={selectedUsers}
+          setSelectedUsers={setSelectedUsers}
           item={shareItem}
+          allUsers={allUsers}
           onUpdateRoleAfterSave={handleSharedRoleUpdate}
-          onClose={handleShareItem}
+          onClose={handleToggleResourcePublic}
           setShareItem={setShareItem}
           isShareLoading={isShareLoading}
           isGoogleDriveRoute={isGoogleDriveRoute}
