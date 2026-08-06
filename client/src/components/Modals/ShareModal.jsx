@@ -10,7 +10,7 @@ import {
   IconLock,
 } from "../Icons/Icons.jsx";
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
-import { ROLE_DESC, ROLE_LABEL } from "../../../Utils/displayUtils.js";
+import { DRIVE_ROLES, ROLE_DESC, ROLE_LABEL } from "../../../Utils/displayUtils.js";
 import { searchUsers } from "../../../apis/userApi.js";
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
@@ -645,7 +645,7 @@ export default function ShareModal({
                         onChange={(r) => {
                           setInviteRole(r);
                           setSelectedUsers((prev) =>
-                            prev.map((u) => ({ ...u, relation: r })),
+                            prev.map((u) => ({ ...u, relation: DRIVE_ROLES[r] })),
                           );
                           setOpenDropdown(null);
                         }}

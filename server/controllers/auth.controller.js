@@ -143,6 +143,7 @@ export const registerUser = async (req, res, next) => {
   }
 };
 
+
 export const loginUser = async (req, res, next) => {
   try {
     const { success, data, error } = loginSchema.safeParse(req.body);
@@ -572,6 +573,7 @@ export const googleAuth = async (req, res, next) => {
   }
 };
 
+
 export const githubAuth = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
@@ -687,7 +689,6 @@ export const githubAuth = async (req, res, next) => {
     session.endSession();
   }
 };
-
 export const googleDrive = async (req, res) => {
   const { code, dirId } = req.query;
 

@@ -12,20 +12,20 @@ const directorySchema = new Schema(
       min: 0,
     },
     parentDirId: {
-      type: mongoose.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       default: null,
     },
     path: {
       type: [
         {
-          type: mongoose.Schema.Types.ObjectId,
+          type: Schema.Types.ObjectId,
           ref: "Directory",
         },
       ],
       default: [],
     },
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
@@ -45,7 +45,7 @@ const directorySchema = new Schema(
     },
     publicRole: {
       type: String,
-      enum: ["viewer", "editor"],
+      enum: ["reader", "writer"],
       required: function () {
         return this.isPublic;
       },

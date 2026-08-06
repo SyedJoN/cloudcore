@@ -334,7 +334,9 @@ export default function DirectoryView({ route }) {
             avatar: u.avatar,
           })),
         );
-      } catch (_) {}
+      } catch (err) {
+        console.log(err.message);
+      }
     }
     loadAllUsers();
   }, []);
@@ -544,7 +546,7 @@ export default function DirectoryView({ route }) {
           }
         } else {
           const userRole = DRIVE_ROLES[role] ?? "reader";
-          const {data} = await toggleDriveFilePermission(id, userRole);
+          const { data } = await toggleDriveFilePermission(id, userRole);
 
           permission = data.permission;
 
@@ -554,7 +556,8 @@ export default function DirectoryView({ route }) {
           });
         }
       } else {
-        await toggleFilePublic(id, role, access, type);
+        const userRole = DRIVE_ROLES[role];
+        await toggleFilePublic(id, userRole, access, type);
 
         toast({
           message: "Public Access updated",
@@ -606,12 +609,7 @@ export default function DirectoryView({ route }) {
     prevRole,
     message,
   ) {
-
-    const updatedRole =
-      type === "google"
-        ? (DRIVE_ROLES[updatedPerson.role] ?? prevRole)
-        : (updatedPerson.role ?? prevRole);
-
+    const updatedRole = DRIVE_ROLES[updatedPerson.role] ?? prevRole;
     if (updatedPerson.role !== "remove" && prevRole === updatedRole) {
       setShareItem(null);
       return;
@@ -625,29 +623,24 @@ export default function DirectoryView({ route }) {
         await revokeFileAccess(type, item._id || item.id, id, relation);
       } else {
         const personArray = [
-          { ...updatedPerson, relation: role, emailAddress },
+          { ...updatedPerson, relation: DRIVE_ROLES[role], emailAddress },
         ];
         await grantAccessById(type, item._id || item.id, personArray, message);
       }
       const update = (list) =>
         list.map((f) =>
           (f.id ?? f._id) === (item._id ?? item.id)
-            ? type === "google"
-              ? {
-                  ...f,
-                  permissions:
-                    role === "remove"
-                      ? f.permissions?.filter((p) => p.id !== id)
-                      : f.permissions?.map((p) =>
-                          p.id === id && p.role !== "owner"
-                            ? { ...p, role: DRIVE_ROLES[role] }
-                            : p,
-                        ),
-                }
-              : {
-                  ...f,
-                  userRole: updatedPerson.role === "remove" ? undefined : role,
-                }
+            ? {
+                ...f,
+                permissions:
+                  role === "remove"
+                    ? f.permissions?.filter((p) => p.id !== id)
+                    : f.permissions?.map((p) =>
+                        p.id === id && p.role !== "owner"
+                          ? { ...p, role: DRIVE_ROLES[role] }
+                          : p,
+                      ),
+              }
             : f,
         );
       setFilesList((prev) => update(prev));

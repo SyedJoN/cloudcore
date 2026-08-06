@@ -29,7 +29,72 @@ const roleMap = {
   editor: "writer",
   commenter: "commenter",
 };
+const resolveRole = async (item, type, userId, parentDir) => {
+  let result = [];
+  const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
 
+  // ── read all pages ──────────────────────────────────────────
+  let allTuples = [];
+  let continuationToken = undefined;
+
+  do {
+    const response = await fgaClient.read(
+      { tuple_key: { object } },
+      { continuationToken },
+    );
+
+    allTuples = allTuples.concat(response.tuples);
+    continuationToken = response.continuation_token;
+  } while (continuationToken);
+  // ────────────────────────────────────────────────────────────
+  const collaborators = allTuples
+    .filter(
+      (t) =>
+        t.key.object === object &&
+        t.key.user.startsWith("user:") &&
+        ["owner", "reader", "writer"].includes(t.key.relation),
+    )
+    .map((t) => ({
+      userId: t.key.user.split(":")[1],
+      relation: t.key.relation,
+    }));
+
+  if (!collaborators.length) {
+    return [];
+  }
+
+  const users = await User.find({
+    _id: { $in: collaborators.map((c) => c.userId) },
+  })
+    .select("name email avatar")
+    .lean();
+
+  result = users.map((user) => ({
+    id: user._id,
+    displayName: user.name,
+    type: "user",
+    emailAddress: user.email,
+    role: collaborators.find((c) => c.userId === user._id.toString())?.relation,
+  }));
+
+  const isPublic = parentDir?.isPublic;
+  const publicRole = isPublic ? item?.publicRole : parentDir?.publicRole;
+
+  if (isPublic) {
+    result.push({
+      id: "anyoneWithLink",
+      type: "anyone",
+      role: publicRole || "reader",
+    });
+  }
+  result.push({
+    id: "superuser",
+    role: "superuser",
+    type: "superuser",
+  });
+
+  return result;
+};
 export const uploadDriveFileToS3 = async (req, res, next) => {
   const { fileId, driveFileId } = req.body;
   const userId = req.user?._id;
@@ -198,7 +263,7 @@ export const completeUpload = async (req, res, next) => {
           },
           {
             user: `folder:${uploadedFile.parentDirId.toString()}`,
-            relation: "parentDir",
+            relation: "parent",
             object: `file:${uploadedFile._id.toString()}`,
           },
         ],
@@ -243,13 +308,13 @@ export const getFileById = async (req, res, next) => {
           return res.status(403).json({ message: "Access denied" });
         }
 
-        const canView = await fgaClient.check({
+        const canRead = await fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_view",
+          relation: "can_read",
           object: `file:${id}`,
         });
 
-        if (!canView.allowed) {
+        if (!canRead.allowed) {
           return res
             .status(403)
             .json({ message: "You don't have access to this file" });
@@ -309,14 +374,14 @@ export const getFileMetaById = async (req, res, next) => {
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
-        userRole: "owner",
       });
     }
 
     // 2. PUBLIC ACCESS CHECK
-    const isAccessible = file.isPublic || parentDir?.isPublic;
+    const isPublicallyAccessible = parentDir?.isPublic;
+    file?.isPublic;
 
-    if (!isAccessible) {
+    if (!isPublicallyAccessible) {
       // 3. NOT LOGGED IN + PRIVATE FILE
       if (!userId) {
         return res.status(403).json({
@@ -326,69 +391,52 @@ export const getFileMetaById = async (req, res, next) => {
       }
 
       // 4. ACL CHECK (FGA) — private file, logged-in user
-      const [canView, canEdit] = await Promise.all([
+      const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_view",
+          relation: "can_read",
           object: `file:${id}`,
         }),
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_edit",
+          relation: "can_write",
           object: `file:${id}`,
         }),
       ]);
 
-      if (!canView.allowed) {
+      if (!canRead.allowed) {
         return res.status(403).json({ message: "Access denied" });
       }
 
       return res.status(200).json({
         ...file,
-        userRole: canEdit.allowed ? "editor" : "viewer",
       });
     }
-
-    // 5. PUBLIC FILE / FOLDER — determine effective role
-    const publicRole = file.isPublic
-      ? file.publicRole || "viewer"
-      : parentDir?.publicRole || "viewer";
 
     // 5a. Logged-in user — run FGA check so explicit grants are honoured,
     //     fall back to publicRole if FGA has no tuple for this user
     if (userId) {
-      const [canView, canEdit] = await Promise.all([
+      const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_view",
+          relation: "can_read",
           object: `file:${id}`,
         }),
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_edit",
+          relation: "can_write",
           object: `file:${id}`,
         }),
       ]);
 
-      // Derive role from FGA result; fall back to publicRole if no FGA tuple exists
-      const fgaRole = canEdit.allowed
-        ? "editor"
-        : canView.allowed
-          ? "viewer"
-          : null;
-
-      return res.status(200).json({
-        ...file,
-        userRole: fgaRole || publicRole,
-      });
+      if (canRead.checked || canWrite.checked) {
+        return res.status(200).json({
+          ...file,
+        });
+      }
     }
     file.viewedByMeTime = new Date();
     await file.save();
-    // 5b. Anonymous user — honour publicRole directly
-    return res.status(200).json({
-      ...file,
-      userRole: publicRole,
-    });
   } catch (error) {
     next(error);
   }
@@ -401,7 +449,7 @@ export const getRecentFiles = async (req, res, next) => {
 
     const allowedFiles = await fgaClient.listObjects({
       user: `user:${userId.toString()}`,
-      relation: "can_view",
+      relation: "can_read",
       type: "file",
     });
 
@@ -427,20 +475,18 @@ export const getRecentFiles = async (req, res, next) => {
     ]);
 
     const sharedFilesWithRoles = await Promise.all(
-      sharedFiles.map(async (file) => {
-        const canEdit = await fgaClient.check({
-          user: `user:${userId.toString()}`,
-          relation: "can_edit",
-          object: `file:${file._id.toString()}`,
-        });
-        return { ...file, userRole: canEdit.allowed ? "editor" : "viewer" };
-      }),
+      sharedFiles.map(async (file) => ({
+        ...file,
+        permissions: await resolveRole(file, "file", userId),
+      })),
     );
 
-    const ownFilesWithRoles = ownFiles.map((file) => ({
-      ...file,
-      userRole: "owner",
-    }));
+    const ownFilesWithRoles = await Promise.all(
+      ownFiles.map(async (file) => ({
+        ...file,
+        permissions: await resolveRole(file, "file", userId),
+      })),
+    );
 
     const allFiles = [...ownFilesWithRoles, ...sharedFilesWithRoles];
 
@@ -531,13 +577,13 @@ export const updateFile = async (req, res, next) => {
       }
 
       // 2. FGA CHECK
-      const canEdit = await fgaClient.check({
+      const canWrite = await fgaClient.check({
         user: `user:${userId}`,
-        relation: "can_edit",
+        relation: "can_write",
         object: `file:${fileId}`,
       });
 
-      if (canEdit.allowed) {
+      if (canWrite.allowed) {
         return await performRename(file, fileId, finalName, res);
       }
 
@@ -598,7 +644,7 @@ export const softDeleteFile = async (req, res, next) => {
           deleteFile: [
             {
               user: `user:${userId}`,
-              relation: "viewer",
+              relation: "reader",
               object: `file:${id}`,
             },
           ],
@@ -607,7 +653,7 @@ export const softDeleteFile = async (req, res, next) => {
           deletes: [
             {
               user: `user:${userId}`,
-              relation: "editor",
+              relation: "writer",
               object: `file:${id}`,
             },
           ],
@@ -667,12 +713,12 @@ export const deleteFile = async (req, res, next) => {
             { user: `user:${userId}`, relation: "owner", object: `file:${id}` },
             {
               user: `user:${userId}`,
-              relation: "editor",
+              relation: "writer",
               object: `file:${id}`,
             },
             {
               user: `user:${userId}`,
-              relation: "viewer",
+              relation: "reader",
               object: `file:${id}`,
             },
           ],
@@ -829,7 +875,7 @@ export const giveAccessById = async (req, res, next) => {
       return res.status(400).json({ message: "No users provided" });
     }
 
-    // ✅ prevent sharing root directory
+    // prevent sharing root directory
     if (type === "folder") {
       const folder = await Directory.findById(id).lean();
       if (!folder) return res.status(404).json({ message: "Folder not found" });
@@ -854,12 +900,12 @@ export const giveAccessById = async (req, res, next) => {
         // check if user already has access
         const existing = await fgaClient.check({
           user: `user:${user.id}`,
-          relation: "can_view",
+          relation: "can_read",
           object,
         });
 
         await Promise.allSettled(
-          ["viewer", "editor"].map((relation) =>
+          ["reader", "writer"].map((relation) =>
             fgaClient.write({
               deletes: [{ user: `user:${user.id}`, relation, object }],
             }),
@@ -871,10 +917,12 @@ export const giveAccessById = async (req, res, next) => {
             { user: `user:${user.id}`, relation: user.relation, object },
           ],
         });
+
         if (!existing.allowed) {
           const userData = await User.findById(user.id)
             .select("name email avatar")
             .lean();
+
           await sendAccessEmail({
             toEmail: userData.email,
             toName: userData.name,
@@ -900,7 +948,7 @@ export const giveAccessById = async (req, res, next) => {
 export const revokeFileAccess = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { userId, type } = req.body;
+    const { targetId: userId, type } = req.body;
 
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
@@ -910,8 +958,10 @@ export const revokeFileAccess = async (req, res, next) => {
           message: "Missing token",
         });
       }
+
       try {
         const drive = getDriveClient(drive_access_token);
+
         const permissions = await drive.permissions.list({
           fileId: id,
           fields: "permissions(id,type)",
@@ -926,79 +976,63 @@ export const revokeFileAccess = async (req, res, next) => {
             message: "Public permission not found",
           });
         }
+
         await drive.permissions.delete({
           fileId: id,
           permissionId: publicPermission.id,
         });
 
-        return res
-          .status(200)
-          .json({ message: "Permission revoked successfully" });
+        return res.status(200).json({
+          message: "Permission revoked successfully",
+        });
       } catch (err) {
         return next(err);
       }
     }
 
-    const item =
-      type === "folder"
-        ? await Directory.findById(id).select("parentDirId userId").lean()
-        : await File.findById(id).select("parentDirId userId").lean();
+    const objectType = type === "folder" ? "folder" : "file";
+    const object = `${objectType}:${id}`;
 
-    if (!item) return res.status(404).json({ message: "Item not found" });
+    const Model = type === "folder" ? Directory : File;
 
-    const parentId = item.parentDirId?.toString();
-    const relations = ["viewer", "editor"];
+    const item = await Model.findById(id).select("_id").lean();
 
-    const deleteTargets = [
-      // delete from item itself
-      ...relations.map((relation) => ({
-        user: `user:${userId}`,
-        relation,
-        object: `${type === "folder" ? "folder" : "file"}:${id}`,
-      })),
-      // delete from parent folder
-      ...(parentId
-        ? relations.map((relation) => ({
-            user: `user:${userId}`,
-            relation,
-            object: `folder:${parentId}`,
-          }))
-        : []),
-    ];
-
-    // ✅ if revoking a folder, also delete tuples from all files/subdirs inside
-    if (type === "folder") {
-      const [childFiles, childDirs] = await Promise.all([
-        File.find({ parentDirId: id }).select("_id").lean(),
-        Directory.find({ parentDirId: id }).select("_id").lean(),
-      ]);
-
-      childFiles.forEach((f) => {
-        relations.forEach((relation) => {
-          deleteTargets.push({
-            user: `user:${userId}`,
-            relation,
-            object: `file:${f._id}`,
-          });
-        });
-      });
-
-      childDirs.forEach((d) => {
-        relations.forEach((relation) => {
-          deleteTargets.push({
-            user: `user:${userId}`,
-            relation,
-            object: `folder:${d._id}`,
-          });
-        });
+    if (!item) {
+      return res.status(404).json({
+        message: "Item not found",
       });
     }
 
-    await Promise.allSettled(
-      deleteTargets.map((tuple) => fgaClient.write({ deletes: [tuple] })),
-    );
+    const relations = ["reader", "writer"];
 
-    return res.status(200).json({ message: "Access revoked successfully" });
+    const existing = await fgaClient.read({
+      tuple_key: {
+        user: `user:${userId}`,
+        object,
+      },
+    });
+
+    const existingRelations = existing.tuples
+      .map((t) => t.key.relation)
+      .filter((r) => relations.includes(r));
+
+    if (!existingRelations.length) {
+      return res.status(404).json({
+        message: "No access found to revoke",
+      });
+    }
+
+    const deletes = existingRelations.map((relation) => ({
+      user: `user:${userId}`,
+      relation,
+      object,
+    }));
+
+    await fgaClient.write({ deletes });
+
+    return res.status(200).json({
+      message: "Access revoked successfully",
+    });
   } catch (error) {
     next(error);
   }
@@ -1033,7 +1067,7 @@ export const fetchItemPermissions = async (req, res, next) => {
         (t) =>
           t.key.object === object &&
           t.key.user.startsWith("user:") &&
-          ["viewer", "editor"].includes(t.key.relation),
+          ["reader", "writer"].includes(t.key.relation),
       )
       .map((t) => ({
         userId: t.key.user.split(":")[1],

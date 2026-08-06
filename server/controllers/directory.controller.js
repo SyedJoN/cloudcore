@@ -20,43 +20,100 @@ import { deleteFileArray } from "../services/s3/deleteArray.js";
 const __filename = fileURLToPath(import.meta.url);
 
 const resolveRole = async (item, type, userId, parentDir) => {
-  if (!userId) return parentDir.publicRole || "viewer";
-  if (item.userId?._id?.toString() === userId.toString()) return "owner";
-  const canEdit = await fgaClient.check({
-    user: `user:${userId}`,
-    relation: "can_edit",
-    object: `${type}:${item._id}`,
+  let result = [];
+  const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
+
+  // ── read all pages ──────────────────────────────────────────
+  let allTuples = [];
+  let continuationToken = undefined;
+
+  do {
+    const response = await fgaClient.read(
+      { tuple_key: { object } },
+      { continuationToken },
+    );
+
+    allTuples = allTuples.concat(response.tuples);
+    continuationToken = response.continuation_token;
+  } while (continuationToken);
+  // ────────────────────────────────────────────────────────────
+  const collaborators = allTuples
+    .filter(
+      (t) =>
+        t.key.object === object &&
+        t.key.user.startsWith("user:") &&
+        ["owner", "reader", "writer"].includes(t.key.relation),
+    )
+    .map((t) => ({
+      userId: t.key.user.split(":")[1],
+      relation: t.key.relation,
+    }));
+
+  if (!collaborators.length) {
+    return [];
+  }
+
+  const users = await User.find({
+    _id: { $in: collaborators.map((c) => c.userId) },
+  })
+    .select("name email avatar")
+    .lean();
+
+  result = users.map((user) => ({
+    id: user._id,
+    displayName: user.name,
+    type: "user",
+    emailAddress: user.email,
+    role: collaborators.find((c) => c.userId === user._id.toString())?.relation,
+  }));
+
+  const isPublic = item.isPublic || parentDir?.isPublic;
+  const publicRole = isPublic ? item?.publicRole : parentDir?.publicRole;
+
+  if (isPublic) {
+    result.push({
+      id: "anyoneWithLink",
+      type: "anyone",
+      role: publicRole || "reader",
+    });
+  }
+  result.push({
+    id: "superuser",
+    role: "superuser",
+    type: "superuser",
   });
-  return canEdit.allowed ? "editor" : parentDir.publicRole || "viewer";
+
+  return result;
 };
 
 async function addRole(item, type, userId) {
-  const canEdit = await fgaClient.check({
+  const canWrite = await fgaClient.check({
     user: `user:${userId}`,
-    relation: "can_edit",
+    relation: "can_write",
     object: `${type}:${item._id}`,
   });
 
   return {
     ...item,
-    userRole: canEdit.allowed ? "editor" : "viewer",
+    userRole: canWrite.allowed ? "editor" : "viewer",
   };
 }
 
 async function listObjects(userId, type) {
-  const canView = await fgaClient.listObjects({
+  const canRead = await fgaClient.listObjects({
     user: `user:${userId.toString()}`,
-    relation: "can_view",
+    relation: "can_read",
     type,
   });
 
-  return canView.objects.map((o) => o.split(":").pop()).filter(Boolean);
+  return canRead.objects.map((o) => o.split(":").pop()).filter(Boolean);
 }
 
 export const getDirectory = async (req, res, next) => {
   try {
     const _id = req.params.id || req.user?.parentDirId;
     const userId = req.user?._id;
+
     const rootDir = await Directory.findOne({ userId })
       .populate("path", "name")
       .lean();
@@ -66,9 +123,9 @@ export const getDirectory = async (req, res, next) => {
     if (!parentDir)
       return res.status(404).json({ message: "Directory not found" });
 
-
+    const isPublic = parentDir.isPublic;
     // fetching children
-    if (parentDir.isPublic) {
+    if (isPublic) {
       const [files, directories] = await Promise.all([
         File.find({ parentDirId: parentDir._id, isDeleted: false })
           .populate("userId", "name email avatar")
@@ -85,7 +142,7 @@ export const getDirectory = async (req, res, next) => {
         parentDir &&
         parentDir.userId.toString() !== userId.toString()
       ) {
-        const relation = parentDir.publicRole || "viewer";
+        const relation = parentDir.publicRole || "reader";
         await fgaClient.write(
           {
             writes: [
@@ -110,22 +167,26 @@ export const getDirectory = async (req, res, next) => {
         Promise.all(
           files.map(async (f) => ({
             ...f,
-            userRole: await resolveRole(f, "file", userId, parentDir),
+            permissions: await resolveRole(f, "file", userId, parentDir),
           })),
         ),
         Promise.all(
           directories.map(async (d) => ({
             ...d,
-            userRole: await resolveRole(d, "folder", userId, parentDir),
+            permissions: await resolveRole(d, "folder", userId, parentDir),
           })),
         ),
       ]);
+      const permissions = await resolveRole(
+        parentDir,
+        "folder",
+        userId,
+        parentDir,
+      );
+      console.log("permissions", permissions);
       const parentDirWithRole = {
         ...parentDirData,
-        userRole:
-          userId && parentDir.userId.toString() === userId.toString()
-            ? "owner"
-            : undefined,
+        permissions,
       };
       return res.status(200).json({
         ...parentDirWithRole,
@@ -143,13 +204,13 @@ export const getDirectory = async (req, res, next) => {
       });
 
     // checking if user can view this currentDirectory
-    const canView = await fgaClient.check({
+    const canRead = await fgaClient.check({
       user: `user:${userId}`,
-      relation: "can_view",
+      relation: "can_read",
       object: `folder:${parentDir._id}`,
     });
 
-    if (!canView.allowed)
+    if (!canRead.allowed)
       return res.status(403).json({
         message: "Access denied",
         requiresAuth: false,
@@ -182,56 +243,25 @@ export const getDirectory = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const [isOwner, canEdit] = await Promise.all([
-          fgaClient.check({
-            user: `user:${userId}`,
-            relation: "owner",
-            object: `file:${file._id}`,
-          }),
-          fgaClient.check({
-            user: `user:${userId}`,
-            relation: "can_edit",
-            object: `file:${file._id}`,
-          }),
-        ]);
         return {
           ...file,
-          userRole: isOwner.allowed
-            ? "owner"
-            : canEdit.allowed
-              ? "editor"
-              : "viewer",
+          permissions: await resolveRole(file, "file", userId, parentDir),
         };
       }),
     );
 
     const directoriesWithRoles = await Promise.all(
       directories.map(async (dir) => {
-        const [isOwner, canEdit] = await Promise.all([
-          fgaClient.check({
-            user: `user:${userId}`,
-            relation: "owner",
-            object: `folder:${dir._id}`,
-          }),
-          fgaClient.check({
-            user: `user:${userId}`,
-            relation: "can_edit",
-            object: `folder:${dir._id}`,
-          }),
-        ]);
         return {
           ...dir,
-          userRole: isOwner.allowed
-            ? "owner"
-            : canEdit.allowed
-              ? "editor"
-              : "viewer",
+          permissions: await resolveRole(dir, "folder", userId, parentDir),
         };
       }),
     );
 
     return res.status(200).json({
       ...parentDir,
+      permissions: await resolveRole(parentDir, "folder", userId, parentDir),
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
@@ -336,11 +366,17 @@ export const getSharedWithMe = async (req, res, next) => {
     );
 
     const filesWithRoles = await Promise.all(
-      topLevelFiles.map(async (file) => addRole(file, "file", userId)),
+      topLevelFiles.map(async (file) => ({
+        ...file,
+        permissions: await resolveRole(file, "file", userId),
+      })),
     );
 
     const directoriesWithRoles = await Promise.all(
-      topLevelDirs.map(async (dir) => addRole(dir, "folder", userId)),
+      topLevelDirs.map(async (dir) => ({
+        ...dir,
+        permissions: await resolveRole(dir, "folder", userId),
+      })),
     );
 
     return res
@@ -442,12 +478,12 @@ export const addDirectory = async (req, res, next) => {
     // ✅ check if user can edit the parent currentDirectory
     const isOwner = parentDirectory.userId.toString() === userId.toString();
     if (!isOwner) {
-      const canEdit = await fgaClient.check({
+      const canWrite = await fgaClient.check({
         user: `user:${userId}`,
-        relation: "can_edit",
+        relation: "can_write",
         object: `folder:${parentDirId}`,
       });
-      if (!canEdit.allowed)
+      if (!canWrite.allowed)
         return res
           .status(403)
           .json({ message: "You don't have permission to create here" });
@@ -469,7 +505,7 @@ export const addDirectory = async (req, res, next) => {
         },
         {
           user: `folder:${parentDirId}`,
-          relation: "parentDir",
+          relation: "parent",
           object: `folder:${addedDirectory._id}`,
         },
       ],
@@ -488,7 +524,7 @@ export const editDirectory = async (req, res, next) => {
   }
   const isEditor = await fgaClient.check({
     user: `user:${req.user._id.toString()}`,
-    relation: "can_edit",
+    relation: "can_write",
     object: `folder:${id}`,
   });
   if (!isEditor.allowed) {
@@ -613,18 +649,17 @@ export const deleteDirectory = async (req, res, next) => {
     ]);
 
     const deletes = [
-
       ...files.flatMap((f) => [
         { user: `user:${userId}`, relation: "owner", object: `file:${f._id}` },
         { user: `user:${userId}`, relation: "editor", object: `file:${f._id}` },
         { user: `user:${userId}`, relation: "viewer", object: `file:${f._id}` },
         {
           user: `folder:${f.parentDirId}`,
-          relation: "parentDir",
+          relation: "parent",
           object: `file:${f._id}`,
         },
       ]),
-   
+
       ...allDirIds.flatMap((dir) => [
         {
           user: `user:${userId}`,
@@ -633,7 +668,7 @@ export const deleteDirectory = async (req, res, next) => {
         },
         {
           user: `folder:${dir.parentDirId}`,
-          relation: "parentDir",
+          relation: "parent",
           object: `folder:${dir._id}`,
         },
       ]),

@@ -299,6 +299,9 @@ export const recoverUser = async (req, res, next) => {
 export const searchUsers = async (req, res, next) => {
   try {
     const { userId } = req.params;
+    if (!userId) {
+       return res.status(404).json({ message: "User Id is required!" });
+    }
     const allUsers = await User.find({ _id: { $ne: userId } })
       .select("name email avatar")
       .lean();
