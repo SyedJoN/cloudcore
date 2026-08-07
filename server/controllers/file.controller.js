@@ -52,11 +52,11 @@ const resolveRole = async (item, type, userId, parentDir) => {
       (t) =>
         t.key.object === object &&
         t.key.user.startsWith("user:") &&
-        ["owner", "reader", "writer"].includes(t.key.relation),
+        ["owner", "reader", "writer"].includes(t.key.role),
     )
     .map((t) => ({
       userId: t.key.user.split(":")[1],
-      relation: t.key.relation,
+      role: t.key.role,
     }));
 
   if (!collaborators.length) {
@@ -71,13 +71,18 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   result = users.map((user) => ({
     id: user._id,
+    photoLink: user.avatar,
     displayName: user.name,
     type: "user",
     emailAddress: user.email,
-    role: collaborators.find((c) => c.userId === user._id.toString())?.relation,
+    role: collaborators.find((c) => c.userId === user._id.toString())?.role,
+    me:
+      user._id.toString() === userId.toString() ||
+      user._id.toString() === item?.userId?._id.toString() ||
+      user._id.toString() === parentDir?.userId?._id.toString(),
   }));
 
-  const isPublic = parentDir?.isPublic;
+  const isPublic = item.isPublic || parentDir?.isPublic;
   const publicRole = isPublic ? item?.publicRole : parentDir?.publicRole;
 
   if (isPublic) {
@@ -310,7 +315,7 @@ export const getFileById = async (req, res, next) => {
 
         const canRead = await fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_read",
+          role: "can_read",
           object: `file:${id}`,
         });
 
@@ -394,12 +399,12 @@ export const getFileMetaById = async (req, res, next) => {
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_read",
+          role: "can_read",
           object: `file:${id}`,
         }),
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_write",
+          role: "can_write",
           object: `file:${id}`,
         }),
       ]);
@@ -419,12 +424,12 @@ export const getFileMetaById = async (req, res, next) => {
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_read",
+          role: "can_read",
           object: `file:${id}`,
         }),
         fgaClient.check({
           user: `user:${userId}`,
-          relation: "can_write",
+          role: "can_write",
           object: `file:${id}`,
         }),
       ]);
@@ -449,7 +454,7 @@ export const getRecentFiles = async (req, res, next) => {
 
     const allowedFiles = await fgaClient.listObjects({
       user: `user:${userId.toString()}`,
-      relation: "can_read",
+      role: "can_read",
       type: "file",
     });
 
@@ -579,7 +584,7 @@ export const updateFile = async (req, res, next) => {
       // 2. FGA CHECK
       const canWrite = await fgaClient.check({
         user: `user:${userId}`,
-        relation: "can_write",
+        role: "can_write",
         object: `file:${fileId}`,
       });
 
@@ -644,7 +649,7 @@ export const softDeleteFile = async (req, res, next) => {
           deleteFile: [
             {
               user: `user:${userId}`,
-              relation: "reader",
+              role: "reader",
               object: `file:${id}`,
             },
           ],
@@ -653,7 +658,7 @@ export const softDeleteFile = async (req, res, next) => {
           deletes: [
             {
               user: `user:${userId}`,
-              relation: "writer",
+              role: "writer",
               object: `file:${id}`,
             },
           ],
@@ -710,15 +715,15 @@ export const deleteFile = async (req, res, next) => {
       await fgaClient.write(
         {
           deletes: [
-            { user: `user:${userId}`, relation: "owner", object: `file:${id}` },
+            { user: `user:${userId}`, role: "owner", object: `file:${id}` },
             {
               user: `user:${userId}`,
-              relation: "writer",
+              role: "writer",
               object: `file:${id}`,
             },
             {
               user: `user:${userId}`,
-              relation: "reader",
+              role: "reader",
               object: `file:${id}`,
             },
           ],
@@ -802,14 +807,14 @@ export const toggleFilePublic = async (req, res, next) => {
       const tuples = await fgaClient.read({ tuple_key: { object } });
 
       const toDelete = tuples.tuples.filter(
-        (t) => t.key.relation !== "owner" && t.key.relation !== "parentDir",
+        (t) => t.key.role !== "owner" && t.key.role !== "parent",
       );
 
       if (toDelete.length) {
         await Promise.allSettled(
           toDelete.map((t) =>
             fgaClient.write({
-              deletes: [{ user: t.key.user, relation: t.key.relation, object }],
+              deletes: [{ user: t.key.user, role: t.key.role, object }],
             }),
           ),
         );
@@ -835,8 +840,15 @@ export const toggleFilePublic = async (req, res, next) => {
 export const giveAccessById = async (req, res, next) => {
   try {
     const { usersArray, message, type } = req.body;
-    let { role, emailAddress } = usersArray[0];
     const id = req.params.id;
+
+    if (!usersArray?.length) {
+      return res.status(400).json({
+        message: "No users provided",
+      });
+    }
+
+    // Google Drive sharing
 
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
@@ -846,45 +858,55 @@ export const giveAccessById = async (req, res, next) => {
           message: "Missing token",
         });
       }
-      const googleRole = roleMap[role];
 
       try {
         const drive = getDriveClient(drive_access_token);
 
-        const response = await drive.permissions.create({
-          fileId: id,
-          requestBody: {
-            type: "user",
-            role: googleRole, // reader | commenter | writer
-            emailAddress,
-          },
-          sendNotificationEmail: true, // Optional
-        });
+        await Promise.all(
+          usersArray.map(async (user) => {
+            const googleRole = roleMap[user.role];
 
-        return res
-          .status(200)
-          .json({ message: "Permission granted successfully!" });
-        console.log("Permission granted:", response.data);
+            if (!googleRole) {
+              throw new Error(`Invalid role: ${user.role}`);
+            }
+
+            await drive.permissions.create({
+              fileId: id,
+              requestBody: {
+                type: "user",
+                role: googleRole,
+                emailAddress: user.emailAddress,
+              },
+              sendNotificationEmail: true,
+            });
+          }),
+        );
+
+        return res.status(200).json({
+          message: "Permissions granted successfully!",
+        });
       } catch (err) {
-        console.error("Error:", err.response?.data || err.message);
+        console.error("Google Drive Error:", err.response?.data || err.message);
+
         return next(err);
       }
     }
 
-    if (!usersArray?.length) {
-      return res.status(400).json({ message: "No users provided" });
-    }
-
-    // prevent sharing root directory
     if (type === "folder") {
       const folder = await Directory.findById(id).lean();
-      if (!folder) return res.status(404).json({ message: "Folder not found" });
+
+      if (!folder) {
+        return res.status(404).json({
+          message: "Folder not found",
+        });
+      }
 
       const user = await User.findById(folder.userId).lean();
+
       if (user && folder._id.toString() === user.parentDirId.toString()) {
-        return res
-          .status(400)
-          .json({ message: "Root directory cannot be shared" });
+        return res.status(400).json({
+          message: "Root directory cannot be shared",
+        });
       }
     }
 
@@ -895,9 +917,14 @@ export const giveAccessById = async (req, res, next) => {
         ? await Directory.findById(id).populate("userId", "name email").lean()
         : await File.findById(id).populate("userId", "name email").lean();
 
+    if (!item) {
+      return res.status(404).json({
+        message: `${type} not found`,
+      });
+    }
+
     await Promise.all(
       usersArray.map(async (user) => {
-        // check if user already has access
         const existing = await fgaClient.check({
           user: `user:${user.id}`,
           relation: "can_read",
@@ -905,42 +932,63 @@ export const giveAccessById = async (req, res, next) => {
         });
 
         await Promise.allSettled(
-          ["reader", "writer"].map((relation) =>
+          ["reader", "writer"].map((role) =>
             fgaClient.write({
-              deletes: [{ user: `user:${user.id}`, relation, object }],
+              deletes: [
+                {
+                  user: `user:${user.id}`,
+                  relation: role,
+                  object,
+                },
+              ],
             }),
           ),
         );
 
-        await fgaClient.write({
-          writes: [
-            { user: `user:${user.id}`, relation: user.relation, object },
-          ],
-        });
+        await fgaClient.write(
+          {
+            writes: [
+              {
+                user: `user:${user.id}`,
+                relation: user.role,
+                object,
+              },
+            ],
+          },
+          {
+            transaction: {
+              disable: true,
+            },
+          },
+        );
 
         if (!existing.allowed) {
           const userData = await User.findById(user.id)
             .select("name email avatar")
             .lean();
 
-          await sendAccessEmail({
-            toEmail: userData.email,
-            toName: userData.name,
-            fromName: item.userId.name,
-            fromEmail: item.userId.email,
-            itemName: item.name,
-            itemType: type,
-            itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "directory" : "file"}/${id}`,
-            role: user.relation,
-            message,
-          });
+          if (userData) {
+            await sendAccessEmail({
+              toEmail: userData.email,
+              toName: userData.name,
+              fromName: item.userId.name,
+              fromEmail: item.userId.email,
+              itemName: item.name,
+              itemType: type,
+              itemUrl: `${process.env.CLIENT_URL}/${
+                type === "folder" ? "directory" : "file"
+              }/${id}`,
+              role: user.role,
+              message,
+            });
+          }
         }
       }),
     );
 
-    return res
-      .status(200)
-      .json({ message: `${type} access granted successfully` });
+    return res.status(200).json({
+      message: `${type} access granted successfully`,
+    });
   } catch (error) {
     next(error);
   }
@@ -948,7 +996,13 @@ export const giveAccessById = async (req, res, next) => {
 export const revokeFileAccess = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { targetId: userId, type } = req.body;
+    const { targetId: userId, type, relation } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: "Target user is required",
+      });
+    }
 
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
@@ -968,12 +1022,12 @@ export const revokeFileAccess = async (req, res, next) => {
         });
 
         const publicPermission = permissions.data.permissions.find(
-          (p) => p.type === "anyone",
+          (permission) => permission.type === "anyone",
         );
 
         if (!publicPermission) {
-          return res.status(404).json({
-            message: "Public permission not found",
+          return res.status(200).json({
+            message: "Permission already revoked",
           });
         }
 
@@ -985,8 +1039,8 @@ export const revokeFileAccess = async (req, res, next) => {
         return res.status(200).json({
           message: "Permission revoked successfully",
         });
-      } catch (err) {
-        return next(err);
+      } catch (error) {
+        return next(error);
       }
     }
 
@@ -1003,7 +1057,10 @@ export const revokeFileAccess = async (req, res, next) => {
       });
     }
 
-    const relations = ["reader", "writer"];
+    const allowedRelations =
+      relation === "remove"
+        ? ["reader", "writer"]
+        : [relation];
 
     const existing = await fgaClient.read({
       tuple_key: {
@@ -1012,23 +1069,28 @@ export const revokeFileAccess = async (req, res, next) => {
       },
     });
 
-    const existingRelations = existing.tuples
-      .map((t) => t.key.relation)
-      .filter((r) => relations.includes(r));
+    const deletes = existing.tuples
+      .filter(
+        (tuple) =>
+          tuple.key.user === `user:${userId}` &&
+          allowedRelations.includes(tuple.key.relation),
+      )
+      .map((tuple) => ({
+        user: tuple.key.user,
+        relation: tuple.key.relation,
+        object: tuple.key.object,
+      }));
 
-    if (!existingRelations.length) {
-      return res.status(404).json({
-        message: "No access found to revoke",
+    // Already removed
+    if (!deletes.length) {
+      return res.status(200).json({
+        message: "Access already revoked",
       });
     }
 
-    const deletes = existingRelations.map((relation) => ({
-      user: `user:${userId}`,
-      relation,
-      object,
-    }));
-
-    await fgaClient.write({ deletes });
+    await fgaClient.write({
+      deletes,
+    });
 
     return res.status(200).json({
       message: "Access revoked successfully",
@@ -1067,11 +1129,11 @@ export const fetchItemPermissions = async (req, res, next) => {
         (t) =>
           t.key.object === object &&
           t.key.user.startsWith("user:") &&
-          ["reader", "writer"].includes(t.key.relation),
+          ["reader", "writer"].includes(t.key.role),
       )
       .map((t) => ({
         userId: t.key.user.split(":")[1],
-        relation: t.key.relation,
+        role: t.key.role,
       }));
 
     if (!collaborators.length) {
@@ -1087,7 +1149,7 @@ export const fetchItemPermissions = async (req, res, next) => {
     const result = users.map((user) => {
       const permissions = collaborators
         .filter((c) => c.userId === user._id.toString())
-        .map((c) => c.relation);
+        .map((c) => c.role);
 
       return {
         id: user._id,

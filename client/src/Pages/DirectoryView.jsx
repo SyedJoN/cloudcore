@@ -92,7 +92,10 @@ export default function DirectoryView({ route }) {
 
   const [error, setError] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
-
+  const [peopleWithAccess, setPeopleWithAccess] = useState([]);
+  const [prevRole, setPrevRole] = useState([]);
+  const [linkAccess, setLinkAccess] = useState("");
+  const [linkRole, setLinkRole] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [showCreateDir, setShowCreateDir] = useState(false);
   const [newDirname, setNewDirname] = useState("New Folder");
@@ -302,7 +305,7 @@ export default function DirectoryView({ route }) {
         .post(
           `/file/grant-access/${dirId}`,
           {
-            usersArray: [{ id: grantUserId, relation: grantRole }],
+            usersArray: [{ id: grantUserId, role: grantRole }],
             type: "folder",
           },
           { headers: { "Content-Type": "application/json" } },
@@ -330,7 +333,7 @@ export default function DirectoryView({ route }) {
             id: u._id,
             name: u.name,
             email: u.email,
-            relation: u.role,
+            role: u.role,
             avatar: u.avatar,
           })),
         );
@@ -522,79 +525,71 @@ export default function DirectoryView({ route }) {
   }
 
   const handleToggleResourcePublic = async (item, role, access) => {
-    try {
-      setIsShareLoading(true);
+    setIsShareLoading(true);
 
-      const id = item.id ?? item._id;
+    try {
+      const itemId = item._id ?? item.id;
       const type = getResourceType(item);
       const isGoogleDrive = type.startsWith("google-drive");
 
-      let permission;
+      const restricted = access === "restricted";
+      const userRole = DRIVE_ROLES[role] ?? "reader";
+
+      let permission = null;
 
       if (isGoogleDrive) {
-        if (access === "restricted") {
-          const publicPermission = item.permissions?.find(
-            (p) => p.type === "anyone",
-          );
-          if (publicPermission) {
-            const message = await revokeFileAccess("google", id);
-
-            toast({
-              message,
-              type: "success",
-            });
-          }
+        if (restricted) {
+          await revokeFileAccess("google", itemId);
         } else {
-          const userRole = DRIVE_ROLES[role] ?? "reader";
-          const { data } = await toggleDriveFilePermission(id, userRole);
+          const { data } = await toggleDriveFilePermission(itemId, userRole);
 
           permission = data.permission;
-
-          toast({
-            message: data.message,
-            type: "success",
-          });
         }
       } else {
-        const userRole = DRIVE_ROLES[role];
-        await toggleFilePublic(id, userRole, access, type);
-
-        toast({
-          message: "Public Access updated",
-          type: "success",
-        });
+        await toggleFilePublic(itemId, userRole, access, type);
       }
 
       const update = (list) =>
-        list.map((f) => {
-          if ((f.id ?? f._id) !== id) return f;
-
-          if (!isGoogleDrive) {
-            return {
-              ...f,
-              isPublic: access !== "restricted",
-              publicRole: access !== "restricted" ? role : undefined,
-            };
+        list.map((resource) => {
+          if (String(resource._id ?? resource.id) !== String(itemId)) {
+            return resource;
           }
 
+          const permissions = resource.permissions ?? [];
+
+          const updatedPermissions = restricted
+            ? permissions.filter((p) => p?.type !== "anyone")
+            : [
+                ...permissions.filter((p) => p?.type !== "anyone"),
+                {
+                  ...(permission ?? {}),
+                  type: "anyone",
+                  role: userRole,
+                },
+              ];
+
           return {
-            ...f,
-            permissions:
-              access === "restricted"
-                ? (f.permissions ?? []).filter((p) => p?.type !== "anyone")
-                : (f.permissions ?? []).some((p) => p?.type === "anyone")
-                  ? (f.permissions ?? []).map((p) =>
-                      p?.type === "anyone" ? permission : p,
-                    )
-                  : [...(f.permissions ?? []), permission],
+            ...resource,
+            permissions: updatedPermissions,
           };
         });
 
-      setFilesList(update);
-      setDirectoriesList(update);
+      setFilesList((prev) => update(prev));
+      setDirectoriesList((prev) => update(prev));
+
+      // Keep local modal state immediately correct
+      setLinkAccess(restricted ? "restricted" : "anyone");
+      setLinkRole(restricted ? "reader" : userRole);
+
+      setShareItem(null);
+
+      toast({
+        message: "Public Access updated",
+        type: "success",
+      });
     } catch (error) {
       toast({
-        message: error.message || "Something went wrong!",
+        message: error?.message || "Something went wrong!",
         type: "error",
       });
     } finally {
@@ -602,58 +597,115 @@ export default function DirectoryView({ route }) {
     }
   };
 
-  async function handleSharedRoleUpdate(
-    item,
-    type,
-    updatedPerson,
-    prevRole,
-    message,
-  ) {
-    const updatedRole = DRIVE_ROLES[updatedPerson.role] ?? prevRole;
-    if (updatedPerson.role !== "remove" && prevRole === updatedRole) {
-      setShareItem(null);
-      return;
-    }
+async function handleSharedRoleUpdate(item, type, message) {
+  if (!peopleWithAccess.length) return;
 
-    try {
-      setIsShareLoading(true);
-      const { id, relation, role, emailAddress } = updatedPerson;
+  const equal =
+    prevRole.length === peopleWithAccess.length &&
+    prevRole.every(
+      (prev, index) =>
+        prev.id === peopleWithAccess[index].id &&
+        prev.role === peopleWithAccess[index].role,
+    );
 
-      if (updatedPerson.role === "remove") {
-        await revokeFileAccess(type, item._id || item.id, id, relation);
-      } else {
-        const personArray = [
-          { ...updatedPerson, relation: DRIVE_ROLES[role], emailAddress },
-        ];
-        await grantAccessById(type, item._id || item.id, personArray, message);
-      }
-      const update = (list) =>
-        list.map((f) =>
-          (f.id ?? f._id) === (item._id ?? item.id)
-            ? {
-                ...f,
-                permissions:
-                  role === "remove"
-                    ? f.permissions?.filter((p) => p.id !== id)
-                    : f.permissions?.map((p) =>
-                        p.id === id && p.role !== "owner"
-                          ? { ...p, role: DRIVE_ROLES[role] }
-                          : p,
-                      ),
-              }
-            : f,
-        );
-      setFilesList((prev) => update(prev));
-      setDirectoriesList((prev) => update(prev));
-      setShareItem(null);
-      toast({ message: "Access updated", type: "success" });
-    } catch (error) {
-      toast({ message: error.message ?? "Error", type: "error" });
-      throw new Error(error || "Something went wrong!");
-    } finally {
-      setIsShareLoading(false);
-    }
+  if (equal) {
+    setShareItem(null);
+    return;
   }
+
+  setIsShareLoading(true);
+
+  try {
+    const itemId = String(item._id ?? item.id);
+
+    const personsToGrant = peopleWithAccess.filter(
+      (person) => person.role !== "remove",
+    );
+
+    const personsToRemove = peopleWithAccess.filter(
+      (person) => person.role === "remove",
+    );
+
+    if (personsToGrant.length) {
+      await grantAccessById(
+        type,
+        itemId,
+        personsToGrant,
+        message,
+      );
+    }
+
+    if (personsToRemove.length) {
+      await Promise.all(
+        personsToRemove.map((person) =>
+          revokeFileAccess(
+            type,
+            itemId,
+            person.id,
+            person.role,
+          ),
+        ),
+      );
+    }
+
+    const update = (list) =>
+      list.map((resource) => {
+        if (
+          String(resource._id ?? resource.id) !== itemId
+        ) {
+          return resource;
+        }
+
+        const permissions = resource.permissions ?? [];
+
+   
+        const nonUserPermissions = permissions.filter(
+          (permission) =>
+            permission.type !== "user",
+        );
+
+        const userPermissions = personsToGrant.map(
+          (person) => ({
+            ...person,
+            type: "user",
+          }),
+        );
+
+        return {
+          ...resource,
+          permissions: [
+            ...nonUserPermissions,
+            ...userPermissions,
+          ],
+        };
+      });
+
+    setFilesList(update);
+    setDirectoriesList(update);
+
+    setPeopleWithAccess(personsToGrant);
+    setPrevRole(personsToGrant);
+
+    setShareItem(null);
+
+    toast({
+      message: "Access updated",
+      type: "success",
+    });
+  } catch (error) {
+    toast({
+      message:
+        error?.message || "Something went wrong!",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+}
+
+  useEffect(() => {
+    console.log("combinedItems", combinedItems);
+  }, [combinedItems]);
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -974,12 +1026,22 @@ export default function DirectoryView({ route }) {
         <ShareModal
           selectedUsers={selectedUsers}
           setSelectedUsers={setSelectedUsers}
+          peopleWithAccess={peopleWithAccess}
+          setPeopleWithAccess={setPeopleWithAccess}
           item={shareItem}
           allUsers={allUsers}
           onUpdateRoleAfterSave={handleSharedRoleUpdate}
           onClose={handleToggleResourcePublic}
           setShareItem={setShareItem}
+          linkAccess={linkAccess}
+          setLinkAccess={setLinkAccess}
+          linkRole={linkRole}
+          setLinkRole={setLinkRole}
+          prevRole={prevRole}
+          setPrevRole={setPrevRole}
           isShareLoading={isShareLoading}
+          setDirectoriesList={setDirectoriesList}
+          setFilesList={setFilesList}
           isGoogleDriveRoute={isGoogleDriveRoute}
           setIsShareLoading={setIsShareLoading}
         />

@@ -10,7 +10,11 @@ import {
   IconLock,
 } from "../Icons/Icons.jsx";
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
-import { DRIVE_ROLES, ROLE_DESC, ROLE_LABEL } from "../../../Utils/displayUtils.js";
+import {
+  DRIVE_ROLES,
+  ROLE_DESC,
+  ROLE_LABEL,
+} from "../../../Utils/displayUtils.js";
 import { searchUsers } from "../../../apis/userApi.js";
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
@@ -32,8 +36,18 @@ export default function ShareModal({
   item,
   allUsers,
   selectedUsers,
+  peopleWithAccess,
+  setPeopleWithAccess,
   setSelectedUsers,
+  setDirectoriesList,
+  setFilesList,
   onClose,
+  prevRole,
+  setPrevRole,
+  linkAccess,
+  setLinkAccess,
+  linkRole,
+  setLinkRole,
   setShareItem,
   isShareLoading,
   setIsShareLoading,
@@ -43,27 +57,19 @@ export default function ShareModal({
   const { user } = useAuth();
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
+  const [personRole, setPersonRole] = useState({});
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [message, setMessage] = useState("");
   const [showInvitePanel, setShowInvitePanel] = useState(false);
-  const [peopleWithAccess, setPeopleWithAccess] = useState([]);
   const [copyFeedback, setCopyFeedback] = useState(false);
-  const [linkAccess, setLinkAccess] = useState(
-    item.permissions?.some((p) => p?.type === "anyone") || item.isPublic
-      ? "anyone"
-      : "restricted",
-  );
-  const [linkRole, setLinkRole] = useState(
-    item.publicRole || item.permissions?.[0].role || "viewer",
-  );
   const [openDropdown, setOpenDropdown] = useState(null);
   const [showInviteSuggestions, setShowInviteSuggestions] = useState(false);
   const [inviteInput, setInviteInput] = useState("");
   const [activePerson, setActivePerson] = useState(null);
   const [showAccessDropdown, setShowAccessDropdown] = useState(false);
-  const [updatedPerson, setUpdatedPerson] = useState({});
-  const [prevRole, setPrevRole] = useState(null);
+  const [updatedPerson, setUpdatedPerson] = useState([]);
   const [isConfirmation, setIsConfirmation] = useState(false);
+  const [isChanged, setIsChanged] = useState(false);
   const inviteRoleRef = useRef(null);
   const linkRoleRef = useRef(null);
   const personRefs = useRef([]);
@@ -77,68 +83,53 @@ export default function ShareModal({
       ? "folder"
       : "file";
 
-  const isOwner = item?.userId?._id === user.id || item.owners?.[0].me === true;
-  const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
+  const isOwner = item.owners?.[0].me === true;
+  const isViewer =
+    item.permissions?.find((p) => p.role === "reader")?.me ||
+    item?.publicRole === "reader";
 
   const isEditor =
     type === "google"
       ? isOwner || item.capabilities?.canEdit
-      : isOwner || !isViewer;
+      : item.permissions?.find((p) => p.role === "writer")?.me;
 
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log(
-      "check",
-      item.permissions?.find((i) => i.type === "anyone"),
-    );
+    const authorizedUsers = item.permissions
+      ?.filter(
+        (person) =>
+          person.type !== "anyone" &&
+          person.type !== "superuser" &&
+          person.role !== "owner",
+      )
+      .map((p) => p);
+    setPeopleWithAccess(authorizedUsers);
+    setPrevRole(authorizedUsers);
+  }, [item]);
+
+  useEffect(() => {
+     const equal =
+  prevRole.length === peopleWithAccess.length &&
+  prevRole.every(
+    (prev, index) =>
+      prev.id === peopleWithAccess[index].id &&
+      prev.role === peopleWithAccess[index].role
+  );
+
+      setIsChanged(!equal);
+  }, [prevRole, peopleWithAccess]);
+
+  useEffect(() => {
     setLinkAccess(
-      item.permissions?.some((p) => p?.type === "anyone") || item.isPublic
+      item.permissions?.some((p) => p?.type === "anyone")
         ? "anyone"
         : "restricted",
     );
     setLinkRole(
-      item.publicRole ||
-        item.permissions?.find((i) => i.type === "anyone")?.role ||
-        "viewer",
+      item.permissions?.find((p) => p.type === "anyone")?.role || "reader",
     );
   }, [item]);
-
-  useEffect(() => {
-    if (!(isEditor || isOwner)) return;
-
-    async function load() {
-      try {
-        if (type === "google") {
-          setPeopleWithAccess(
-            item.permissions.filter(
-              (i) =>
-                i.type !== "anyone" &&
-                i.emailAddress !== item.owners?.[0].emailAddress,
-            ),
-          );
-       
-        } else {
-          const data = await fetchFilePermissions(item?._id, type);
-          setPeopleWithAccess(data.users);
-          setPrevRole(data.users[0].permissions?.[0]);
-          // setUpdatedPerson({ role: data.users[0].permissions?.[0] });
-        }
-      } catch (_) {}
-    }
-    load();
-  }, [isEditor, isOwner, type]);
-
-  useEffect(()=> {
-       const prevRole = item?.permissions?.find(
-            (i) =>
-              i.type !== "anyone" &&
-              i.emailAddress !== item.owners?.[0]?.emailAddress,
-          )?.role || item?.userRole || item.publicRole;
-    
-          setPrevRole(prevRole);
-          prevRoleRef.current = prevRole
-  }, [item])
 
   useClickOutside(suggestionsRef, () => setShowSuggestions(false));
   useClickOutside(inviteSuggestionsRef, () => setShowInviteSuggestions(false));
@@ -164,7 +155,7 @@ export default function ShareModal({
 
   function handleSelectUser(e, user) {
     e.stopPropagation();
-    setSelectedUsers([{ ...user, relation: inviteRole }]);
+    setSelectedUsers([{ ...user, role: DRIVE_ROLES[inviteRole] }]);
     setEmailInput("");
     setShowSuggestions(false);
     setShowInvitePanel(true);
@@ -172,7 +163,7 @@ export default function ShareModal({
 
   function handleAddUser(user) {
     if (selectedUsers.find((s) => s.id === user.id)) return;
-    setSelectedUsers((prev) => [...prev, { ...user, relation: inviteRole }]);
+    setSelectedUsers((prev) => [...prev, { ...user, role: DRIVE_ROLES[inviteRole] }]);
     setInviteInput("");
     setShowInviteSuggestions(false);
   }
@@ -187,23 +178,109 @@ export default function ShareModal({
   }
 
   async function handleSend(e) {
-    try {
-      setIsShareLoading(true);
-      e.preventDefault();
-      if (!selectedUsers.length) return;
-      await grantAccessById(type, item?._id, selectedUsers, message);
-      setShowInvitePanel(false);
-      setSelectedUsers([]);
-      setMessage("");
-      setInviteInput("");
-      toast({ message: "Access updated", type: "success" });
-      setShareItem(null);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setIsShareLoading(false);
-    }
+  e.preventDefault();
+
+  if (!selectedUsers.length) return;
+
+  setIsShareLoading(true);
+
+  try {
+    const itemId = String(item?._id ?? item?.id);
+
+    await grantAccessById(
+      type,
+      itemId,
+      selectedUsers,
+      message,
+    );
+
+    const updatedUsers = selectedUsers.map((user) => ({
+      id: user.id,
+      photoLink: user.avatar,
+      displayName: user.name,
+      type: "user",
+      emailAddress: user.emailAddress ?? user.email,
+      role: DRIVE_ROLES[user.role] ?? user.role,
+    }));
+
+    const updateList = (list) =>
+      list.map((resource) => {
+        if (
+          String(resource._id ?? resource.id) !== itemId
+        ) {
+          return resource;
+        }
+
+        const permissions = resource.permissions ?? [];
+
+        const updatedPermissions = permissions.map((permission) => {
+          const updatedUser = updatedUsers.find(
+            (user) =>
+              String(user.id) === String(permission.id)
+          );
+
+          // Not one of the selected users
+          if (!updatedUser) {
+            return permission;
+          }
+
+          // Never change owner
+          if (permission.role === "owner") {
+            return permission;
+          }
+
+          return {
+            ...permission,
+            ...updatedUser,
+          };
+        });
+
+        const existingIds = new Set(
+          permissions.map((permission) =>
+            String(permission.id)
+          )
+        );
+
+        const newPermissions = updatedUsers.filter(
+          (user) =>
+            !existingIds.has(String(user.id))
+        );
+
+        return {
+          ...resource,
+          permissions: [
+            ...updatedPermissions,
+            ...newPermissions,
+          ],
+        };
+      });
+
+    setFilesList(updateList);
+    setDirectoriesList(updateList);
+
+    setSelectedUsers([]);
+    setShowInvitePanel(false);
+    setMessage("");
+    setInviteInput("");
+
+    toast({
+      message: "Access updated",
+      type: "success",
+    });
+
+    setShareItem(null);
+  } catch (error) {
+    console.error(error);
+
+    toast({
+      message:
+        error?.message ?? "Something went wrong",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
   }
+}
   async function handleSendLink(e) {
     if (isShareLoading) return;
     e.preventDefault();
@@ -241,39 +318,23 @@ export default function ShareModal({
     setMessage("");
     setInviteInput("");
   }
-  useEffect(() => {
-    console.log(peopleWithAccess);
-  }, [peopleWithAccess]);
 
   async function updatePersonRole(person, idx, role) {
     const userId = person.id;
     console.log("prevRole", prevRole);
-    console.log("person.role", person.permissions);
     setPeopleWithAccess((prev) =>
-      prev.map((p, i) =>
-        i === idx
-          ? type === "google"
-            ? { ...p, role: role.charAt(0).toUpperCase() + role.slice(1) }
-            : {
-                ...p,
-                permissions: [role.charAt(0).toUpperCase() + role.slice(1)],
-              }
+      prev.map((p) =>
+        p.id === person.id
+          ? { ...p, role: role !== "remove" ? DRIVE_ROLES[role] : role }
           : p,
       ),
     );
-    console.log('ref', prevRoleRef.current)
-    if (prevRoleRef.current === (person.permissions?.[0])) {
+
+    console.log("ref", prevRoleRef.current);
+    if (prevRoleRef.current === role) {
       setOpenDropdown(null);
       return;
     }
-    setUpdatedPerson({
-      id: person.id,
-      relation: role,
-      role,
-      emailAddress: person.emailAddress,
-    });
-
-    
 
     setOpenDropdown(null);
   }
@@ -293,13 +354,8 @@ export default function ShareModal({
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
   }
-  // isConfirmation && createPortal(
-  //   <div className="gd-modal-confirmation">
-  //     <ConfirmationModal onClose={() => setShareItem(null)} />
-  //   </div>,
-  //   document.body)
 
-  if (!isOwner && !isEditor) {
+  if (isOwner) {
     return (
       <>
         <div className="gd-modal-overlay confirmation-tab">
@@ -311,7 +367,7 @@ export default function ShareModal({
           key={item}
           className="gd-modal-overlay"
           onClick={() =>
-            Object.keys(updatedPerson).length > 0
+            isChanged
               ? setIsConfirmation(true)
               : setShareItem(null)
           }
@@ -398,28 +454,28 @@ export default function ShareModal({
                     <div
                       style={{ fontSize: 14, color: "var(--text-secondary)" }}
                     >
-                      {item.isPublic ||
-                      item.permissions?.[0].id === "anyoneWithLink"
+                      {
+                      linkAccess === "anyone"
                         ? "Anyone with the link"
                         : "Restricted"}
                     </div>
                     <div
                       style={{ fontSize: 12, color: "var(--text-tertiary)" }}
                     >
-                      {item.isPublic ||
-                      item.permissions?.[0].id === "anyoneWithLink"
+                      {
+                      linkAccess === "anyone"
                         ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
                         : "Only people with access can open with this link"}
                     </div>
                   </div>
-                  {item.isPublic ||
-                    (item.permissions?.[0].id === "anyoneWithLink" && (
+                  {
+                    (linkAccess === "anyone" && (
                       <span
                         style={{ fontSize: 13, color: "var(--text-secondary)" }}
                       >
                         {ROLE_LABEL[
-                          item.publicRole || item.permissions?.[0].role
-                        ] || "Viewer"}
+                          linkRole
+                        ]}
                       </span>
                     ))}
                 </div>
@@ -480,7 +536,7 @@ export default function ShareModal({
         <div
           className="gd-modal-overlay"
           onClick={() =>
-            Object.keys(updatedPerson).length > 0
+          isChanged
               ? setIsConfirmation(true)
               : setShareItem(null)
           }
@@ -501,7 +557,7 @@ export default function ShareModal({
               <button
                 className="gd-icon-btn"
                 onClick={() =>
-                  Object.keys(updatedPerson).length > 0
+                  isChanged
                     ? setIsConfirmation(true)
                     : setShareItem(null)
                 }
@@ -643,14 +699,17 @@ export default function ShareModal({
                         anchorRef={inviteRoleRef}
                         current={inviteRole}
                         onChange={(r) => {
+                          console.log("hi");
                           setInviteRole(r);
                           setSelectedUsers((prev) =>
-                            prev.map((u) => ({ ...u, relation: DRIVE_ROLES[r] })),
+                            prev.map((u) => ({
+                              ...u,
+                              role: DRIVE_ROLES[r],
+                            })),
                           );
                           setOpenDropdown(null);
                         }}
                         onClose={() => setOpenDropdown(null)}
-                        showRemove={true}
                       />
                     )}
                   </div>
@@ -806,9 +865,14 @@ export default function ShareModal({
                   </div>
                 </>
 
-                {peopleWithAccess.length > 0 && (
+                {item.permissions?.length > 0 && (
                   <div className="gd-share-people-list">
-                    {peopleWithAccess.map((person, idx) => {
+                    {peopleWithAccess?.map((person, idx) => {
+                      if (
+                        person.type === "superuser" ||
+                        person.role === "owner"
+                      )
+                        return;
                       if (!personRefs.current[idx])
                         personRefs.current[idx] = { current: null };
                       return (
@@ -826,7 +890,7 @@ export default function ShareModal({
                             />
                             <div className="gd-share-person-info">
                               <div
-                                className={`gd-share-person-name  ${person.permissions?.[0] === "Remove" || person?.role === "Remove" ? "line-through" : ""}`}
+                                className={`gd-share-person-name ${person.role === "remove" ? "line-through" : ""}`}
                               >
                                 {person.name || person.displayName}{" "}
                                 {(person.email || person.emailAddress) ===
@@ -851,24 +915,18 @@ export default function ShareModal({
                                   );
                                 }}
                               >
-                                {ROLE_LABEL[
-                                  person.permissions?.[0] || person.role
-                                ] ||
-                                  person.permissions?.[0] ||
-                                  person?.role}{" "}
+                                {ROLE_LABEL[person.role]}{" "}
                                 <IconChevronDown size={12} />
                               </button>
                               {openDropdown === idx && (
                                 <RoleDropdown
                                   anchorRef={personRefs.current[idx]}
-                                  current={
-                                    person.permissions?.[0] || person?.role
-                                  }
+                                  current={ROLE_LABEL[person.role]}
                                   onChange={(r) =>
                                     updatePersonRole(person, idx, r)
                                   }
                                   onClose={() => setOpenDropdown(null)}
-                                  showRemove={isOwner}
+                                  showRemove={true}
                                 />
                               )}
                             </div>
@@ -998,25 +1056,19 @@ export default function ShareModal({
                     )}
                   </button>
                   <div className="gd-pending-span">
-                    {!!Object.keys(updatedPerson).length && (
+                    {isChanged && (
                       <span>Pending changes</span>
                     )}
                   </div>
                   <button
                     className={`gd-btn  ${isShareLoading ? "btn-loading" : "gd-btn-primary"}`}
                     onClick={() =>
-                      onUpdateRoleAfterSave(
-                        item,
-                        type,
-                        updatedPerson,
-                        prevRole,
-                        message,
-                      )
+                      onUpdateRoleAfterSave(item, type, message)
                     }
                   >
                     {isShareLoading
                       ? "Saving..."
-                      : Object.keys(updatedPerson).length
+                      : isChanged
                         ? "Save"
                         : "Done"}
                   </button>

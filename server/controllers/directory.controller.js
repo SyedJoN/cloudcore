@@ -61,10 +61,15 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   result = users.map((user) => ({
     id: user._id,
+    photoLink: user.avatar,
     displayName: user.name,
     type: "user",
     emailAddress: user.email,
     role: collaborators.find((c) => c.userId === user._id.toString())?.relation,
+    me:
+      user._id.toString() === userId.toString() ||
+      user._id.toString() === item?.userId?._id.toString() ||
+      user._id.toString() === parentDir?.userId?._id.toString(),
   }));
 
   const isPublic = item.isPublic || parentDir?.isPublic;
@@ -85,19 +90,6 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   return result;
 };
-
-async function addRole(item, type, userId) {
-  const canWrite = await fgaClient.check({
-    user: `user:${userId}`,
-    relation: "can_write",
-    object: `${type}:${item._id}`,
-  });
-
-  return {
-    ...item,
-    userRole: canWrite.allowed ? "editor" : "viewer",
-  };
-}
 
 async function listObjects(userId, type) {
   const canRead = await fgaClient.listObjects({
@@ -438,19 +430,21 @@ export const getStarredItems = async (req, res, next) => {
     );
 
     const sharedFilesWithRoles = await Promise.all(
-      topLevelSharedFiles.map(async (file) => addRole(file, "file", userId)),
+      topLevelSharedFiles.map(async (file) =>
+        resolveRole(file, "file", userId),
+      ),
     );
 
     const sharedDirectoriesWithRoles = await Promise.all(
-      topLevelSharedDirs.map(async (dir) => addRole(dir, "folder", userId)),
+      topLevelSharedDirs.map(async (dir) => resolveRole(dir, "folder", userId)),
     );
 
     const filesWithRoles = await Promise.all(
-      files.map(async (file) => addRole(file, "file", userId)),
+      files.map(async (file) => resolveRole(file, "file", userId)),
     );
 
     const directoriesWithRoles = await Promise.all(
-      directories.map(async (dir) => addRole(dir, "folder", userId)),
+      directories.map(async (dir) => resolveRole(dir, "folder", userId)),
     );
 
     return res.status(200).json({

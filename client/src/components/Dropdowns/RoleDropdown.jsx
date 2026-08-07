@@ -49,7 +49,7 @@ export default function RoleDropdown({
         {ROLES.map(r => (
           <button key={r} className="gd-role-option" onClick={() => onChange(r)}>
             <span className="gd-role-option-label">
-              <span>{ROLE_LABEL[r]}</span>
+              <span>{ROLE_LABEL[r] || r}</span>
               <span className="role-desc">{ROLE_DESC[r]}</span>
             </span>
             {current === r && (
