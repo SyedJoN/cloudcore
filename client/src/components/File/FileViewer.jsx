@@ -239,35 +239,33 @@ export default function FileViewer({
               >
                 <IconLink size={20} />
               </button>
-           
             </>
           )}
           {(isOwner || canEdit) && !isDeleted && (
             <>
-               <button
+              <button
                 className="fv-action-btn gd-icon-btn"
                 title="Rename"
                 onClick={() => onRename?.(item)}
               >
                 <IconRename size={20} />
               </button>
-              {!isGDrive &&
-                   <button
-                className="fv-action-btn gd-icon-btn fv-action-danger"
-                title="Move to trash"
-                onClick={async () => {
-                  await onSoftDelete?.(item);
-                  onDeleteSuccess?.(item._id);
-                  onClose();
-                }}
-              >
-                <IconTrash size={20} />
-              </button>
-              }
-         
+              {!isGDrive && (
+                <button
+                  className="fv-action-btn gd-icon-btn fv-action-danger"
+                  title="Move to trash"
+                  onClick={async () => {
+                    await onSoftDelete?.(item);
+                    onDeleteSuccess?.(item._id);
+                    onClose();
+                  }}
+                >
+                  <IconTrash size={20} />
+                </button>
+              )}
             </>
           )}
-          {(isDeleted && !isGDrive) && (
+          {isDeleted && !isGDrive && (
             <>
               <button
                 className="fv-action-btn gd-icon-btn"

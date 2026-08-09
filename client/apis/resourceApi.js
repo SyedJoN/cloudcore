@@ -1,17 +1,17 @@
 import { axiosWithCreds } from "./axiosInstances";
 
-export async function sendLink(
-  emailInput,
+export async function sendLink({
+  toEmail,
   message,
   type,
-  itemId,
+  id,
   name,
   url,
   isPublic,
   publicRole,
-) {
+}) {
   const { data } = await axiosWithCreds.post("/item/send-link", {
-    toEmail: emailInput,
+    toEmail,
     message,
     type,
     id,
@@ -25,6 +25,8 @@ export async function sendLink(
 }
 
 export async function toggleItemStar(id, type) {
-  const response = await axiosWithCreds.patch(`/item/${type}/${id}/toggle-star`);
+  const response = await axiosWithCreds.patch(
+    `/item/${type}/${id}/toggle-star`,
+  );
   return response;
 }

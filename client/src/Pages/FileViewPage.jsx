@@ -1,16 +1,31 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import FileViewer from "../Components/File/FileViewer";
-import { getFileByMetaId, toggleFilePublic } from "../../apis/fileApi";
+import {
+  getFileByMetaId,
+  toggleFilePublic,
+  grantAccessById,
+  revokeFileAccess,
+} from "../../apis/fileApi";
 import ShareModal from "../Components/Modals/ShareModal";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useRef } from "react";
-import { useAuth } from "../Contexts";
+import { useAuth, useGDrive, useToast } from "../Contexts";
+import { searchUsers } from "../../apis/userApi";
+import { useDirectoryData } from "../Hooks/useDirectoryData";
+import { updateSharedAccess } from "../../Utils/shareRoleAccess";
+import { getResourceType } from "../../Utils/getResourceType";
+import { DRIVE_ROLES } from "../../Utils/displayUtils";
+import { updateItemState } from "../../Utils/updateItemState";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function FileViewPage() {
-  const {user, setUser, refreshUser} = useAuth();
+  const { user, setUser, refreshUser } = useAuth();
+  const { dirId } = useParams();
+  const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
+    useGDrive();
+  const { toast } = useToast();
   const { fileId } = useParams();
   const [item, setItem] = useState(null);
   const [error, setError] = useState(null);
@@ -20,7 +35,21 @@ export default function FileViewPage() {
   const [renameId, setRenameId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameType, setRenameType] = useState("");
+  const [allUsers, setAllUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [peopleWithAccess, setPeopleWithAccess] = useState([]);
+  const [directoriesList, setDirectoriesList] = useState([]);
+  const [filesList, setFilesList] = useState([]);
+  const [prevRole, setPrevRole] = useState([]);
+  const [linkAccess, setLinkAccess] = useState("");
+  const [linkRole, setLinkRole] = useState("");
+  const [isStarred, setIsStarred] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const usersLoadedRef = useRef(null);
+  const navigate = useNavigate();
   const extRef = useRef(null);
+
 
   function openRename(item) {
     setRenameType(item.isDirectory ? "directory" : "file");
@@ -52,6 +81,202 @@ export default function FileViewPage() {
     }
   }
 
+const handleToggleResourcePublic = async (
+  item,
+  role,
+  access,
+) => {
+  setIsShareLoading(true);
+
+  try {
+    const itemId = item._id ?? item.id;
+    const type = getResourceType(item);
+    const isGoogleDrive = type.startsWith(
+      "google-drive",
+    );
+
+    const restricted = access === "restricted";
+    const userRole =
+      DRIVE_ROLES[role] ?? "reader";
+
+    let permission = null;
+
+    if (isGoogleDrive) {
+      if (restricted) {
+        await revokeFileAccess(
+          "google",
+          itemId,
+        );
+      } else {
+        const { data } =
+          await toggleDriveFilePermission(
+            itemId,
+            userRole,
+          );
+
+        permission = data.permission;
+      }
+    } else {
+      await toggleFilePublic(
+        itemId,
+        userRole,
+        access,
+        type,
+      );
+    }
+
+    const permissions =
+      item.permissions ?? [];
+
+    const updatedPermissions = restricted
+      ? permissions.filter(
+          (p) => p?.type !== "anyone",
+        )
+      : [
+          ...permissions.filter(
+            (p) => p?.type !== "anyone",
+          ),
+          {
+            ...(permission ?? {}),
+            type: "anyone",
+            role: userRole,
+          },
+        ];
+
+
+    const update = (list) =>
+      list.map((resource) => {
+        if (
+          String(
+            resource._id ?? resource.id,
+          ) !== String(itemId)
+        ) {
+          return resource;
+        }
+
+        return {
+          ...resource,
+          permissions: updatedPermissions,
+          isPublic: !restricted,
+          publicRole: restricted
+            ? undefined
+            : userRole,
+        };
+      });
+
+    updateItemState(setItem, itemId, {
+      permissions: updatedPermissions,
+      isPublic: !restricted,
+      publicRole: restricted
+        ? undefined
+        : userRole,
+    });
+
+
+    setLinkAccess(
+      restricted ? "restricted" : "anyone",
+    );
+
+    setLinkRole(
+      restricted ? "reader" : userRole,
+    );
+
+    toast({
+      message: "Public Access updated",
+      type: "success",
+    });
+  } catch (error) {
+    toast({
+      message:
+        error?.message ||
+        "Something went wrong!",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+};
+
+
+const handleSharedRoleUpdate = async (
+  item,
+  type,
+  message,
+) => {
+  setIsShareLoading(true);
+
+  try {
+    const result = await updateSharedAccess({
+      item,
+      type,
+      peopleWithAccess,
+      prevRole,
+      message,
+      grantAccessById,
+      revokeFileAccess,
+    });
+
+    if (!result.changed) {
+      setShareItem(null);
+      return;
+    }
+
+    const itemId = String(
+      item._id ?? item.id,
+    );
+
+  
+
+
+    setItem((currentItem) => {
+      if (!currentItem) {
+        return currentItem;
+      }
+
+      if (
+        String(currentItem._id) !== itemId
+      ) {
+        return currentItem;
+      }
+
+      const nonUserPermissions = (
+        currentItem.permissions ?? []
+      ).filter(
+        (permission) =>
+          permission.type !== "user",
+      );
+
+      return {
+        ...currentItem,
+        permissions: [
+          ...nonUserPermissions,
+          ...result.permissions,
+        ],
+      };
+    });
+
+    setPeopleWithAccess(result.permissions);
+    setPrevRole(result.permissions);
+    setShareItem(null);
+
+    toast({
+      message: "Access updated",
+      type: "success",
+    });
+  } catch (error) {
+    toast({
+      message:
+        error?.message ||
+        "Something went wrong!",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+};
+
+
+
   useEffect(() => {
     refreshUser();
   }, []);
@@ -61,6 +286,28 @@ export default function FileViewPage() {
   }
   useEffect(() => {
     getFile();
+  }, [fileId]);
+
+  useEffect(() => {
+    async function loadAllUsers() {
+      if (usersLoadedRef.current) return;
+      usersLoadedRef.current = true;
+      try {
+        const data = await searchUsers(user.id);
+        setAllUsers(
+          data.users.map((u) => ({
+            id: u._id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            avatar: u.avatar,
+          })),
+        );
+      } catch (err) {
+        console.log(err.message);
+      }
+    }
+    loadAllUsers();
   }, [fileId]);
   const getFileById = async (fileId) => {
     try {
@@ -74,6 +321,9 @@ export default function FileViewPage() {
     }
   };
 
+  useEffect(()=> {
+    console.log('item', item)
+  }, [shareItem])
   if (error)
     return (
       <div
@@ -136,10 +386,12 @@ export default function FileViewPage() {
       setError(err.message || "Something went wrong");
     }
   }
+
   return (
     <>
       <FileViewer
         key={item._id}
+        shareItem={shareItem}
         item={item}
         onClose={() => window.close()}
         meta={true}
@@ -147,16 +399,7 @@ export default function FileViewPage() {
         onRename={(item) => {
           openRename(item);
         }}
-        onShare={
-          item?.publicRole === "editor" ||
-          item?.publicRole === "owner" ||
-          item.userRole === "editor" ||
-          item?.userRole === "owner"
-            ? (item) => {
-                setShareItem(item);
-              }
-            : null
-        }
+        onShare={(item) => setShareItem(item)}
         onSoftDelete={(item) => handleMoveToTrash(item)}
         onDownload={() =>
           window.open(`${BASE_URL}/file/${item._id}?action=download`, "_blank")
@@ -165,9 +408,26 @@ export default function FileViewPage() {
       {shareItem && (
         <ShareModal
           item={shareItem}
-          onClose={handleShareItem}
+          setItem={setItem}
+          onClose={handleToggleResourcePublic}
+          onUpdateRoleAfterSave={handleSharedRoleUpdate}
           setShareItem={setShareItem}
           isShareLoading={isShareLoading}
+          setIsShareLoading={setIsShareLoading}
+          setDirectoriesList={setDirectoriesList}
+          setFilesList={setFilesList}
+          selectedUsers={selectedUsers}
+          setSelectedUsers={setSelectedUsers}
+          peopleWithAccess={peopleWithAccess}
+          prevRole={prevRole}
+          setPrevRole={setPrevRole}
+          linkAccess={linkAccess}
+          setLinkAccess={setLinkAccess}
+          linkRole={linkRole}
+          setLinkRole={setLinkRole}
+          setPeopleWithAccess={setPeopleWithAccess}
+          allUsers={allUsers}
+          setAllUsers={setAllUsers}
         />
       )}
       {showRename && (

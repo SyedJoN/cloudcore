@@ -20,75 +20,201 @@ import { deleteFileArray } from "../services/s3/deleteArray.js";
 const __filename = fileURLToPath(import.meta.url);
 
 const resolveRole = async (item, type, userId, parentDir) => {
-  let result = [];
+  const ROLE_PRIORITY = {
+    reader: 1,
+    writer: 2,
+    owner: 3,
+  };
+
   const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
 
-  // ── read all pages ──────────────────────────────────────────
-  let allTuples = [];
-  let continuationToken = undefined;
+  const getTuples = async (object) => {
+    let allTuples = [];
+    let continuationToken;
 
-  do {
-    const response = await fgaClient.read(
-      { tuple_key: { object } },
-      { continuationToken },
+    do {
+      const response = await fgaClient.read(
+        {
+          tuple_key: {
+            object,
+          },
+        },
+        continuationToken
+          ? {
+              continuationToken,
+            }
+          : undefined,
+      );
+
+      allTuples = allTuples.concat(response.tuples || []);
+      continuationToken = response.continuation_token;
+    } while (continuationToken);
+
+    return allTuples;
+  };
+
+  const getCollaborators = (tuples, object) => {
+    return tuples
+      .filter(
+        (t) =>
+          t.key.object === object &&
+          t.key.user?.startsWith("user:") &&
+          ["owner", "reader", "writer"].includes(t.key.relation),
+      )
+      .map((t) => ({
+        userId: t.key.user.split(":")[1],
+        relation: t.key.relation,
+      }));
+  };
+
+  const getUsers = async (collaborators) => {
+    if (!collaborators.length) return [];
+
+    return User.find({
+      _id: {
+        $in: collaborators.map((c) => c.userId),
+      },
+    })
+      .select("name email avatar")
+      .lean();
+  };
+
+
+  const mergePermission = (permissionMap, user, relation) => {
+    if (!user?._id || !ROLE_PRIORITY[relation]) return;
+
+    const userId = user._id.toString();
+    const existing = permissionMap.get(userId);
+
+    if (!existing) {
+      permissionMap.set(userId, {
+        id: user._id,
+        photoLink: user.avatar,
+        displayName: user.name,
+        type: "user",
+        emailAddress: user.email,
+        role: relation,
+      });
+
+      return;
+    }
+
+    const existingPriority = ROLE_PRIORITY[existing.role] || 0;
+    const incomingPriority = ROLE_PRIORITY[relation] || 0;
+
+    if (incomingPriority > existingPriority) {
+      existing.role = relation;
+    }
+  };
+
+  const resolveObjectPermissions = async (object) => {
+    const tuples = await getTuples(object);
+    const collaborators = getCollaborators(tuples, object);
+    const users = await getUsers(collaborators);
+
+    const collaboratorMap = new Map(
+      collaborators.map((c) => [c.userId, c.relation]),
     );
 
-    allTuples = allTuples.concat(response.tuples);
-    continuationToken = response.continuation_token;
-  } while (continuationToken);
-  // ────────────────────────────────────────────────────────────
-  const collaborators = allTuples
-    .filter(
-      (t) =>
-        t.key.object === object &&
-        t.key.user.startsWith("user:") &&
-        ["owner", "reader", "writer"].includes(t.key.relation),
-    )
-    .map((t) => ({
-      userId: t.key.user.split(":")[1],
-      relation: t.key.relation,
+    return users.map((user) => ({
+      user,
+      relation: collaboratorMap.get(user._id.toString()),
     }));
+  };
 
-  if (!collaborators.length) {
-    return [];
+  const getAncestorDirectories = async (directory) => {
+    const ancestors = [];
+
+    let current = directory;
+
+    while (current?._id) {
+      ancestors.push(current);
+
+
+      if (!current.parentId) {
+        break;
+      }
+
+      current = await Folder.findById(current.parentId)
+        .select("_id parentId isPublic publicRole")
+        .lean();
+    }
+
+    return ancestors;
+  };
+
+
+
+  const permissionMap = new Map();
+
+
+  const directPermissions = await resolveObjectPermissions(object);
+
+  for (const { user, relation } of directPermissions) {
+    mergePermission(permissionMap, user, relation);
+  }
+  if (parentDir?._id) {
+    const ancestors = await getAncestorDirectories(parentDir);
+
+    for (const ancestor of ancestors) {
+      const parentObject = `folder:${ancestor._id}`;
+
+      const inheritedPermissions =
+        await resolveObjectPermissions(parentObject);
+
+      for (const { user, relation } of inheritedPermissions) {
+        mergePermission(permissionMap, user, relation);
+      }
+    }
   }
 
-  const users = await User.find({
-    _id: { $in: collaborators.map((c) => c.userId) },
-  })
-    .select("name email avatar")
-    .lean();
+  const permissions = Array.from(permissionMap.values());
 
-  result = users.map((user) => ({
-    id: user._id,
-    photoLink: user.avatar,
-    displayName: user.name,
-    type: "user",
-    emailAddress: user.email,
-    role: collaborators.find((c) => c.userId === user._id.toString())?.relation,
-    me:
-      user._id.toString() === userId.toString() ||
-      user._id.toString() === item?.userId?._id.toString() ||
-      user._id.toString() === parentDir?.userId?._id.toString(),
-  }));
 
-  const isPublic = item.isPublic || parentDir?.isPublic;
-  const publicRole = isPublic ? item?.publicRole : parentDir?.publicRole;
+  const owners = permissions
+    .filter((permission) => permission.role === "owner")
+    .map((permission) => ({
+      displayName: permission.displayName,
+      kind: "drive#user",
+      me:
+        permission.id?.toString() ===
+        userId?.toString(),
+      permissionId: permission.id,
+      emailAddress: permission.emailAddress,
+      photoLink: permission.photoLink,
+    }));
+
+  const isPublic = Boolean(
+    item.isPublic || parentDir?.isPublic,
+  );
+
+  let publicRole;
+
+  if (item.isPublic) {
+    publicRole = item.publicRole;
+  } else if (parentDir?.isPublic) {
+    publicRole = parentDir.publicRole;
+  }
 
   if (isPublic) {
-    result.push({
+    permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
       role: publicRole || "reader",
     });
   }
-  result.push({
+
+
+  permissions.push({
     id: "superuser",
     role: "superuser",
     type: "superuser",
   });
 
-  return result;
+  return {
+    permissions,
+    owners,
+  };
 };
 
 async function listObjects(userId, type) {
@@ -157,27 +283,35 @@ export const getDirectory = async (req, res, next) => {
 
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
-          files.map(async (f) => ({
-            ...f,
-            permissions: await resolveRole(f, "file", userId, parentDir),
-          })),
+          files.map(async (f) => {
+            const roles = await resolveRole(f, "file", userId, parentDir);
+            return {
+              ...f,
+              owners: roles.owners,
+              permissions: roles.permissions,
+            };
+          }),
         ),
         Promise.all(
-          directories.map(async (d) => ({
-            ...d,
-            permissions: await resolveRole(d, "folder", userId, parentDir),
-          })),
+          directories.map(async (d) => {
+            const roles = await resolveRole(d, "folder", userId, parentDir);
+            return {
+              ...d,
+              owners: roles.owners,
+              permissions: roles.permissions,
+            };
+          }),
         ),
       ]);
-      const permissions = await resolveRole(
+      const { owners, permissions } = await resolveRole(
         parentDir,
         "folder",
         userId,
         parentDir,
       );
-      console.log("permissions", permissions);
       const parentDirWithRole = {
         ...parentDirData,
+        owners,
         permissions,
       };
       return res.status(200).json({
@@ -235,25 +369,35 @@ export const getDirectory = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
+        const roles = await resolveRole(file, "file", userId, parentDir);
         return {
           ...file,
-          permissions: await resolveRole(file, "file", userId, parentDir),
+          owners: roles.owners,
+          permissions: roles.permissions,
         };
       }),
     );
 
     const directoriesWithRoles = await Promise.all(
       directories.map(async (dir) => {
+        const roles = await resolveRole(dir, "folder", userId, parentDir);
         return {
           ...dir,
-          permissions: await resolveRole(dir, "folder", userId, parentDir),
+          owners: roles.owners,
+          permissions: roles.permissions,
         };
       }),
     );
-
+    const { owners, permissions } = await resolveRole(
+      parentDir,
+      "folder",
+      userId,
+      parentDir,
+    );
     return res.status(200).json({
       ...parentDir,
-      permissions: await resolveRole(parentDir, "folder", userId, parentDir),
+      owners,
+      permissions,
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
@@ -333,6 +477,7 @@ export const getSharedWithMe = async (req, res, next) => {
             _id: { $in: allowedFileIds },
             userId: { $ne: userId },
           })
+            .populate("parentDirId")
             .populate("userId", "name email avatar")
             .populate("path", "name")
             .lean()
@@ -358,17 +503,25 @@ export const getSharedWithMe = async (req, res, next) => {
     );
 
     const filesWithRoles = await Promise.all(
-      topLevelFiles.map(async (file) => ({
-        ...file,
-        permissions: await resolveRole(file, "file", userId),
-      })),
+      topLevelFiles.map(async (file) => {
+        const roles = await resolveRole(file, "file", userId, file.parentDirId);
+        return {
+          ...file,
+          owners: roles.owners,
+          permissions: roles.permissions,
+        };
+      }),
     );
 
     const directoriesWithRoles = await Promise.all(
-      topLevelDirs.map(async (dir) => ({
-        ...dir,
-        permissions: await resolveRole(dir, "folder", userId),
-      })),
+      topLevelDirs.map(async (dir) => {
+        const roles = await resolveRole(dir, "folder", userId);
+        return {
+          ...dir,
+          owners: roles.owners,
+          permissions: roles.permissions,
+        };
+      }),
     );
 
     return res
@@ -794,11 +947,12 @@ export const sendLink = async (req, res, next) => {
   try {
     const { id, toEmail, message, name, type, url, isPublic, publicRole } =
       req.body;
-    const userId = req.user._id;
-    const isGoogleDriveLink = type.startsWith("google-drive");
-    const sender = await User.findById(userId).select("name email").lean();
-    const cleanMessage = sanitizeText(message || "");
-
+      const userId = req.user._id;
+      const isGoogleDriveLink = type.startsWith("google-drive");
+      const sender = await User.findById(userId).select("name email").lean();
+      const cleanMessage = sanitizeText(message || "");
+      
+      console.log('toEmail', cleanMessage)
     if (isGoogleDriveLink) {
       await sendLinkEmail({
         toEmail,
@@ -827,7 +981,7 @@ export const sendLink = async (req, res, next) => {
       itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "currentDirectory" : "file"}/${id}`,
       isPublic: item.isPublic,
       publicRole: item.publicRole,
-      cleanMessage,
+      message: cleanMessage,
     });
 
     return res.status(200).json({ message: "Link sent" });

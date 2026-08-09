@@ -33,6 +33,7 @@ const directorySchema = new Schema(
       type: Boolean,
       default: false,
     },
+
  viewedByMeTime: {
       type: Date,
       default: Date.now,

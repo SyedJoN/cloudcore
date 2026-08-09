@@ -44,12 +44,15 @@ export default function SelectionBar({
   const isFile = !item?.isDirectory;
   const publicRole = item?.publicRole;
 
-  const isOwner = item?.userId?._id === user.id || item.owners?.[0].me === true;
-  const isViewer = userRole === "viewer" || publicRole === "viewer";
-  const canEdit =
+  const isOwner = item.owners?.[0].me === true;
+  const isViewer =
+    (!isOwner &&
+      item.permissions?.find((p) => p.role === "reader")?.id === user.id) ||
+    item?.publicRole === "reader";
+ const canEdit =
     type === "google"
       ? isOwner || item.capabilities?.canEdit
-      : isOwner || !isViewer;
+      : !isOwner && item.permissions?.find((p) => p.role === "writer")?.role;
   const canDelete = type === "google" && item.capabilities?.canDelete === true;
   const isTrashRoute = route === "trash";
   const isSharedRoute = route === "shared";

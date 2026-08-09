@@ -16,6 +16,7 @@ const fileSchema = new Schema(
     },
     parentDirId: {
       type: Schema.Types.ObjectId,
+      ref: "Directory",
       default: null,
     },
     path: {

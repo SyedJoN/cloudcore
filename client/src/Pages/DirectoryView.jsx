@@ -54,6 +54,7 @@ import {
 } from "../Components/Drive/Recent/ApplyRecentFilters";
 import { toggleItemStar } from "../../apis/resourceApi";
 import { searchUsers } from "../../apis/userApi";
+import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -581,8 +582,6 @@ export default function DirectoryView({ route }) {
       setLinkAccess(restricted ? "restricted" : "anyone");
       setLinkRole(restricted ? "reader" : userRole);
 
-      setShareItem(null);
-
       toast({
         message: "Public Access updated",
         type: "success",
@@ -597,95 +596,63 @@ export default function DirectoryView({ route }) {
     }
   };
 
-async function handleSharedRoleUpdate(item, type, message) {
-  if (!peopleWithAccess.length) return;
-
-  const equal =
-    prevRole.length === peopleWithAccess.length &&
-    prevRole.every(
-      (prev, index) =>
-        prev.id === peopleWithAccess[index].id &&
-        prev.role === peopleWithAccess[index].role,
-    );
-
-  if (equal) {
-    setShareItem(null);
-    return;
-  }
-
+const handleSharedRoleUpdate = async (
+  item,
+  type,
+  message,
+) => {
   setIsShareLoading(true);
 
   try {
-    const itemId = String(item._id ?? item.id);
+    const result = await updateSharedAccess({
+      item,
+      type,
+      peopleWithAccess,
+      prevRole,
+      message,
+      grantAccessById,
+      revokeFileAccess,
+    });
 
-    const personsToGrant = peopleWithAccess.filter(
-      (person) => person.role !== "remove",
-    );
-
-    const personsToRemove = peopleWithAccess.filter(
-      (person) => person.role === "remove",
-    );
-
-    if (personsToGrant.length) {
-      await grantAccessById(
-        type,
-        itemId,
-        personsToGrant,
-        message,
-      );
+    
+    if (!result.changed) {
+      setShareItem(null);
+      return;
     }
 
-    if (personsToRemove.length) {
-      await Promise.all(
-        personsToRemove.map((person) =>
-          revokeFileAccess(
-            type,
-            itemId,
-            person.id,
-            person.role,
-          ),
-        ),
-      );
-    }
-
-    const update = (list) =>
+   
+    const updateResource = (list) =>
       list.map((resource) => {
-        if (
-          String(resource._id ?? resource.id) !== itemId
-        ) {
+        const resourceId = String(
+          resource._id ?? resource.id,
+        );
+
+        if (resourceId !== result.itemId) {
           return resource;
         }
 
-        const permissions = resource.permissions ?? [];
-
-   
-        const nonUserPermissions = permissions.filter(
+        const nonUserPermissions = (
+          resource.permissions ?? []
+        ).filter(
           (permission) =>
             permission.type !== "user",
-        );
-
-        const userPermissions = personsToGrant.map(
-          (person) => ({
-            ...person,
-            type: "user",
-          }),
         );
 
         return {
           ...resource,
           permissions: [
             ...nonUserPermissions,
-            ...userPermissions,
+            ...result.permissions,
           ],
         };
       });
 
-    setFilesList(update);
-    setDirectoriesList(update);
 
-    setPeopleWithAccess(personsToGrant);
-    setPrevRole(personsToGrant);
+    setFilesList(updateResource);
+    setDirectoriesList(updateResource);
 
+    setPeopleWithAccess(result.permissions);
+    setPrevRole(result.permissions);
     setShareItem(null);
 
     toast({
@@ -695,13 +662,16 @@ async function handleSharedRoleUpdate(item, type, message) {
   } catch (error) {
     toast({
       message:
-        error?.message || "Something went wrong!",
+        error?.message ||
+        "Something went wrong!",
       type: "error",
     });
   } finally {
     setIsShareLoading(false);
   }
-}
+};
+
+
 
   useEffect(() => {
     console.log("combinedItems", combinedItems);

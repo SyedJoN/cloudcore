@@ -30,75 +30,189 @@ const roleMap = {
   commenter: "commenter",
 };
 const resolveRole = async (item, type, userId, parentDir) => {
-  let result = [];
+  const ROLE_PRIORITY = {
+    reader: 1,
+    writer: 2,
+    owner: 3,
+  };
+
   const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
 
-  // ── read all pages ──────────────────────────────────────────
-  let allTuples = [];
-  let continuationToken = undefined;
+  const getTuples = async (object) => {
+    let allTuples = [];
+    let continuationToken;
 
-  do {
-    const response = await fgaClient.read(
-      { tuple_key: { object } },
-      { continuationToken },
+    do {
+      const response = await fgaClient.read(
+        {
+          tuple_key: {
+            object,
+          },
+        },
+        continuationToken
+          ? {
+              continuationToken,
+            }
+          : undefined,
+      );
+
+      allTuples = allTuples.concat(response.tuples || []);
+      continuationToken = response.continuation_token;
+    } while (continuationToken);
+
+    return allTuples;
+  };
+
+  const getCollaborators = (tuples, object) => {
+    return tuples
+      .filter(
+        (t) =>
+          t.key.object === object &&
+          t.key.user?.startsWith("user:") &&
+          ["owner", "reader", "writer"].includes(t.key.relation),
+      )
+      .map((t) => ({
+        userId: t.key.user.split(":")[1],
+        relation: t.key.relation,
+      }));
+  };
+
+  const getUsers = async (collaborators) => {
+    if (!collaborators.length) return [];
+
+    return User.find({
+      _id: {
+        $in: collaborators.map((c) => c.userId),
+      },
+    })
+      .select("name email avatar")
+      .lean();
+  };
+
+  const mergePermission = (permissionMap, user, relation) => {
+    if (!user?._id || !ROLE_PRIORITY[relation]) return;
+
+    const userId = user._id.toString();
+    const existing = permissionMap.get(userId);
+
+    if (!existing) {
+      permissionMap.set(userId, {
+        id: user._id,
+        photoLink: user.avatar,
+        displayName: user.name,
+        type: "user",
+        emailAddress: user.email,
+        role: relation,
+      });
+
+      return;
+    }
+
+    const existingPriority = ROLE_PRIORITY[existing.role] || 0;
+    const incomingPriority = ROLE_PRIORITY[relation] || 0;
+
+    if (incomingPriority > existingPriority) {
+      existing.role = relation;
+    }
+  };
+
+  const resolveObjectPermissions = async (object) => {
+    const tuples = await getTuples(object);
+    const collaborators = getCollaborators(tuples, object);
+    const users = await getUsers(collaborators);
+
+    const collaboratorMap = new Map(
+      collaborators.map((c) => [c.userId, c.relation]),
     );
 
-    allTuples = allTuples.concat(response.tuples);
-    continuationToken = response.continuation_token;
-  } while (continuationToken);
-  // ────────────────────────────────────────────────────────────
-  const collaborators = allTuples
-    .filter(
-      (t) =>
-        t.key.object === object &&
-        t.key.user.startsWith("user:") &&
-        ["owner", "reader", "writer"].includes(t.key.role),
-    )
-    .map((t) => ({
-      userId: t.key.user.split(":")[1],
-      role: t.key.role,
+    return users.map((user) => ({
+      user,
+      relation: collaboratorMap.get(user._id.toString()),
     }));
+  };
 
-  if (!collaborators.length) {
-    return [];
+  const getAncestorDirectories = async (directory) => {
+    const ancestors = [];
+
+    let current = directory;
+
+    while (current?._id) {
+      ancestors.push(current);
+
+      if (!current.parentId) {
+        break;
+      }
+
+      current = await Folder.findById(current.parentId)
+        .select("_id parentId isPublic publicRole")
+        .lean();
+    }
+
+    return ancestors;
+  };
+
+  const permissionMap = new Map();
+
+  const directPermissions = await resolveObjectPermissions(object);
+
+  for (const { user, relation } of directPermissions) {
+    mergePermission(permissionMap, user, relation);
+  }
+  if (parentDir?._id) {
+    const ancestors = await getAncestorDirectories(parentDir);
+
+    for (const ancestor of ancestors) {
+      const parentObject = `folder:${ancestor._id}`;
+
+      const inheritedPermissions = await resolveObjectPermissions(parentObject);
+
+      for (const { user, relation } of inheritedPermissions) {
+        mergePermission(permissionMap, user, relation);
+      }
+    }
   }
 
-  const users = await User.find({
-    _id: { $in: collaborators.map((c) => c.userId) },
-  })
-    .select("name email avatar")
-    .lean();
+  const permissions = Array.from(permissionMap.values());
 
-  result = users.map((user) => ({
-    id: user._id,
-    photoLink: user.avatar,
-    displayName: user.name,
-    type: "user",
-    emailAddress: user.email,
-    role: collaborators.find((c) => c.userId === user._id.toString())?.role,
-    me:
-      user._id.toString() === userId.toString() ||
-      user._id.toString() === item?.userId?._id.toString() ||
-      user._id.toString() === parentDir?.userId?._id.toString(),
-  }));
+  const owners = permissions
+    .filter((permission) => permission.role === "owner")
+    .map((permission) => ({
+      displayName: permission.displayName,
+      kind: "drive#user",
+      me: permission.id?.toString() === userId?.toString(),
+      permissionId: permission.id,
+      emailAddress: permission.emailAddress,
+      photoLink: permission.photoLink,
+    }));
 
-  const isPublic = item.isPublic || parentDir?.isPublic;
-  const publicRole = isPublic ? item?.publicRole : parentDir?.publicRole;
+  const isPublic = Boolean(item.isPublic || parentDir?.isPublic);
+
+  let publicRole;
+
+  if (item.isPublic) {
+    publicRole = item.publicRole;
+  } else if (parentDir?.isPublic) {
+    publicRole = parentDir.publicRole;
+  }
 
   if (isPublic) {
-    result.push({
+    permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
       role: publicRole || "reader",
     });
   }
-  result.push({
+
+  permissions.push({
     id: "superuser",
     role: "superuser",
     type: "superuser",
   });
 
-  return result;
+  return {
+    permissions,
+    owners,
+  };
 };
 export const uploadDriveFileToS3 = async (req, res, next) => {
   const { fileId, driveFileId } = req.body;
@@ -374,11 +488,14 @@ export const getFileMetaById = async (req, res, next) => {
       .lean();
 
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
+    const roles = await resolveRole(file, "file", userId, parentDir);
 
     // 1. OWNER OR SUPERUSER → always owner
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
+        owners: roles.owners,
+        permissions: roles.permissions,
       });
     }
 
@@ -415,6 +532,8 @@ export const getFileMetaById = async (req, res, next) => {
 
       return res.status(200).json({
         ...file,
+        owners: roles.owners,
+        permissions: roles.permissions,
       });
     }
 
@@ -480,17 +599,25 @@ export const getRecentFiles = async (req, res, next) => {
     ]);
 
     const sharedFilesWithRoles = await Promise.all(
-      sharedFiles.map(async (file) => ({
-        ...file,
-        permissions: await resolveRole(file, "file", userId),
-      })),
+      sharedFiles.map(async (file) => {
+        const roles = await resolveRole(file, "file", userId);
+        return {
+          ...file,
+          owners: roles.owners,
+          permissions: roles.permissions,
+        };
+      }),
     );
 
     const ownFilesWithRoles = await Promise.all(
-      ownFiles.map(async (file) => ({
-        ...file,
-        permissions: await resolveRole(file, "file", userId),
-      })),
+      ownFiles.map(async (file) => {
+        const roles = await resolveRole(file, "file", userId);
+        return {
+          ...file,
+          owners: roles.owners,
+          permissions: roles.permissions,
+        };
+      }),
     );
 
     const allFiles = [...ownFilesWithRoles, ...sharedFilesWithRoles];
@@ -864,7 +991,7 @@ export const giveAccessById = async (req, res, next) => {
 
         await Promise.all(
           usersArray.map(async (user) => {
-            const googleRole = roleMap[user.role];
+            const googleRole = user.role;
 
             if (!googleRole) {
               throw new Error(`Invalid role: ${user.role}`);
@@ -998,7 +1125,7 @@ export const revokeFileAccess = async (req, res, next) => {
     const { id } = req.params;
     const { targetId: userId, type, relation } = req.body;
 
-    if (!userId) {
+    if (type !== "google" && !userId) {
       return res.status(400).json({
         message: "Target user is required",
       });
@@ -1058,9 +1185,7 @@ export const revokeFileAccess = async (req, res, next) => {
     }
 
     const allowedRelations =
-      relation === "remove"
-        ? ["reader", "writer"]
-        : [relation];
+      relation === "remove" ? ["reader", "writer"] : [relation];
 
     const existing = await fgaClient.read({
       tuple_key: {
