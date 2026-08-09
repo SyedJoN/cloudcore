@@ -24,6 +24,9 @@ import {
   getTrashItems,
   sendLink,
   toggleItemStar,
+  sendOwnershipMail,
+  cancelOwnershipMail,
+  ownershipAction,
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
@@ -115,6 +118,9 @@ app.get("/starred", checkAuth, getStarredItems);
 app.get("/trash/{:id}", checkAuth, getTrashItems);
 app.patch("/item/:type/:id/toggle-star", checkAuth, toggleItemStar);
 app.post("/item/send-link", checkAuth, sendLink);
+app.post("/item/sendMail/transfer-ownership", checkAuth, sendOwnershipMail);
+app.post("/item/cancel-pending-ownership", checkAuth, cancelOwnershipMail);
+app.get("/item/ownership-transfer/:transferId/:action", checkAuth, ownershipAction);
 
 app.use((err, req, res, next) => {
   console.log(err);

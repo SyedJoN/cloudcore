@@ -209,8 +209,23 @@ const resolveRole = async (item, type, userId, parentDir) => {
     type: "superuser",
   });
 
+  const ownership = await Ownership.findOne({ itemId: item?._id });
+  const updatedPermissions = permissions.map((p) => {
+    const permissionId = p.id?.toString();
+    const ownerId = ownership?.toUser?.toString();
+
+    if (ownership?.status === "pending" && permissionId === ownerId) {
+      return {
+        ...p,
+        transferStatus: ownership.status,
+      };
+    }
+
+    return p;
+  });
+
   return {
-    permissions,
+    permissions: updatedPermissions,
     owners,
   };
 };
@@ -429,7 +444,7 @@ export const getFileById = async (req, res, next) => {
 
         const canRead = await fgaClient.check({
           user: `user:${userId}`,
-          role: "can_read",
+          relation: "can_read",
           object: `file:${id}`,
         });
 

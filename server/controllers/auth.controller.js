@@ -492,13 +492,14 @@ export const googleAuth = async (req, res, next) => {
           relation: "owner",
           object: `folder:${dirId}`,
         };
-      }
-    });
-    if (fgaTuple) {
+          if (fgaTuple) {
       await fgaClient.write({
         writes: [fgaTuple],
       });
     }
+      }
+    });
+  
     // REDIS SESSION HANDLING
 
     const userSessions = await redisClient.ft.search(

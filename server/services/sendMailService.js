@@ -8,6 +8,345 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+export const sendOwnershipTransferEmail = async ({
+  to,
+  toName,
+  fromName,
+  itemName,
+  itemType,
+  transferId,
+  expiresAt,
+}) => {
+  const acceptUrl = `${process.env.SERVER_URL}/item/ownership-transfer/${transferId}/accept`;
+  const rejectUrl = `${process.env.SERVER_URL}/item/ownership-transfer/${transferId}/reject`;
+
+  const formattedItemType = itemType === "Directory" ? "folder" : "file";
+
+  const subject = `${fromName} wants to transfer ownership of "${itemName}" to you`;
+ try {
+   const info = await transporter.sendMail({
+     from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
+     to: to,
+     subject: `${fromName} shared "${itemName}" with you`,
+     html: `<!DOCTYPE html>
+     <html>
+       <head>
+         <meta charset="UTF-8" />
+         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+         <title>Ownership Transfer</title>
+       </head>
+ 
+       <body style="
+         margin: 0;
+         padding: 0;
+         background-color: #f8f9fa;
+         font-family: Arial, Helvetica, sans-serif;
+         color: #202124;
+       ">
+         <div style="
+           max-width: 560px;
+           margin: 40px auto;
+           background: #ffffff;
+           border: 1px solid #dadce0;
+           border-radius: 8px;
+           overflow: hidden;
+         ">
+ 
+           <div style="
+             padding: 24px 32px;
+             border-bottom: 1px solid #dadce0;
+           ">
+             <h2 style="
+               margin: 0;
+               font-size: 20px;
+               font-weight: 500;
+               color: #202124;
+             ">
+               Ownership transfer request
+             </h2>
+           </div>
+ 
+           <div style="padding: 32px;">
+ 
+             <p style="font-size: 15px; line-height: 1.6; margin-top: 0;">
+               Hi ${toName || "there"},
+             </p>
+ 
+             <p style="font-size: 15px; line-height: 1.6;">
+               <strong>${fromName}</strong> wants to transfer ownership
+               of the ${formattedItemType}
+               <strong>"${itemName}"</strong> to you.
+             </p>
+ 
+             <div style="
+               margin: 24px 0;
+               padding: 16px;
+               background: #f8f9fa;
+               border-radius: 6px;
+             ">
+               <div style="
+                 font-size: 13px;
+                 color: #5f6368;
+                 margin-bottom: 6px;
+               ">
+                 ${formattedItemType}
+               </div>
+ 
+               <div style="
+                 font-size: 16px;
+                 font-weight: 500;
+                 color: #202124;
+               ">
+                 ${itemName}
+               </div>
+             </div>
+ 
+             <p style="
+               font-size: 14px;
+               line-height: 1.6;
+               color: #5f6368;
+             ">
+               If you accept, you will become the new owner of this
+               ${formattedItemType}.
+             </p>
+ 
+             <div style="
+               margin: 30px 0;
+               text-align: center;
+             ">
+               <a
+                 href="${acceptUrl}"
+                 style="
+                   display: inline-block;
+                   padding: 11px 24px;
+                   background: #1a73e8;
+                   color: #ffffff;
+                   text-decoration: none;
+                   border-radius: 4px;
+                   font-size: 14px;
+                   font-weight: 500;
+                   margin-right: 8px;
+                 "
+               >
+                 Accept ownership
+               </a>
+ 
+               <a
+                 href="${rejectUrl}"
+                 style="
+                   display: inline-block;
+                   padding: 11px 24px;
+                   background: #ffffff;
+                   color: #1a73e8;
+                   text-decoration: none;
+                   border: 1px solid #dadce0;
+                   border-radius: 4px;
+                   font-size: 14px;
+                   font-weight: 500;
+                 "
+               >
+                 Reject
+               </a>
+             </div>
+ 
+             ${
+               expiresAt
+                 ? `
+                   <p style="
+                     font-size: 12px;
+                     color: #80868b;
+                     text-align: center;
+                     margin-top: 24px;
+                   ">
+                     This request expires on ${new Date(
+                       expiresAt,
+                     ).toLocaleString()}.
+                   </p>
+                 `
+                 : ""
+             }
+ 
+             <p style="
+               font-size: 12px;
+               line-height: 1.5;
+               color: #80868b;
+               margin-top: 28px;
+             ">
+               If you weren't expecting this request, you can safely ignore
+               this email.
+             </p>
+ 
+           </div>
+         </div>
+       </body>
+     </html>
+   `,
+   });
+   return info;
+ } catch (error) {
+  throw error;
+ }
+};
+
+export const sendOwnershipTransferResultEmail = async ({
+  to,
+  toName,
+  newOwnerName,
+  itemName,
+  itemType,
+  status,
+}) => {
+  const formattedItemType =
+    itemType === "Directory" ? "folder" : "file";
+
+  const isAccepted = status === "accepted";
+
+  const subject = isAccepted
+    ? `Ownership of "${itemName}" has been transferred`
+    : `Ownership transfer for "${itemName}" was rejected`;
+
+  const title = isAccepted
+    ? "Ownership transfer accepted"
+    : "Ownership transfer rejected";
+
+  const message = isAccepted
+    ? `<strong>${newOwnerName}</strong> accepted your request to transfer ownership of the ${formattedItemType} <strong>"${itemName}"</strong>.`
+    : `<strong>${newOwnerName}</strong> rejected your request to transfer ownership of the ${formattedItemType} <strong>"${itemName}"</strong>.`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Your App" <muhammadjoncs16@gmail.com>`,
+      to,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1.0"
+            />
+            <title>${title}</title>
+          </head>
+
+          <body style="
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #202124;
+          ">
+            <div style="
+              max-width: 560px;
+              margin: 40px auto;
+              background: #ffffff;
+              border: 1px solid #dadce0;
+              border-radius: 8px;
+              overflow: hidden;
+            ">
+
+              <div style="
+                padding: 24px 32px;
+                border-bottom: 1px solid #dadce0;
+              ">
+                <h2 style="
+                  margin: 0;
+                  font-size: 20px;
+                  font-weight: 500;
+                  color: #202124;
+                ">
+                  ${title}
+                </h2>
+              </div>
+
+              <div style="padding: 32px;">
+
+                <p style="
+                  font-size: 15px;
+                  line-height: 1.6;
+                  margin-top: 0;
+                ">
+                  Hi ${toName || "there"},
+                </p>
+
+                <p style="
+                  font-size: 15px;
+                  line-height: 1.6;
+                ">
+                  ${message}
+                </p>
+
+                <div style="
+                  margin: 24px 0;
+                  padding: 16px;
+                  background: #f8f9fa;
+                  border-radius: 6px;
+                ">
+                  <div style="
+                    font-size: 13px;
+                    color: #5f6368;
+                    margin-bottom: 6px;
+                  ">
+                    ${formattedItemType}
+                  </div>
+
+                  <div style="
+                    font-size: 16px;
+                    font-weight: 500;
+                    color: #202124;
+                  ">
+                    ${itemName}
+                  </div>
+                </div>
+
+                ${
+                  isAccepted
+                    ? `
+                      <p style="
+                        font-size: 14px;
+                        line-height: 1.6;
+                        color: #5f6368;
+                      ">
+                        Ownership of this ${formattedItemType}
+                        has now been transferred to
+                        ${newOwnerName}.
+                      </p>
+                    `
+                    : `
+                      <p style="
+                        font-size: 14px;
+                        line-height: 1.6;
+                        color: #5f6368;
+                      ">
+                        The ownership transfer was not completed.
+                        You remain the owner of this ${formattedItemType}.
+                      </p>
+                    `
+                }
+
+                <p style="
+                  font-size: 12px;
+                  line-height: 1.5;
+                  color: #80868b;
+                  margin-top: 28px;
+                ">
+                  You can manage this ${formattedItemType}
+                  from your storage.
+                </p>
+
+              </div>
+            </div>
+          </body>
+        </html>
+      `,
+    });
+
+    return info;
+  } catch (error) {
+    throw error;
+  }
+};
 export const sendAccessEmail = async function ({
   toEmail,
   toName,
@@ -22,11 +361,12 @@ export const sendAccessEmail = async function ({
   try {
     const roleLabel = role === "editor" ? "Editor" : "Viewer";
     const roleColor = role === "editor" ? "#1a73e8" : "#5f6368";
-  const itemIcon = itemType === "folder"
-  ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
-  : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
+    const itemIcon =
+      itemType === "folder"
+        ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
+        : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
 
-if (!toEmail) throw new Error("toEmail is required but missing");
+    if (!toEmail) throw new Error("toEmail is required but missing");
     const info = await transporter.sendMail({
       from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
       to: toEmail,
@@ -84,12 +424,16 @@ if (!toEmail) throw new Error("toEmail is required but missing");
                         You've been added as <strong style="color:${roleColor};">${roleLabel}</strong>
                       </p>
 
-                      ${message ? `
+                      ${
+                        message
+                          ? `
                       <!-- Message -->
                       <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">
                         "${message}"
                       </div>
-                      ` : ""}
+                      `
+                          : ""
+                      }
 
                       <!-- Item card -->
                       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:28px;">
@@ -146,12 +490,12 @@ if (!toEmail) throw new Error("toEmail is required but missing");
 };
 
 export const sendRequestAccessEmail = async function ({
-toEmail,
-itemId,
+  toEmail,
+  itemId,
   toName,
   fromName,
   fromEmail,
-  fromUserId, 
+  fromUserId,
   itemName,
   itemType,
   itemUrl,
@@ -160,10 +504,11 @@ itemId,
 }) {
   try {
     const roleLabel = role === "editor" ? "Editor" : "Viewer";
-    const itemIcon = itemType === "folder"
-      ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
-      : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
-if (!toEmail) throw new Error("toEmail is required but missing");
+    const itemIcon =
+      itemType === "folder"
+        ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
+        : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
+    if (!toEmail) throw new Error("toEmail is required but missing");
 
     const info = await transporter.sendMail({
       from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
@@ -216,11 +561,15 @@ if (!toEmail) throw new Error("toEmail is required but missing");
                         They would like <strong>${roleLabel}</strong> access to your ${itemType}.
                       </p>
 
-                      ${message ? `
+                      ${
+                        message
+                          ? `
                       <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">
                         "${message}"
                       </div>
-                      ` : ""}
+                      `
+                          : ""
+                      }
 
                       <!-- Item card -->
                       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:28px;">
@@ -296,11 +645,14 @@ export const sendLinkEmail = async function ({
 }) {
   try {
     const accessLabel = isPublic ? "Anyone with the link" : "Restricted";
-    const roleLabel = isPublic ? publicRole.charAt(0).toUpperCase() + publicRole.slice(1) : null;
-    const itemIcon = itemType === "folder"
-      ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
-      : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
-if (!toEmail) throw new Error("toEmail is required but missing");
+    const roleLabel = isPublic
+      ? publicRole.charAt(0).toUpperCase() + publicRole.slice(1)
+      : null;
+    const itemIcon =
+      itemType === "folder"
+        ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
+        : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
+    if (!toEmail) throw new Error("toEmail is required but missing");
 
     const info = await transporter.sendMail({
       from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
@@ -353,11 +705,15 @@ if (!toEmail) throw new Error("toEmail is required but missing");
                         You've received a link to a ${itemType} on StorageApp.
                       </p>
 
-                      ${message ? `
+                      ${
+                        message
+                          ? `
                       <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">
                         "${message}"
                       </div>
-                      ` : ""}
+                      `
+                          : ""
+                      }
 
                       <!-- Item card -->
                       <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:20px;">
@@ -381,15 +737,21 @@ if (!toEmail) throw new Error("toEmail is required but missing");
                           <td style="padding-left:10px;vertical-align:middle;">
                             <div style="font-size:13px;font-weight:500;color:#202124;">${accessLabel}</div>
                             <div style="font-size:12px;color:#5f6368;margin-top:2px;">
-                              ${isPublic
-                                ? `Anyone on the internet with the link can ${roleLabel?.toLowerCase() || "view"}`
-                                : "Only people with access can open this link"}
+                              ${
+                                isPublic
+                                  ? `Anyone on the internet with the link can ${roleLabel?.toLowerCase() || "view"}`
+                                  : "Only people with access can open this link"
+                              }
                             </div>
                           </td>
-                          ${roleLabel ? `
+                          ${
+                            roleLabel
+                              ? `
                           <td style="text-align:right;vertical-align:middle;">
                             <span style="font-size:12px;color:#5f6368;background:#e8eaed;padding:4px 10px;border-radius:12px;">${roleLabel}</span>
-                          </td>` : ""}
+                          </td>`
+                              : ""
+                          }
                         </tr>
                       </table>
 

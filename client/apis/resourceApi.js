@@ -1,5 +1,27 @@
 import { axiosWithCreds } from "./axiosInstances";
 
+export async function sendOwnershipMail({ newOwner, itemId, type }) {
+  const { data } = await axiosWithCreds.post(
+    "/item/sendMail/transfer-ownership",
+    {
+      newOwner,
+      itemId,
+      type,
+    },
+  );
+
+  return data.message;
+}
+
+export async function cancelPendingOwnership({ newOwner, itemId }) {
+  const { data } = await axiosWithCreds.post("/item/cancel-pending-ownership", {
+    newOwner,
+    itemId,
+  });
+
+  return data.message;
+}
+
 export async function sendLink({
   toEmail,
   message,

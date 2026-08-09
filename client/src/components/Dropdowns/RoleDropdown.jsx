@@ -5,7 +5,11 @@ import {
   useState,
   useCallback,
 } from "react";
-import { ROLE_LABEL, ROLE_DESC, DRIVE_ROLES } from "../../../Utils/displayUtils";
+import {
+  ROLE_LABEL,
+  ROLE_DESC,
+  DRIVE_ROLES,
+} from "../../../Utils/displayUtils";
 import { CheckIcon } from "@heroicons/react/24/solid";
 
 const ROLES = ["viewer", "editor"];
@@ -13,8 +17,12 @@ const ROLES = ["viewer", "editor"];
 export default function RoleDropdown({
   anchorRef,
   current,
+  isOwnerPending,
   onChange,
+  onTransfer,
+  onCancel,
   onClose,
+  isOwner = false,
   showRemove = false,
 }) {
   const dropdownRef = useRef(null);
@@ -25,25 +33,17 @@ export default function RoleDropdown({
 
   const updatePosition = useCallback(() => {
     const anchor = anchorRef?.current;
-
     if (!anchor) return;
 
     const rect = anchor.getBoundingClientRect();
-
     let left = rect.right - dropdownWidth;
-
     if (left < 8) {
-      left = rect.left;
+      left = rect.right;
     }
-
     if (left + dropdownWidth > window.innerWidth - 8) {
       left = window.innerWidth - dropdownWidth - 8;
     }
-
-    setPosition({
-      top: rect.bottom + 4,
-      left,
-    });
+    setPosition({ top: rect.bottom + 4, left });
   }, [anchorRef]);
 
   useLayoutEffect(() => {
@@ -96,9 +96,7 @@ export default function RoleDropdown({
         onClick={(e) => e.stopPropagation()}
       >
         {ROLES.map((r) => {
-          const isSelected =
-            String(current).toLowerCase() === r;
-          console.log("current", r);
+          const isSelected = String(current).toLowerCase() === r;
 
           return (
             <button
@@ -140,6 +138,15 @@ export default function RoleDropdown({
               Remove access
             </button>
           </>
+        )}
+        {isOwner && (
+          <button
+            type="button"
+            className="gd-role-option remove"
+            onClick={() => (isOwnerPending ? onCancel() : onTransfer())}
+          >
+            {isOwnerPending ? "Cancel ownership" : "Transfer ownership"}
+          </button>
         )}
       </div>
     </>

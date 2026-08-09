@@ -4,17 +4,17 @@ export const updateSharedAccess = async ({
   item,
   type,
   peopleWithAccess,
-  prevRole,
+  prevPermissions,
   message,
   grantAccessById,
   revokeFileAccess,
 }) => {
 
   const equal =
-    prevRole.length === peopleWithAccess.length &&
-    prevRole.every(
+    prevPermissions?.length === peopleWithAccess?.length &&
+    prevPermissions?.every(
       (prev) =>
-        peopleWithAccess.some(
+        peopleWithAccess?.some(
           (person) =>
             String(person.id) === String(prev.id) &&
             person.role === prev.role,
@@ -25,7 +25,7 @@ export const updateSharedAccess = async ({
   if (equal) {
     return {
       changed: false,
-      permissions: prevRole,
+      permissions: prevPermissions,
     };
   }
 

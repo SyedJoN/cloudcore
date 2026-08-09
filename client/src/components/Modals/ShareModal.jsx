@@ -25,7 +25,11 @@ import {
   revokeFileAccess,
 } from "../../../apis/fileApi.js";
 import { useToast } from "../../Contexts/ToastContext.jsx";
-import { sendLink } from "../../../apis/resourceApi.js";
+import {
+  cancelPendingOwnership,
+  sendLink,
+  sendOwnershipMail,
+} from "../../../apis/resourceApi.js";
 import { useAuth } from "../../Contexts/AuthContext.jsx";
 import ConfirmationModal from "./ConfirmationModal.jsx";
 import { createPortal } from "react-dom";
@@ -73,6 +77,7 @@ export default function ShareModal({
   const [updatedPerson, setUpdatedPerson] = useState([]);
   const [isConfirmation, setIsConfirmation] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
+  const [isOwnerPending, setIsOwnerPending] = useState({});
   const inviteRoleRef = useRef(null);
   const linkRoleRef = useRef(null);
   const personRefs = useRef([]);
@@ -349,7 +354,6 @@ export default function ShareModal({
 
   async function updatePersonRole(person, idx, role) {
     const userId = person.id;
-    console.log("prevPermissions", prevPermissions);
     setPeopleWithAccess((prev) =>
       prev.map((p) =>
         p.id === person.id
@@ -358,7 +362,6 @@ export default function ShareModal({
       ),
     );
 
-    console.log("ref", prevRoleRef.current);
     if (prevRoleRef.current === role) {
       setOpenDropdown(null);
       return;
@@ -367,6 +370,67 @@ export default function ShareModal({
     setOpenDropdown(null);
   }
 
+  async function sendOwnershipTransferMail(person) {
+    setIsShareLoading(true);
+
+    try {
+      const message = await sendOwnershipMail({
+        newOwner: person,
+        itemId: item._id ?? item.id,
+        type,
+      });
+      const update = () => {
+        setShareItem((currentItem) => ({
+          ...currentItem,
+          permissions: (currentItem.permissions ?? []).map((p) =>
+            String(p.id ?? p._id) === String(person.id ?? person._id)
+              ? {
+                  ...p,
+                  transferStatus: "pending",
+                }
+              : p,
+          ),
+        }));
+      };
+      update();
+      setOpenDropdown(null);
+      toast({ message, type: "success" });
+    } catch (error) {
+      toast({ message: error.message, type: "error" });
+    } finally {
+      setIsShareLoading(false);
+    }
+  }
+  async function cancelOwnershipTransferMail(person) {
+    try {
+      setIsShareLoading(true);
+      const message = await cancelPendingOwnership({
+        newOwner: person,
+        itemId: item._id ?? item.id,
+      });
+
+      const update = () => {
+        setShareItem((currentItem) => ({
+          ...currentItem,
+          permissions: (currentItem.permissions ?? []).map((p) =>
+            String(p.id ?? p._id) === String(person.id ?? person._id)
+              ? {
+                  ...p,
+                  transferStatus: null,
+                }
+              : p,
+          ),
+        }));
+      };
+      update();
+      setOpenDropdown(null);
+      toast({ message, type: "success" });
+    } catch (error) {
+      toast({ message: error.message, type: "error" });
+    } finally {
+      setIsShareLoading(false);
+    }
+  }
   function handleCopyLink() {
     const url = item.webViewLink
       ? item.webViewLink
@@ -1013,21 +1077,24 @@ export default function ShareModal({
                         >
                           <div className="gd-share-person-row">
                             <UseAvatar
-                              name={person.name || person.displayName}
-                              avatar={person.avatar || person.photoLink}
+                              name={person.displayName}
+                              avatar={person.photoLink}
                             />
                             <div className="gd-share-person-info">
                               <div
                                 className={`gd-share-person-name ${person.role === "remove" ? "line-through" : ""}`}
                               >
-                                {person.name || person.displayName}{" "}
-                                {(person.email || person.emailAddress) ===
-                                user.email
+                                {person.displayName}{" "}
+                                {person.emailAddress === user.email
                                   ? "(you)"
                                   : ""}
                               </div>
                               <div className="gd-share-person-email">
-                                {person.email || person.emailAddress}
+                                {person.emailAddress}
+                              </div>
+                              <div className="gd-share-person-pending-owner">
+                                {person.transferStatus === "pending" &&
+                                  "Pending owner"}
                               </div>
                             </div>
                             <div className="gd-share-role-select">
@@ -1048,6 +1115,15 @@ export default function ShareModal({
                               </button>
                               {openDropdown === idx && (
                                 <RoleDropdown
+                                  isOwnerPending={
+                                    person.transferStatus === "pending"
+                                  }
+                                  onTransfer={() =>
+                                    sendOwnershipTransferMail(person)
+                                  }
+                                  onCancel={() =>
+                                    cancelOwnershipTransferMail(person)
+                                  }
                                   anchorRef={personRefs.current[idx]}
                                   current={ROLE_LABEL[person.role]}
                                   onChange={(r) =>
@@ -1055,6 +1131,7 @@ export default function ShareModal({
                                   }
                                   onClose={() => setOpenDropdown(null)}
                                   showRemove={true}
+                                  isOwner={isOwner}
                                 />
                               )}
                             </div>

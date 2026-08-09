@@ -6,8 +6,10 @@ import File from "../models/file.model.js";
 import { fgaClient } from "../services/openFGAService.js";
 import { ClientWriteRequestOnMissingDeletes } from "@openfga/sdk";
 import {
+  sendOwnershipTransferEmail,
   sendLinkEmail,
   sendRequestAccessEmail,
+  sendOwnershipTransferResultEmail,
 } from "../services/sendMailService.js";
 import User from "../models/user.model.js";
 import { sanitizeText } from "../utils/sanitizeText.js";
@@ -16,6 +18,8 @@ import { formatSize } from "../utils/formatSize.js";
 import { getDirectoryPath } from "../utils/updatePath.js";
 import { deleteFile } from "../services/s3/delete.js";
 import { deleteFileArray } from "../services/s3/deleteArray.js";
+import Ownership from "../models/ownership.model.js";
+import { getOwnerRoots, getOwnershipModel, transferFgaOwnership, updateDirectoryChildren, updateOwnershipStatus, updateOwnerStorage, updateResourceOwnership } from "../utils/ownershipHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -79,7 +83,6 @@ const resolveRole = async (item, type, userId, parentDir) => {
       .lean();
   };
 
-
   const mergePermission = (permissionMap, user, relation) => {
     if (!user?._id || !ROLE_PRIORITY[relation]) return;
 
@@ -130,7 +133,6 @@ const resolveRole = async (item, type, userId, parentDir) => {
     while (current?._id) {
       ancestors.push(current);
 
-
       if (!current.parentId) {
         break;
       }
@@ -156,8 +158,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
     for (const ancestor of ancestors) {
       const parentObject = `folder:${ancestor._id}`;
 
-      const inheritedPermissions =
-        await resolveObjectPermissions(parentObject);
+      const inheritedPermissions = await resolveObjectPermissions(parentObject);
 
       for (const { user, relation } of inheritedPermissions) {
         mergePermission(permissionMap, user, relation);
@@ -167,23 +168,18 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   const permissions = Array.from(permissionMap.values());
 
-
   const owners = permissions
     .filter((permission) => permission.role === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
       kind: "drive#user",
-      me:
-        permission.id?.toString() ===
-        userId?.toString(),
+      me: permission.id?.toString() === userId?.toString(),
       permissionId: permission.id,
       emailAddress: permission.emailAddress,
       photoLink: permission.photoLink,
     }));
 
-  const isPublic = Boolean(
-    item.isPublic || parentDir?.isPublic,
-  );
+  const isPublic = Boolean(item.isPublic || parentDir?.isPublic);
 
   let publicRole;
 
@@ -201,15 +197,29 @@ const resolveRole = async (item, type, userId, parentDir) => {
     });
   }
 
-
   permissions.push({
     id: "superuser",
     role: "superuser",
     type: "superuser",
   });
 
+  const ownership = await Ownership.findOne({ itemId: item?._id });
+  const updatedPermissions = permissions.map((p) => {
+    const permissionId = p.id?.toString();
+    const ownerId = ownership?.toUser?.toString();
+
+    if (ownership?.status === "pending" && permissionId === ownerId) {
+      return {
+        ...p,
+        transferStatus: ownership.status,
+      };
+    }
+
+    return p;
+  });
+
   return {
-    permissions,
+    permissions: updatedPermissions,
     owners,
   };
 };
@@ -944,12 +954,12 @@ export const sendLink = async (req, res, next) => {
   try {
     const { id, toEmail, message, name, type, url, isPublic, publicRole } =
       req.body;
-      const userId = req.user._id;
-      const isGoogleDriveLink = type.startsWith("google-drive");
-      const sender = await User.findById(userId).select("name email").lean();
-      const cleanMessage = sanitizeText(message || "");
-      
-      console.log('toEmail', cleanMessage)
+    const userId = req.user._id;
+    const isGoogleDriveLink = type.startsWith("google-drive");
+    const sender = await User.findById(userId).select("name email").lean();
+    const cleanMessage = sanitizeText(message || "");
+
+    console.log("toEmail", cleanMessage);
     if (isGoogleDriveLink) {
       await sendLinkEmail({
         toEmail,
@@ -1024,3 +1034,322 @@ export const toggleItemStar = async (req, res, next) => {
     next(error);
   }
 };
+// export const formatTransferExpiryDate = (date) => {
+//   return new Intl.DateTimeFormat("en-US", {
+//     dateStyle: "long",
+//     timeStyle: "short",
+//   }).format(new Date(date));
+// };
+
+export const sendOwnershipMail = async (req, res, next) => {
+  try {
+    const { newOwner, itemId, type } = req.body;
+
+    const currentOwnerId = req.user?._id;
+    const currentOwnerName = req.user?.name;
+
+    if (!currentOwnerId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+
+    if (!newOwner || !itemId || !type) {
+      return res.status(400).json({
+        message: "newOwner, itemId, and type are required",
+      });
+    }
+
+    if (!["folder", "file"].includes(type)) {
+      return res.status(400).json({
+        message: "Invalid resource type. Expected 'folder' or 'file'",
+      });
+    }
+
+    if (String(currentOwnerId) === String(newOwner.id)) {
+      return res.status(400).json({
+        message: "The new owner must be different from the current owner",
+      });
+    }
+
+    const itemType = type === "folder" ? "Directory" : "File";
+    const Model = type === "folder" ? Directory : File;
+    const object = `${type}:${itemId}`;
+
+    const { allowed: isOwner } = await fgaClient.check({
+      user: `user:${currentOwnerId}`,
+      relation: "owner",
+      object,
+    });
+
+    if (!isOwner) {
+      return res.status(403).json({
+        message: "You do not have permission to transfer ownership",
+      });
+    }
+
+    const resource = await Model.findOne({
+      _id: itemId,
+      userId: currentOwnerId,
+    });
+
+    if (!resource) {
+      return res.status(404).json({
+        message: `${type} not found`,
+      });
+    }
+
+    const transfer = await Ownership.create({
+      itemId,
+      itemType,
+      fromUser: currentOwnerId,
+      toUser: newOwner.id,
+      status: "pending",
+    });
+
+    await sendOwnershipTransferEmail({
+      to: newOwner.emailAddress,
+      toName: newOwner.displayName,
+      fromName: currentOwnerName,
+      itemName: resource.name,
+      transferId: transfer._id,
+      expiresAt: transfer.expiresAt,
+    });
+
+    return res.status(200).json({
+      message: "Ownership mail sent successfully!",
+    });
+  } catch (error) {
+    console.error("OWNERSHIP MAIL ERROR:", error);
+    return next(error);
+  }
+};
+export const cancelOwnershipMail = async (req, res, next) => {
+  try {
+    const { newOwner, itemId } = req.body;
+    const currentOwnerId = req.user?._id;
+    const newOwnerId = newOwner?._id || newOwner?.id;
+    const currentOwnerName = req.user?.name;
+
+    if (!currentOwnerId) {
+      return res.status(401).json({
+        message: "Authentication required",
+      });
+    }
+    if (!newOwner || !itemId) {
+      return res.status(400).json({
+        message: "newOwner and itemId are required",
+      });
+    }
+    const ownership = await Ownership.findOne({ toUser: newOwnerId });
+
+    if (!ownership) {
+      return res
+        .status(400)
+        .json({ message: "No active link sent to the provided user!" });
+    }
+    ownership.status = "cancelled";
+    await ownership.save();
+    return res
+      .status(200)
+      .json({ message: "Ownership mail cancelled successfully!" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+
+export const ownershipAction = async (req, res, next) => {
+  try {
+    const { action, transferId } = req.params;
+
+    // VALIDATION
+
+    if (!transferId || !action) {
+      return res.status(400).json({
+        message: "Id or action is required!",
+      });
+    }
+
+    if (!["accept", "reject"].includes(action)) {
+      return res.status(400).json({
+        message: "Invalid ownership action!",
+      });
+    }
+
+
+    // GET OWNERSHIP
+
+
+    const ownership = await Ownership.findById(transferId)
+      .populate("fromUser")
+      .populate("toUser");
+
+    if (!ownership) {
+      return res.status(404).json({
+        message: "Ownership transfer not found!",
+      });
+    }
+
+    if (ownership.status !== "pending") {
+      return res.status(400).json({
+        message: `This ownership transfer has already been ${ownership.status}.`,
+      });
+    }
+
+  
+    // EXPIRY
+
+
+    if (
+      ownership.expiresAt &&
+      ownership.expiresAt.getTime() < Date.now()
+    ) {
+      await updateOwnershipStatus(
+        ownership,
+        "cancelled",
+      );
+
+      return res.status(400).json({
+        message: "Ownership transfer expired!",
+      });
+    }
+
+   
+    // GET RESOURCE
+
+
+    const Model = getOwnershipModel(
+      ownership.itemType,
+    );
+
+    const item = await Model.findById(
+      ownership.itemId,
+    );
+
+    if (!item) {
+      return res.status(400).json({
+        message: "Resource invalid!",
+      });
+    }
+
+    // REJECT
+   
+
+    if (action === "reject") {
+      await updateOwnershipStatus(
+        ownership,
+        "rejected",
+      );
+
+      await sendOwnershipTransferResultEmail({
+        to: ownership.fromUser?.email,
+        toName: ownership.fromUser?.name,
+        newOwnerName: ownership.toUser?.name,
+        itemName: item.name,
+        itemType:
+          ownership.itemType === "Directory"
+            ? "Folder"
+            : "File",
+        status: "rejected",
+      });
+
+      return res.redirect(
+        `${process.env.CLIENT_URL}/home?ownership=rejected`,
+      );
+    }
+
+ 
+    // ACCEPT
+
+
+    const oldOwnerId =
+      ownership.fromUser._id;
+
+    const newOwnerId =
+      ownership.toUser._id;
+
+    // FGA
+    await transferFgaOwnership({
+      itemType: ownership.itemType,
+      itemId: item._id,
+      oldOwnerId,
+      newOwnerId,
+    });
+
+  
+    // ROOT DIRECTORIES
+
+
+    const {
+      currentOwnerRootDir,
+      newOwnerRootDir,
+    } = await getOwnerRoots(
+      oldOwnerId,
+      newOwnerId,
+    );
+
+   
+    // STORAGE
+
+
+    await updateOwnerStorage({
+      oldRootId: currentOwnerRootDir._id,
+      newRootId: newOwnerRootDir._id,
+      size: item.size,
+    });
+
+
+    // RESOURCE
+
+
+    const newDirectoryPath =
+      await updateResourceOwnership({
+        item,
+        newOwnerId,
+        newOwnerRootId:
+          newOwnerRootDir._id,
+      });
+
+   
+    // DIRECTORY CHILDREN
+
+
+    if (ownership.itemType === "Directory") {
+      await updateDirectoryChildren({
+        directoryId: item._id,
+        newOwnerId,
+        newDirectoryPath,
+      });
+    }
+
+    // ACCEPTED
+
+    await updateOwnershipStatus(
+      ownership,
+      "accepted",
+    );
+
+    // NOTIFY OLD OWNER
+
+
+    await sendOwnershipTransferResultEmail({
+      to: ownership.fromUser?.email,
+      toName: ownership.fromUser?.name,
+      newOwnerName: ownership.toUser?.name,
+      itemName: item.name,
+      itemType:
+        ownership.itemType === "Directory"
+          ? "Folder"
+          : "File",
+      status: "accepted",
+    });
+
+    return res.redirect(
+      `${process.env.CLIENT_URL}/home?ownership=accepted`,
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+

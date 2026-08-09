@@ -74,7 +74,7 @@ export const ROLE_LABEL = {
   reader: "Viewer",
   editor: "Editor",
   writer: "Editor",
-  remove: "Remove",
+  remove: "Remove"
 };
 export const ROLE_DESC = {
   viewer: "can view",

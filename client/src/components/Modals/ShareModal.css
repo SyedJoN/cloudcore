@@ -188,9 +188,7 @@
   transition: background var(--transition);
 }
 .gd-role-option.remove {
-  padding: 0;
-  padding-block: 10px;
-  justify-content: center;
+  padding-left: 16px;
 }
 .gd-role-option:hover {
   background: var(--btn-bg-medium);
@@ -290,6 +288,14 @@
 .gd-share-person-email {
   font-size: 13px;
   font-weight: 500;
+  color: var(--text-tertiary, rgb(95, 99, 104));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gd-share-person-pending-owner {
+  font-size: 14px;
+  font-weight: normal;
   color: var(--text-tertiary, rgb(95, 99, 104));
   white-space: nowrap;
   overflow: hidden;

@@ -33,8 +33,25 @@ const directorySchema = new Schema(
       type: Boolean,
       default: false,
     },
-
- viewedByMeTime: {
+    transfer: {
+      fromUser: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      toUser: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+      status: {
+        type: String,
+        enum: ["pending", "accepted", "rejected", "cancelled"],
+        default: "pending",
+      },
+      expiresAt: {
+        type: Date,
+      },
+    },
+    viewedByMeTime: {
       type: Date,
       default: Date.now,
       index: true,
@@ -51,7 +68,7 @@ const directorySchema = new Schema(
         return this.isPublic;
       },
     },
-   isStarred: {
+    isStarred: {
       type: Boolean,
       default: false,
     },

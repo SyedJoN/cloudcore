@@ -138,6 +138,28 @@ export default function DirectoryView({ route }) {
     }
   }
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ownership = params.get("ownership");
+
+    if (ownership === "accepted") {
+      toast({
+        message: "You are now the owner",
+        type: "success",
+      });
+    }
+
+    if (ownership === "rejected") {
+      toast({
+        message: "Ownership rejected",
+        type: "success",
+      });
+    }
+
+    if (ownership) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+  useEffect(() => {
     previousDirContext.current = dirContext;
   }, [dirContext]);
 
@@ -596,80 +618,63 @@ export default function DirectoryView({ route }) {
     }
   };
 
-const handleSharedRoleUpdate = async (
-  item,
-  type,
-  message,
-) => {
-  setIsShareLoading(true);
+  const handleSharedRoleUpdate = async (item, type, message) => {
+    setIsShareLoading(true);
 
-  try {
-    const result = await updateSharedAccess({
-      item,
-      type,
-      peopleWithAccess,
-      prevPermissions,
-      message,
-      grantAccessById,
-      revokeFileAccess,
-    });
-
-    
-    if (!result.changed) {
-      setShareItem(null);
-      return;
-    }
-
-   
-    const updateResource = (list) =>
-      list.map((resource) => {
-        const resourceId = String(
-          resource._id ?? resource.id,
-        );
-
-        if (resourceId !== result.itemId) {
-          return resource;
-        }
-
-        const nonUserPermissions = (
-          resource.permissions ?? []
-        ).filter(
-          (permission) =>
-            permission.type !== "user",
-        );
-
-        return {
-          ...resource,
-          permissions: [
-            ...nonUserPermissions,
-            ...result.permissions,
-          ],
-        };
+    try {
+      const result = await updateSharedAccess({
+        item,
+        type,
+        peopleWithAccess,
+        prevPermissions,
+        message,
+        grantAccessById,
+        revokeFileAccess,
       });
 
+      if (!result.changed) {
+        setShareItem(null);
+        return;
+      }
 
-    setFilesList(updateResource);
-    setDirectoriesList(updateResource);
+      const updateResource = (list) =>
+        list.map((resource) => {
+          const resourceId = String(resource._id ?? resource.id);
 
-    setPeopleWithAccess(result.permissions);
-    setPrevPermissions(result.permissions);
-    setShareItem(null);
+          if (resourceId !== result.itemId) {
+            return resource;
+          }
 
-    toast({
-      message: "Access updated",
-      type: "success",
-    });
-  } catch (error) {
-    toast({
-      message:
-        error?.message ||
-        "Something went wrong!",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-};
+          const nonUserPermissions = (resource.permissions ?? []).filter(
+            (permission) => permission.type !== "user",
+          );
+
+          return {
+            ...resource,
+            permissions: [...nonUserPermissions, ...result.permissions],
+          };
+        });
+
+      setFilesList(updateResource);
+      setDirectoriesList(updateResource);
+
+      setPeopleWithAccess(result.permissions);
+      setPrevPermissions(result.permissions);
+      setShareItem(null);
+
+      toast({
+        message: "Access updated",
+        type: "success",
+      });
+    } catch (error) {
+      toast({
+        message: error?.message || "Something went wrong!",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
 
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
