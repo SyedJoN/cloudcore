@@ -143,10 +143,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
     return ancestors;
   };
 
-
-
   const permissionMap = new Map();
-
 
   const directPermissions = await resolveObjectPermissions(object);
 

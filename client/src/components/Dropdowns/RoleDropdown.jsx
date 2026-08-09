@@ -1,12 +1,17 @@
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import { IconCheck } from "../Icons/Icons";
-import { ROLE_LABEL, ROLE_DESC } from "../../../Utils/displayUtils";
+import {
+  useLayoutEffect,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import { ROLE_LABEL, ROLE_DESC, DRIVE_ROLES } from "../../../Utils/displayUtils";
+import { CheckIcon } from "@heroicons/react/24/solid";
 
 const ROLES = ["viewer", "editor"];
 
 export default function RoleDropdown({
-  anchorRef,    
+  anchorRef,
   current,
   onChange,
   onClose,
@@ -14,55 +19,122 @@ export default function RoleDropdown({
 }) {
   const dropdownRef = useRef(null);
 
-  const rect = anchorRef?.current?.getBoundingClientRect() || { bottom: 0, right: 0, left: 0 };
-  const dropdownWidth = 180;
-  let left = rect.right - dropdownWidth;
-  if (left < 8) left = rect.left;
+  const [position, setPosition] = useState(null);
 
-  // Close on Escape
+  const dropdownWidth = 180;
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef?.current;
+
+    if (!anchor) return;
+
+    const rect = anchor.getBoundingClientRect();
+
+    let left = rect.right - dropdownWidth;
+
+    if (left < 8) {
+      left = rect.left;
+    }
+
+    if (left + dropdownWidth > window.innerWidth - 8) {
+      left = window.innerWidth - dropdownWidth - 8;
+    }
+
+    setPosition({
+      top: rect.bottom + 4,
+      left,
+    });
+  }, [anchorRef]);
+
+  useLayoutEffect(() => {
+    updatePosition();
+
+    const handleResize = () => {
+      updatePosition();
+    };
+
+    const handleScroll = () => {
+      updatePosition();
+    };
+
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [updatePosition]);
+
   useEffect(() => {
-    const onKey = e => { if (e.key === "Escape") onClose(); };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+    };
   }, [onClose]);
 
-  return createPortal(
+  return (
     <>
-      {/* Full-screen backdrop */}
-      <div
-        style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-        onClick={onClose}
-      />
-      {/* Dropdown */}
       <div
         ref={dropdownRef}
         className="gd-role-dropdown"
         style={{
           position: "fixed",
-          top: rect.bottom + 4,
-          left,
+          top: position?.top ?? 0,
+          left: position?.left ?? 0,
           zIndex: 9999,
           minWidth: dropdownWidth,
+          visibility: position ? "visible" : "hidden",
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        {ROLES.map(r => (
-          <button key={r} className="gd-role-option" onClick={() => onChange(r)}>
-            <span className="gd-role-option-label">
-              <span>{ROLE_LABEL[r] || r}</span>
-              <span className="role-desc">{ROLE_DESC[r]}</span>
-            </span>
-            {current === r && (
-              <IconCheck size={16} style={{ color: "var(--accent-blue)", flexShrink: 0 }} />
-            )}
-          </button>
-        ))}
+        {ROLES.map((r) => {
+          const isSelected =
+            String(current).toLowerCase() === r;
+          console.log("current", r);
+
+          return (
+            <button
+              key={r}
+              type="button"
+              className="gd-role-option"
+              onClick={() => onChange(r)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <span className="absolute left-3 top-2.75">
+                {isSelected && (
+                  <CheckIcon className="w-5 h-5 min-w-5 text-(--accent-blue)" />
+                )}
+              </span>
+
+              <span className="gd-role-option-label">
+                <span>{ROLE_LABEL[r] || r}</span>
+              </span>
+            </button>
+          );
+        })}
+
         {showRemove && (
           <>
             <div className="gd-context-divider" />
+
             <button
-              className="gd-role-option"
-              style={{ color: "#d93025" }}
+              type="button"
+              className="gd-role-option remove"
+              style={{
+                color: "#d93025",
+              }}
               onClick={() => onChange("remove")}
             >
               Remove access
@@ -70,7 +142,6 @@ export default function RoleDropdown({
           </>
         )}
       </div>
-    </>,
-    document.body
+    </>
   );
 }

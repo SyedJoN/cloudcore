@@ -45,8 +45,8 @@ export default function ShareModal({
   setDirectoriesList,
   setFilesList,
   onClose,
-  prevRole,
-  setPrevRole,
+  prevPermissions,
+  setPrevPermissions,
   linkAccess,
   setLinkAccess,
   linkRole,
@@ -80,6 +80,7 @@ export default function ShareModal({
   const inviteSuggestionsRef = useRef(null);
   const accessDropdownRef = useRef(null);
   const prevRoleRef = useRef(null);
+  const shareModalOverlayRef = useRef(null);
   const type = item?.webViewLink
     ? "google"
     : item.isDirectory
@@ -109,20 +110,20 @@ export default function ShareModal({
       )
       .map((p) => p);
     setPeopleWithAccess(authorizedUsers);
-    setPrevRole(authorizedUsers);
+    setPrevPermissions(authorizedUsers);
   }, [item]);
 
   useEffect(() => {
     const equal =
-      prevRole?.length === peopleWithAccess?.length &&
-      prevRole?.every(
+      prevPermissions?.length === peopleWithAccess?.length &&
+      prevPermissions?.every(
         (prev, index) =>
           prev.id === peopleWithAccess[index].id &&
           prev.role === peopleWithAccess[index].role,
       );
 
     setIsChanged(!equal);
-  }, [prevRole, peopleWithAccess]);
+  }, [prevPermissions, peopleWithAccess]);
 
   useEffect(() => {
     setLinkAccess(
@@ -348,7 +349,7 @@ export default function ShareModal({
 
   async function updatePersonRole(person, idx, role) {
     const userId = person.id;
-    console.log("prevRole", prevRole);
+    console.log("prevPermissions", prevPermissions);
     setPeopleWithAccess((prev) =>
       prev.map((p) =>
         p.id === person.id
@@ -664,6 +665,7 @@ export default function ShareModal({
           </div>
         )}
         <div
+          ref={shareModalOverlayRef}
           className="gd-modal-overlay"
           onClick={() =>
             isChanged ? setIsConfirmation(true) : setShareItem(null)
@@ -705,7 +707,7 @@ export default function ShareModal({
                     style={{ position: "relative" }}
                   >
                     {selectedUsers.map((u) => (
-                      <div key={u._id} className="gd-invite-chip">
+                      <div key={u._id ?? u.id} className="gd-invite-chip">
                         {u.avatar ? (
                           <img
                             src={u.avatar}
@@ -822,10 +824,10 @@ export default function ShareModal({
                     </button>
                     {openDropdown === "invite" && (
                       <RoleDropdown
+                        containerRef={shareModalOverlayRef}
                         anchorRef={inviteRoleRef}
                         current={inviteRole}
                         onChange={(r) => {
-                          console.log("hi");
                           setInviteRole(r);
                           setSelectedUsers((prev) =>
                             prev.map((u) => ({
@@ -1150,7 +1152,8 @@ export default function ShareModal({
                           {openDropdown === "link" && (
                             <RoleDropdown
                               anchorRef={linkRoleRef}
-                              current={linkRole}
+                              containerRef={shareModalOverlayRef}
+                              current={ROLE_LABEL[linkRole]}
                               onChange={(r) => {
                                 setLinkRole(r);
                                 setOpenDropdown(null);

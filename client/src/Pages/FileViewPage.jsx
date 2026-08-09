@@ -40,7 +40,7 @@ export default function FileViewPage() {
   const [peopleWithAccess, setPeopleWithAccess] = useState([]);
   const [directoriesList, setDirectoriesList] = useState([]);
   const [filesList, setFilesList] = useState([]);
-  const [prevRole, setPrevRole] = useState([]);
+  const [prevPermissions, setPrevPermissions] = useState([]);
   const [linkAccess, setLinkAccess] = useState("");
   const [linkRole, setLinkRole] = useState("");
   const [isStarred, setIsStarred] = useState(false);
@@ -210,7 +210,7 @@ const handleSharedRoleUpdate = async (
       item,
       type,
       peopleWithAccess,
-      prevRole,
+      prevPermissions,
       message,
       grantAccessById,
       revokeFileAccess,
@@ -256,7 +256,7 @@ const handleSharedRoleUpdate = async (
     });
 
     setPeopleWithAccess(result.permissions);
-    setPrevRole(result.permissions);
+    setPrevPermissions(result.permissions);
     setShareItem(null);
 
     toast({
@@ -419,8 +419,8 @@ const handleSharedRoleUpdate = async (
           selectedUsers={selectedUsers}
           setSelectedUsers={setSelectedUsers}
           peopleWithAccess={peopleWithAccess}
-          prevRole={prevRole}
-          setPrevRole={setPrevRole}
+          prevPermissions={prevPermissions}
+          setPrevPermissions={setPrevPermissions}
           linkAccess={linkAccess}
           setLinkAccess={setLinkAccess}
           linkRole={linkRole}

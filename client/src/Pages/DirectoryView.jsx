@@ -94,7 +94,7 @@ export default function DirectoryView({ route }) {
   const [error, setError] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [peopleWithAccess, setPeopleWithAccess] = useState([]);
-  const [prevRole, setPrevRole] = useState([]);
+  const [prevPermissions, setPrevPermissions] = useState([]);
   const [linkAccess, setLinkAccess] = useState("");
   const [linkRole, setLinkRole] = useState("");
   const [viewMode, setViewMode] = useState("grid");
@@ -608,7 +608,7 @@ const handleSharedRoleUpdate = async (
       item,
       type,
       peopleWithAccess,
-      prevRole,
+      prevPermissions,
       message,
       grantAccessById,
       revokeFileAccess,
@@ -652,7 +652,7 @@ const handleSharedRoleUpdate = async (
     setDirectoriesList(updateResource);
 
     setPeopleWithAccess(result.permissions);
-    setPrevRole(result.permissions);
+    setPrevPermissions(result.permissions);
     setShareItem(null);
 
     toast({
@@ -671,11 +671,6 @@ const handleSharedRoleUpdate = async (
   }
 };
 
-
-
-  useEffect(() => {
-    console.log("combinedItems", combinedItems);
-  }, [combinedItems]);
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1007,8 +1002,8 @@ const handleSharedRoleUpdate = async (
           setLinkAccess={setLinkAccess}
           linkRole={linkRole}
           setLinkRole={setLinkRole}
-          prevRole={prevRole}
-          setPrevRole={setPrevRole}
+          prevPermissions={prevPermissions}
+          setPrevPermissions={setPrevPermissions}
           isShareLoading={isShareLoading}
           setDirectoriesList={setDirectoriesList}
           setFilesList={setFilesList}
