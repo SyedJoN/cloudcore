@@ -88,7 +88,9 @@ export const revokeUser = async (req, res, next) => {
     const requesterRole = req.user?.role;
 
     const userToBeRevoked = await User.findById(userId).select("role").lean();
-
+    if (!userId) {
+      return res.status(400).json({ message: "userid is required!" });
+    }
     if (!userToBeRevoked) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -172,7 +174,9 @@ export const updateUser = async (req, res, next) => {
 export const softDelete = async (req, res, next) => {
   try {
     const { userId } = req.params;
-
+    if (!userId) {
+      return res.status(400).json({ message: "userid is required!" });
+    }
     const user = await User.findByIdAndUpdate(
       userId,
       {
@@ -211,7 +215,9 @@ export const deleteUser = async (req, res, next) => {
   const session = await mongoose.startSession();
   try {
     const { userId } = req.params;
-
+    if (!userId) {
+      return res.status(400).json({ message: "userid is required!" });
+    }
     const userFiles = await File.find({ userId }).select("extension");
     await session.withTransaction(async () => {
       await Promise.all([
@@ -261,7 +267,9 @@ export const deleteUser = async (req, res, next) => {
 export const recoverUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
-
+    if (!userId) {
+      return res.status(400).json({ message: "userid is required!" });
+    }
     const user = await User.findByIdAndUpdate(
       userId,
       {
@@ -300,7 +308,7 @@ export const searchUsers = async (req, res, next) => {
   try {
     const { userId } = req.params;
     if (!userId) {
-       return res.status(404).json({ message: "User Id is required!" });
+      return res.status(404).json({ message: "User Id is required!" });
     }
     const allUsers = await User.find({ _id: { $ne: userId } })
       .select("name email avatar")

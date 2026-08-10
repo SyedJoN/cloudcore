@@ -76,8 +76,7 @@ export default function DetailsSidebar({
     );
   }
   const isDir = item.isDirectory;
-  const owner =
-    userEmail === item.userId?.email || (item?.owners?.[0]?.emailAddress === user.email) ? "Me" : item.userId?.name || item?.owners?.[0]?.displayName || "—";
+  const owner = item?.owners?.[0]?.me;
   const size = formatSize(item.size);
   const modified = formatDate(item.updatedAt || item.modifiedTime);
   const created = formatDate(item.createdAt || item.createdTime);

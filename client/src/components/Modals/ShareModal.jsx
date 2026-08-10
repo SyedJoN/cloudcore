@@ -35,6 +35,9 @@ import ConfirmationModal from "./ConfirmationModal.jsx";
 import { createPortal } from "react-dom";
 import { getResourceType } from "../../../Utils/getResourceType.js";
 import { updateItemState } from "../../../Utils/updateItemState.js";
+import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
+import { LockClosedIcon } from "@heroicons/react/24/outline";
+import MouseTooltip from "../Tooltip/Tooltip.jsx";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -78,6 +81,8 @@ export default function ShareModal({
   const [isConfirmation, setIsConfirmation] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
   const [isOwnerPending, setIsOwnerPending] = useState({});
+  const [hasImgError, setHasImgError] = useState(false);
+
   const inviteRoleRef = useRef(null);
   const linkRoleRef = useRef(null);
   const personRefs = useRef([]);
@@ -103,6 +108,7 @@ export default function ShareModal({
       ? isOwner || item.capabilities?.canEdit
       : !isOwner && item.permissions?.find((p) => p.role === "writer")?.role;
 
+  const isInherited = item?.permissions?.some((p) => p.inherited === true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -211,8 +217,6 @@ export default function ShareModal({
         role: DRIVE_ROLES[user.role] ?? user.role,
       }));
 
-      // Build the updated permissions for the
-      // currently selected resource.
       const currentPermissions = item?.permissions ?? [];
 
       const updatedPermissions = currentPermissions.map((permission) => {
@@ -220,12 +224,10 @@ export default function ShareModal({
           (user) => String(user.id) === String(permission.id),
         );
 
-        // Not one of the selected users
         if (!updatedUser) {
           return permission;
         }
 
-        // Never change owner
         if (permission.role === "owner") {
           return permission;
         }
@@ -246,7 +248,6 @@ export default function ShareModal({
 
       const finalPermissions = [...updatedPermissions, ...newPermissions];
 
-      // Update files list
       setFilesList((list) =>
         list.map((resource) => {
           if (String(resource._id ?? resource.id) !== itemId) {
@@ -260,7 +261,6 @@ export default function ShareModal({
         }),
       );
 
-      // Update directories list
       setDirectoriesList((list) =>
         list.map((resource) => {
           if (String(resource._id ?? resource.id) !== itemId) {
@@ -274,7 +274,6 @@ export default function ShareModal({
         }),
       );
 
-      // ⭐ Update currently opened item
       if (setItem) {
         updateItemState(setItem, itemId, {
           permissions: finalPermissions,
@@ -306,7 +305,13 @@ export default function ShareModal({
 
   async function handleSendLink(e) {
     e.preventDefault();
-    console.log("invite", selectedUsers);
+    setSelectedUsers((prev) => [
+      ...prev,
+      {
+        email: inviteInput,
+        message: message,
+      },
+    ]);
     if (isShareLoading) return;
     if (!selectedUsers.length) return;
     const type = getResourceType(item);
@@ -452,7 +457,13 @@ export default function ShareModal({
       <>
         <div className="gd-modal-overlay confirmation-tab">
           {isConfirmation && (
-            <ConfirmationModal onClose={() => setShareItem(null)} />
+            <ConfirmationModal
+              title="Discard unsaved changes?"
+              action_1="Cancel"
+              action_2="Discard"
+              onAction_1={() => setIsConfirmation(false)}
+              onAction_2={() => setShareItem(null)}
+            />
           )}
         </div>
         <div
@@ -577,31 +588,12 @@ export default function ShareModal({
                                 gap: 10,
                               }}
                             >
-                              {user.avatar ? (
-                                <img
-                                  src={user.avatar}
-                                  alt={user.name}
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  className="gd-avatar"
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    background: "#1a73e8",
-                                    fontSize: 18,
-                                    fontWeight: 100,
-                                  }}
-                                >
-                                  {user.name?.charAt(0)?.toUpperCase()}
-                                </span>
-                              )}
+                              <UseAvatar
+                                name={user.name}
+                                avatar={user.avatar}
+                                size={36}
+                              />
+
                               <div className="people-details">
                                 <span className="people-name">{user.name}</span>
                                 <span className="people-email">
@@ -723,8 +715,11 @@ export default function ShareModal({
         {isConfirmation && (
           <div className="gd-modal-confirmation">
             <ConfirmationModal
-              onClose={() => setIsConfirmation(false)}
-              onDiscard={() => setShareItem(null)}
+              title="Discard unsaved changes?"
+              action_1="Cancel"
+              action_2="Discard"
+              onAction_1={() => setIsConfirmation(false)}
+              onAction_2={() => setShareItem(null)}
             />
           </div>
         )}
@@ -834,31 +829,12 @@ export default function ShareModal({
                                 gap: 10,
                               }}
                             >
-                              {user.avatar ? (
-                                <img
-                                  src={user.avatar}
-                                  alt={user.name}
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                  }}
-                                />
-                              ) : (
-                                <span
-                                  className="gd-avatar"
-                                  style={{
-                                    width: 36,
-                                    height: 36,
-                                    background: "#1a73e8",
-                                    fontSize: 18,
-                                    fontWeight: 100,
-                                  }}
-                                >
-                                  {user.name?.charAt(0)?.toUpperCase()}
-                                </span>
-                              )}
+                              <UseAvatar
+                                name={user.name}
+                                avatar={user.avatar}
+                                size={36}
+                              />
+
                               <div className="people-details">
                                 <span className="people-name">{user.name}</span>
                                 <span className="people-email">
@@ -977,34 +953,14 @@ export default function ShareModal({
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 10,
                           }}
                         >
-                          {user.avatar ? (
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: "50%",
-                                objectFit: "cover",
-                              }}
-                            />
-                          ) : (
-                            <span
-                              className="gd-avatar"
-                              style={{
-                                width: 36,
-                                height: 36,
-                                background: "#1a73e8",
-                                fontSize: 18,
-                                fontWeight: 100,
-                              }}
-                            >
-                              {user.name?.charAt(0)?.toUpperCase()}
-                            </span>
-                          )}
+                          <UseAvatar
+                            name={user.name}
+                            avatar={user.avatar}
+                            size={36}
+                          />
+
                           <div className="people-details">
                             <span className="people-name">{user.name}</span>
                             <span className="people-email">{user.email}</span>
@@ -1098,22 +1054,40 @@ export default function ShareModal({
                               </div>
                             </div>
                             <div className="gd-share-role-select">
-                              <button
-                                ref={(el) =>
-                                  (personRefs.current[idx] = { current: el })
-                                }
-                                className="gd-share-person-role-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenDropdown(
-                                    openDropdown === idx ? null : idx,
-                                  );
-                                }}
+                              <MouseTooltip
+                                disabled={isInherited}
+                                message="Can't reduce permission because it's set on a parent folder"
                               >
-                                {ROLE_LABEL[person.role]}{" "}
-                                <IconChevronDown size={12} />
-                              </button>
-                              {openDropdown === idx && (
+                                <button
+                                  ref={(el) =>
+                                    (personRefs.current[idx] = { current: el })
+                                  }
+                                  className="gd-share-person-role-btn"
+                                  aria-disabled={isInherited}
+                                  onClick={(e) => {
+                                    if (isInherited) return;
+                                    e.stopPropagation();
+                                    setOpenDropdown(
+                                      openDropdown === idx ? null : idx,
+                                    );
+                                  }}
+                                  style={{
+                                    opacity: isInherited ? 0.5 : 1,
+                                    cursor: isInherited
+                                      ? "not-allowed"
+                                      : "pointer",
+                                    pointerEvents: isInherited
+                                      ? "none"
+                                      : "auto",
+                                  }}
+                                >
+                                  {ROLE_LABEL[person.role]}{" "}
+                                  {!isInherited && (
+                                    <IconChevronDown size={12} />
+                                  )}
+                                </button>
+                              </MouseTooltip>
+                              {openDropdown === idx && !isInherited && (
                                 <RoleDropdown
                                   isOwnerPending={
                                     person.transferStatus === "pending"
@@ -1152,9 +1126,9 @@ export default function ShareModal({
                       className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
                     >
                       {linkAccess === "anyone" ? (
-                        <IconGlobe size={18} />
+                        <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
                       ) : (
-                        <IconLock size={18} />
+                        <LockClosedIcon className="text-black w-5 h-5" />
                       )}
                     </div>
                     <div className="gd-share-link-info">

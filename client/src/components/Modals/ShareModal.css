@@ -141,6 +141,7 @@
   position: relative;
   flex-shrink: 0;
 }
+
 .gd-share-role-btn {
   display: flex;
   align-items: center;
@@ -315,9 +316,11 @@
   cursor: pointer;
   padding: 4px 6px;
   border-radius: var(--radius-sm);
-  font-family: var();
-  transition: background var(--transition);
   flex-shrink: 0;
+}
+.gd-share-person-role-btn:disabled {
+  cursor: default;
+  color: var(--text-tertiary, rgb(95, 99, 104));
 }
 
 .gd-share-owner-label {
@@ -327,13 +330,12 @@
   background: none;
   border: none;
   font-size: 14px;
-  color: rgba(31, 31, 31, 0.38);
   padding: 4px 6px;
-  font-family: var();
-  transition: background var(--transition);
+  color: var(--text-tertiary, rgb(95, 99, 104));
   flex-shrink: 0;
+  cursor: default;
 }
-.gd-share-person-role-btn:hover {
+.gd-share-person-role-btn:hover:not(:disabled) {
   background: rgba(32, 33, 36, 0.08);
 }
 .gd-share-divider {
@@ -358,7 +360,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-secondary);
+  /* color: var(--text-secondary); */
 }
 .gd-share-link-info {
   flex: 1;
@@ -657,7 +659,7 @@
   padding: 12px;
   font-size: 14px;
   font-family: inherit;
-  color: #202124;
+  color: var(--text-primary);
   resize: vertical;
   outline: none;
   margin-top: 4px;
@@ -723,7 +725,7 @@
   background: var(--border);
 }
 .gd-share-link-icon.active {
-  background: #a4e0b5;
+  background: var(--color-green-200);
 }
 .gd-pending-span {
   display: "flex";
@@ -731,4 +733,8 @@
   color: var(--text-secondary);
   font-size: 0.95rem;
   font-style: italic;
+}
+@keyframes gdTooltipGrow {
+  from { opacity: 0; transform: translateX(-50%) scale(0.8); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
 }

@@ -141,9 +141,8 @@ export const updateDirectoryChildren = async ({
       }),
     ]);
 
-  // -----------------------------
+
   // CHILD DIRECTORIES
-  // -----------------------------
 
   if (childDirectories.length) {
     const directoryUpdates = childDirectories
@@ -184,10 +183,8 @@ export const updateDirectoryChildren = async ({
     }
   }
 
-  // -----------------------------
   // CHILD FILES
-  // -----------------------------
-
+  
   if (childFiles.length) {
     const fileUpdates = childFiles
       .map((file) => {

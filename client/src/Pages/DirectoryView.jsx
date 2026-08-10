@@ -106,6 +106,7 @@ export default function DirectoryView({ route }) {
   const [renameValue, setRenameValue] = useState("");
   const [shareItem, setShareItem] = useState(null);
   const [viewItem, setViewItem] = useState(null);
+  const [isRenameLoading, setIsRenameLoading] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
@@ -477,7 +478,6 @@ export default function DirectoryView({ route }) {
     setRenameValue(item.name);
     setShowRename(true);
   }
-  const [isRenameLoading, setIsRenameLoading] = useState(false);
   async function handleRenameSubmit(e) {
     e.preventDefault();
     showError("");

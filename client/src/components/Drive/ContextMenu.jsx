@@ -118,13 +118,16 @@ function ContextMenuContent({
   const shareHover = useHoverIntent(setShowShare);
 
   const type = item?.webViewLink ? "google" : "local";
-  const isOwner = item?.userId?._id === user.id || item.owners?.[0].me === true;
+   const isOwner = item.owners?.[0].me === true;
 
-  const isViewer = item?.userRole === "viewer" || item?.publicRole === "viewer";
+  const isViewer =
+    (!isOwner &&
+      item.permissions?.find((p) => p.role === "reader")?.id === user.id) ||
+    item?.publicRole === "reader";
   const canEdit =
     type === "google"
       ? isOwner || item.capabilities?.canEdit
-      : isOwner || !isViewer;
+      : !isOwner && item.permissions?.find((p) => p.role === "writer")?.role;
   const canDelete = type === "google" && item.capabilities?.canDelete === true;
 
   const showDeleteActions = isTrashRoute && isDeleted && !dirId;

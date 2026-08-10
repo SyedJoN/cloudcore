@@ -19,21 +19,27 @@ import { getDirectoryPath } from "../utils/updatePath.js";
 import { deleteFile } from "../services/s3/delete.js";
 import { deleteFileArray } from "../services/s3/deleteArray.js";
 import Ownership from "../models/ownership.model.js";
-import { getOwnerRoots, getOwnershipModel, transferFgaOwnership, updateDirectoryChildren, updateOwnershipStatus, updateOwnerStorage, updateResourceOwnership } from "../utils/ownershipHelpers.js";
+import {
+  getOwnerRoots,
+  getOwnershipModel,
+  transferFgaOwnership,
+  updateDirectoryChildren,
+  updateOwnershipStatus,
+  updateOwnerStorage,
+  updateResourceOwnership,
+} from "../utils/ownershipHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
-
+const ROLE_PRIORITY = {
+  reader: 1,
+  writer: 2,
+  owner: 3,
+};
 const resolveRole = async (item, type, userId, parentDir) => {
-  const ROLE_PRIORITY = {
-    reader: 1,
-    writer: 2,
-    owner: 3,
-  };
-
   const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
 
   const getTuples = async (object) => {
-    let allTuples = [];
+    const allTuples = [];
     let continuationToken;
 
     do {
@@ -50,7 +56,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
           : undefined,
       );
 
-      allTuples = allTuples.concat(response.tuples || []);
+      allTuples.push(...(response.tuples || []));
       continuationToken = response.continuation_token;
     } while (continuationToken);
 
@@ -60,14 +66,14 @@ const resolveRole = async (item, type, userId, parentDir) => {
   const getCollaborators = (tuples, object) => {
     return tuples
       .filter(
-        (t) =>
-          t.key.object === object &&
-          t.key.user?.startsWith("user:") &&
-          ["owner", "reader", "writer"].includes(t.key.relation),
+        (tuple) =>
+          tuple.key.object === object &&
+          tuple.key.user?.startsWith("user:") &&
+          ["owner", "reader", "writer"].includes(tuple.key.relation),
       )
-      .map((t) => ({
-        userId: t.key.user.split(":")[1],
-        relation: t.key.relation,
+      .map((tuple) => ({
+        userId: tuple.key.user.split(":")[1],
+        relation: tuple.key.relation,
       }));
   };
 
@@ -83,36 +89,12 @@ const resolveRole = async (item, type, userId, parentDir) => {
       .lean();
   };
 
-  const mergePermission = (permissionMap, user, relation) => {
-    if (!user?._id || !ROLE_PRIORITY[relation]) return;
-
-    const userId = user._id.toString();
-    const existing = permissionMap.get(userId);
-
-    if (!existing) {
-      permissionMap.set(userId, {
-        id: user._id,
-        photoLink: user.avatar,
-        displayName: user.name,
-        type: "user",
-        emailAddress: user.email,
-        role: relation,
-      });
-
-      return;
-    }
-
-    const existingPriority = ROLE_PRIORITY[existing.role] || 0;
-    const incomingPriority = ROLE_PRIORITY[relation] || 0;
-
-    if (incomingPriority > existingPriority) {
-      existing.role = relation;
-    }
-  };
-
   const resolveObjectPermissions = async (object) => {
     const tuples = await getTuples(object);
     const collaborators = getCollaborators(tuples, object);
+
+    if (!collaborators.length) return [];
+
     const users = await getUsers(collaborators);
 
     const collaboratorMap = new Map(
@@ -133,9 +115,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
     while (current?._id) {
       ancestors.push(current);
 
-      if (!current.parentId) {
-        break;
-      }
+      if (!current.parentId) break;
 
       current = await Folder.findById(current.parentId)
         .select("_id parentId isPublic publicRole")
@@ -147,39 +127,121 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   const permissionMap = new Map();
 
-  const directPermissions = await resolveObjectPermissions(object);
+ 
+  const mergePermission = (
+    user,
+    relation,
+    source = "direct",
+  ) => {
+    if (!user?._id || !ROLE_PRIORITY[relation]) return;
+
+    const id = user._id.toString();
+
+    let permission = permissionMap.get(id);
+
+    if (!permission) {
+      permission = {
+        id: user._id,
+        photoLink: user.avatar,
+        displayName: user.name,
+        type: "user",
+        emailAddress: user.email,
+        role: relation,
+        directRole: source === "direct" ? relation : null,
+        inheritedRole: source === "parent" ? relation : null,
+        inherited: source === "parent",
+      };
+
+      permissionMap.set(id, permission);
+
+      return;
+    }
+
+
+    if (source === "direct") {
+      permission.directRole = relation;
+    }
+
+  
+    if (source === "parent") {
+      const currentInheritedPriority = permission.inheritedRole
+        ? ROLE_PRIORITY[permission.inheritedRole]
+        : 0;
+
+      const incomingInheritedPriority =
+        ROLE_PRIORITY[relation];
+
+      if (
+        incomingInheritedPriority >
+        currentInheritedPriority
+      ) {
+        permission.inheritedRole = relation;
+      }
+    }
+
+  const directPriority = permission.directRole
+  ? ROLE_PRIORITY[permission.directRole]
+  : 0;
+
+const inheritedPriority = permission.inheritedRole
+  ? ROLE_PRIORITY[permission.inheritedRole]
+  : 0;
+
+if (inheritedPriority >= directPriority) {
+  permission.role = permission.inheritedRole;
+  permission.inherited = true;
+} else {
+  permission.role = permission.directRole;
+  permission.inherited = false;
+}
+  };
+
+  
+  const directPermissions =
+    await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
-    mergePermission(permissionMap, user, relation);
+    mergePermission(user, relation, "direct");
   }
+
+  
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
     for (const ancestor of ancestors) {
       const parentObject = `folder:${ancestor._id}`;
 
-      const inheritedPermissions = await resolveObjectPermissions(parentObject);
+      const inheritedPermissions =
+        await resolveObjectPermissions(parentObject);
 
       for (const { user, relation } of inheritedPermissions) {
-        mergePermission(permissionMap, user, relation);
+        mergePermission(user, relation, "parent");
       }
     }
   }
 
-  const permissions = Array.from(permissionMap.values());
+  const permissions = Array.from(
+    permissionMap.values(),
+  );
 
+ 
   const owners = permissions
     .filter((permission) => permission.role === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
       kind: "drive#user",
-      me: permission.id?.toString() === userId?.toString(),
+      me:
+        permission.id?.toString() ===
+        userId?.toString(),
       permissionId: permission.id,
       emailAddress: permission.emailAddress,
       photoLink: permission.photoLink,
     }));
 
-  const isPublic = Boolean(item.isPublic || parentDir?.isPublic);
+
+  const isPublic = Boolean(
+    item.isPublic || parentDir?.isPublic,
+  );
 
   let publicRole;
 
@@ -194,29 +256,40 @@ const resolveRole = async (item, type, userId, parentDir) => {
       id: "anyoneWithLink",
       type: "anyone",
       role: publicRole || "reader",
+      inherited: !item.isPublic,
     });
   }
 
+  
   permissions.push({
     id: "superuser",
     role: "superuser",
     type: "superuser",
   });
 
-  const ownership = await Ownership.findOne({ itemId: item?._id });
-  const updatedPermissions = permissions.map((p) => {
-    const permissionId = p.id?.toString();
-    const ownerId = ownership?.toUser?.toString();
 
-    if (ownership?.status === "pending" && permissionId === ownerId) {
-      return {
-        ...p,
-        transferStatus: ownership.status,
-      };
-    }
-
-    return p;
+  const ownership = await Ownership.findOne({
+    itemId: item?._id,
   });
+
+  const updatedPermissions = permissions.map(
+    (permission) => {
+      const permissionId = permission.id?.toString();
+      const ownerId = ownership?.toUser?.toString();
+
+      if (
+        ownership?.status === "pending" &&
+        permissionId === ownerId
+      ) {
+        return {
+          ...permission,
+          transferStatus: ownership.status,
+        };
+      }
+
+      return permission;
+    },
+  );
 
   return {
     permissions: updatedPermissions,
@@ -1034,12 +1107,6 @@ export const toggleItemStar = async (req, res, next) => {
     next(error);
   }
 };
-// export const formatTransferExpiryDate = (date) => {
-//   return new Intl.DateTimeFormat("en-US", {
-//     dateStyle: "long",
-//     timeStyle: "short",
-//   }).format(new Date(date));
-// };
 
 export const sendOwnershipMail = async (req, res, next) => {
   try {
@@ -1158,7 +1225,6 @@ export const cancelOwnershipMail = async (req, res, next) => {
   }
 };
 
-
 export const ownershipAction = async (req, res, next) => {
   try {
     const { action, transferId } = req.params;
@@ -1177,9 +1243,7 @@ export const ownershipAction = async (req, res, next) => {
       });
     }
 
-
     // GET OWNERSHIP
-
 
     const ownership = await Ownership.findById(transferId)
       .populate("fromUser")
@@ -1197,35 +1261,21 @@ export const ownershipAction = async (req, res, next) => {
       });
     }
 
-  
     // EXPIRY
 
-
-    if (
-      ownership.expiresAt &&
-      ownership.expiresAt.getTime() < Date.now()
-    ) {
-      await updateOwnershipStatus(
-        ownership,
-        "cancelled",
-      );
+    if (ownership.expiresAt && ownership.expiresAt.getTime() < Date.now()) {
+      await updateOwnershipStatus(ownership, "cancelled");
 
       return res.status(400).json({
         message: "Ownership transfer expired!",
       });
     }
 
-   
     // GET RESOURCE
 
+    const Model = getOwnershipModel(ownership.itemType);
 
-    const Model = getOwnershipModel(
-      ownership.itemType,
-    );
-
-    const item = await Model.findById(
-      ownership.itemId,
-    );
+    const item = await Model.findById(ownership.itemId);
 
     if (!item) {
       return res.status(400).json({
@@ -1234,40 +1284,27 @@ export const ownershipAction = async (req, res, next) => {
     }
 
     // REJECT
-   
 
     if (action === "reject") {
-      await updateOwnershipStatus(
-        ownership,
-        "rejected",
-      );
+      await updateOwnershipStatus(ownership, "rejected");
 
       await sendOwnershipTransferResultEmail({
         to: ownership.fromUser?.email,
         toName: ownership.fromUser?.name,
         newOwnerName: ownership.toUser?.name,
         itemName: item.name,
-        itemType:
-          ownership.itemType === "Directory"
-            ? "Folder"
-            : "File",
+        itemType: ownership.itemType === "Directory" ? "Folder" : "File",
         status: "rejected",
       });
 
-      return res.redirect(
-        `${process.env.CLIENT_URL}/home?ownership=rejected`,
-      );
+      return res.redirect(`${process.env.CLIENT_URL}/home?ownership=rejected`);
     }
 
- 
     // ACCEPT
 
+    const oldOwnerId = ownership.fromUser._id;
 
-    const oldOwnerId =
-      ownership.fromUser._id;
-
-    const newOwnerId =
-      ownership.toUser._id;
+    const newOwnerId = ownership.toUser._id;
 
     // FGA
     await transferFgaOwnership({
@@ -1277,21 +1314,14 @@ export const ownershipAction = async (req, res, next) => {
       newOwnerId,
     });
 
-  
     // ROOT DIRECTORIES
 
-
-    const {
-      currentOwnerRootDir,
-      newOwnerRootDir,
-    } = await getOwnerRoots(
+    const { currentOwnerRootDir, newOwnerRootDir } = await getOwnerRoots(
       oldOwnerId,
       newOwnerId,
     );
 
-   
     // STORAGE
-
 
     await updateOwnerStorage({
       oldRootId: currentOwnerRootDir._id,
@@ -1299,21 +1329,15 @@ export const ownershipAction = async (req, res, next) => {
       size: item.size,
     });
 
-
     // RESOURCE
 
+    const newDirectoryPath = await updateResourceOwnership({
+      item,
+      newOwnerId,
+      newOwnerRootId: newOwnerRootDir._id,
+    });
 
-    const newDirectoryPath =
-      await updateResourceOwnership({
-        item,
-        newOwnerId,
-        newOwnerRootId:
-          newOwnerRootDir._id,
-      });
-
-   
     // DIRECTORY CHILDREN
-
 
     if (ownership.itemType === "Directory") {
       await updateDirectoryChildren({
@@ -1325,31 +1349,21 @@ export const ownershipAction = async (req, res, next) => {
 
     // ACCEPTED
 
-    await updateOwnershipStatus(
-      ownership,
-      "accepted",
-    );
+    await updateOwnershipStatus(ownership, "accepted");
 
     // NOTIFY OLD OWNER
-
 
     await sendOwnershipTransferResultEmail({
       to: ownership.fromUser?.email,
       toName: ownership.fromUser?.name,
       newOwnerName: ownership.toUser?.name,
       itemName: item.name,
-      itemType:
-        ownership.itemType === "Directory"
-          ? "Folder"
-          : "File",
+      itemType: ownership.itemType === "Directory" ? "Folder" : "File",
       status: "accepted",
     });
 
-    return res.redirect(
-      `${process.env.CLIENT_URL}/home?ownership=accepted`,
-    );
+    return res.redirect(`${process.env.CLIENT_URL}/home?ownership=accepted`);
   } catch (error) {
     next(error);
   }
 };
-

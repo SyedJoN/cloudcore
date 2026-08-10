@@ -18,6 +18,8 @@
   border-radius: 50%;
 }
 .sidebar h2 {
+  font-size: 18px;
+  font-weight: 500;
   text-transform: capitalize;
 }
 .sidebar ul {
@@ -41,6 +43,10 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+}
+.topbar h1 {
+  font-size: 18px;
+font-weight: 500;
 }
 
 /* Profile Section */

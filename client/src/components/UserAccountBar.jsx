@@ -8,6 +8,7 @@ import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useAuth } from "../Contexts/AuthContext";
 import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
 import GoogleDriveBtn from "./ThirdPartyButtons/GoogleDrive";
+import { UseAvatar } from "../Hooks/useAvatar";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -32,35 +33,6 @@ function UserAccountBar() {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
-
-  // ── Avatar: photo → coloured initial fallback ─────────────────────────────
-  const avatarEl =
-    user.avatar && !hasImgError ? (
-      <img
-        src={user.avatar}
-        alt={user.name}
-        onError={() => setHasImgError(true)}
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: "50%",
-          objectFit: "cover",
-          display: "block",
-        }}
-      />
-    ) : (
-      <span
-        className="gd-avatar"
-        style={{
-          background: getColor(user.name),
-          cursor: "pointer",
-          userSelect: "none",
-        }}
-      >
-        {user.name?.charAt(0)?.toUpperCase()}
-      </span>
-    );
-
   return (
     <div
       className="gd-user-menu-container"
@@ -77,7 +49,7 @@ function UserAccountBar() {
           title="Account"
           onClick={() => setShowUserMenu((v) => !v)}
         >
-          {avatarEl}
+          <UseAvatar name={user.name} avatar={user.avatar} size={36} />
         </div>
       )}
 
@@ -98,25 +70,8 @@ function UserAccountBar() {
               <div
                 className={`gd-user-menu-profile ${isMongoId || isMainPage ? "not-empty" : ""}`}
               >
-                {user.avatar && !hasImgError ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <span
-                    className="gd-user-menu-avatar"
-                    style={{ background: getColor(user.name) }}
-                  >
-                    {user.name?.charAt(0)?.toUpperCase()}
-                  </span>
-                )}
+                <UseAvatar name={user.name} avatar={user.avatar} size={56} />
+
                 <div className="gd-user-menu-name">{user.name}</div>
                 {user.email && (
                   <div className="gd-user-menu-email">{user.email}</div>
@@ -126,8 +81,11 @@ function UserAccountBar() {
                   <span className="gd-user-menu-plan-badge">{user.plan}</span>
                   {user.plan !== "business" && (
                     <a
-                    onClick={()=> location.pathname.endsWith("/main") ? navigate("#pricing") : navigate("/main#pricing")}
-                     
+                      onClick={() =>
+                        location.pathname.endsWith("/main")
+                          ? navigate("#pricing")
+                          : navigate("/main#pricing")
+                      }
                       className="btn hover:bg-blue-200 hover:text-blue-500 flex items-center rounded-md text-xs text-gray-500 capitalize font-medium py-2.5 cursor-pointer"
                     >
                       <DiamondPlus className="mr-1 text-blue-500" size={13} />
@@ -176,7 +134,11 @@ function UserAccountBar() {
                 )}
                 {!isGoogleDrive && (
                   <button className="gd-user-menu-gdrive flex sm:hidden">
-                    <GoogleDriveBtn width={18} height={18} classNames="p-0 gap-[14px]" />
+                    <GoogleDriveBtn
+                      width={18}
+                      height={18}
+                      classNames="p-0 gap-[14px]"
+                    />
                   </button>
                 )}
                 <div className="gd-user-menu-divider" />

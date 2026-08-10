@@ -15,11 +15,12 @@ import { getColor } from "../../Utils/getProfileColor.js";
 import FileBrowser from "../Components/File/FileBrowser.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import { useAuth, useSidebar } from "../Contexts";
+import ConfirmationModal from "../Components/Modals/ConfirmationModal.jsx";
 
 const ROLE_OPTIONS = ["admin", "manager", "user"];
 
 export default function UsersPage() {
-  const {user: currentUser, refreshUser} = useAuth();
+  const { user: currentUser, refreshUser, logout } = useAuth();
   const { toggleSidebar } = useSidebar();
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState([]);
@@ -31,6 +32,9 @@ export default function UsersPage() {
   const [apiData, setApiData] = useState([]);
   const [showDeletedUsers, setShowDeletedUsers] = useState(false);
   const [hasError, setHasError] = useState(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedUser, setSelectedUser] = useState({});
+  const [isFetching, setIsFetching] = useState(false);
 
   const [showFiles, setShowFiles] = useState(false);
   const navigate = useNavigate();
@@ -157,48 +161,78 @@ export default function UsersPage() {
   };
 
   const handleSubmit = async () => {
-    const editableId = Object.keys(isEditable)[0];
-    const editedUser = userData.find((u) => u.id === editableId);
+    try {
+      setIsFetching(true);
+      const editableId = Object.keys(isEditable)[0];
+      const editedUser = userData.find((u) => u.id === editableId);
 
-    const payload = {
-      ...editedUser,
-      role: role[editableId],
-    };
+      const payload = {
+        ...editedUser,
+        role: role[editableId],
+      };
 
-    const data = await updateUser(payload);
-    setApiData((prev) =>
-      prev.map((u) => (u.id === data.user.id ? { ...data.user } : u)),
-    );
-    setIsEditable({});
+      const data = await updateUser(payload);
+      setApiData((prev) =>
+        prev.map((u) => (u.id === data.user.id ? { ...data.user } : u)),
+      );
+      setIsEditable({});
+      setShowConfirmation(false);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const softDelete = async (id) => {
-    const user = userData.find((u) => u.id === id);
-    if (!confirm(`Delete ${user.email}?`)) return;
+    try {
+      setIsFetching(true);
+      const user = userData.find((u) => u.id === id);
 
-    const data = await softDeleteUser(id);
-    setUserData((prev) => prev.filter((u) => u.id !== id));
+      const data = await softDeleteUser(id);
+      setUserData((prev) => prev.filter((u) => u.id !== id));
 
-    setDeletedUsers((prev) => [...prev, data.user]);
+      setDeletedUsers((prev) => [...prev, data.user]);
+      setShowConfirmation(false);
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const deleteUser = async (id) => {
-    const user = deletedUsers.find((u) => u.id === id);
-    if (!confirm(`Delete ${user.email} permanently from database?`)) return;
+    try {
+      setIsFetching(true);
+      const user = deletedUsers.find((u) => u.id === id);
 
-    await deleteUserFromDB(id);
-    setDeletedUsers((prev) => prev.filter((u) => u.id !== id));
+      await deleteUserFromDB(id);
+      setDeletedUsers((prev) => prev.filter((u) => u.id !== id));
+      setShowConfirmation(false);
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const handleRecover = async (id) => {
-    const user = deletedUsers.find((u) => u.id === id);
-    if (!confirm(`Reover ${user.email}?`)) return;
+    try {
+      setIsFetching(true);
 
-    const data = await recoverUser(id);
+      const user = deletedUsers.find((u) => u.id === id);
 
-    setDeletedUsers((prev) => prev.filter((u) => u.id !== id));
+      const data = await recoverUser(id);
 
-    setUserData((prev) => [...prev, data.user]);
+      setDeletedUsers((prev) => prev.filter((u) => u.id !== id));
+
+      setUserData((prev) => [...prev, data.user]);
+      setShowConfirmation(false);
+    } catch (error) {
+      console.log(error.message);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const logoutUser = async (id) => {
@@ -223,10 +257,32 @@ export default function UsersPage() {
 
   return (
     <div className="dashboard">
+      {showConfirmation && (
+        <ConfirmationModal
+          title={
+            selectedUser.action === "Submit"
+              ? "Are you sure you want to save?"
+              : `${selectedUser.action} ${selectedUser.email}?`
+          }
+          action_1="Yes"
+          action_2="Cancel"
+          onAction_1={async () =>
+            selectedUser.action === "Submit"
+              ? await handleSubmit()
+              : selectedUser.action === "Recover"
+                ? await handleRecover(selectedUser.id)
+                : selectedUser.action === "Delete"
+                  ? await deleteUser(selectedUser.id)
+                  : await softDelete(selectedUser.id)
+          }
+          onAction_2={() => setShowConfirmation(false)}
+          isFetching={isFetching}
+        />
+      )}
       {/* Sidebar */}
       <aside className="sidebar">
         {/* <img src={currentUser.avatar}/> */}
-        <div className="text-[var(--text-primary)] pl-5">
+        <div className="text-(--text-primary) pl-5">
           <h2>{currentUser.role} Panel</h2>
 
           <ul>
@@ -275,7 +331,7 @@ export default function UsersPage() {
           <div className="flex items-center">
             <h1>User Management</h1>
             <a
-              className="hover:bg-[var(--btn-bg-medium)] md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
+              className="hover:bg-(--btn-bg-medium) md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
               onClick={toggleSidebar}
             >
               <Bars3Icon width="25" height="25" color="var(--text-secondary)" />
@@ -324,9 +380,10 @@ export default function UsersPage() {
                 <div className="dropdown-item" onClick={() => navigate("/")}>
                   Home
                 </div>
+                
                 <div
                   className="dropdown-item logout"
-                  onClick={() => navigate("/login")}
+                  onClick={() => logout()}
                 >
                   Logout
                 </div>
@@ -354,18 +411,20 @@ export default function UsersPage() {
                   </tr>
                 </thead>
 
-                <tbody
-                  
-                >
+                <tbody>
                   {userData.length === 0 ? (
-                    <tr >
+                    <tr>
                       <td colSpan={5}>No users found</td>
                     </tr>
                   ) : (
                     userData.map((user) => (
-                      <tr className={`${!showDeletedUsers && userData.length > 0 ? "border-t border-[#eee]" : ""}`} key={user.id}>
+                      <tr
+                        className={`${!showDeletedUsers && userData.length > 0 ? "border-t border-[#eee]" : ""}`}
+                        key={user.id}
+                      >
                         <td>
                           <input
+                          className="cursor-text bg-(--surface-container-dark-hover) disabled:bg-(--surface-white) disabled:text-(--border-inverse) disabled:cursor-not-allowed"
                             ref={(el) => (inputRef.current[user.id] = el)}
                             disabled={!isEditable[user.id]}
                             name="name"
@@ -376,6 +435,7 @@ export default function UsersPage() {
 
                         <td>
                           <input
+                          className="cursor-text bg-(--surface-container-dark-hover) disabled:bg-(--surface-white) disabled:text-(--border-inverse) disabled:cursor-not-allowed"
                             disabled={!isEditable[user.id]}
                             name="email"
                             value={user.email}
@@ -385,7 +445,7 @@ export default function UsersPage() {
 
                         <td>
                           <select
-                            className="bg-[var(--surface-white)]"
+                            className="cursor-pointer bg-(--surface-container-dark-hover) disabled:bg-(--surface-white) disabled:text-(--border-inverse) disabled:cursor-not-allowed"
                             value={role[user.id]}
                             disabled={
                               !canAccess(currentUser.role, user.role) ||
@@ -437,7 +497,14 @@ export default function UsersPage() {
                               <button
                                 type="button"
                                 className="btn btn-danger"
-                                onClick={() => softDelete(user.id)}
+                                onClick={() => {
+                                  setSelectedUser({
+                                    id: user.id,
+                                    email: user.email,
+                                    action: "Trash",
+                                  });
+                                  setShowConfirmation(true);
+                                }}
                               >
                                 Delete
                               </button>
@@ -463,16 +530,17 @@ export default function UsersPage() {
                   </tr>
                 </thead>
 
-                <tbody
-                
-                >
+                <tbody>
                   {deletedUsers.length === 0 ? (
                     <tr className="flex flex-col">
                       <td colSpan={5}>No users found</td>
                     </tr>
                   ) : (
                     deletedUsers.map((user) => (
-                      <tr   className={`${showDeletedUsers && deletedUsers.length > 0 ? "border-t border-[#eee]" : ""}`} key={user.id}>
+                      <tr
+                        className={`${showDeletedUsers && deletedUsers.length > 0 ? "border-t border-[#eee]" : ""}`}
+                        key={user.id}
+                      >
                         <td>
                           <input
                             ref={(el) => (inputRef.current[user.id] = el)}
@@ -492,7 +560,14 @@ export default function UsersPage() {
                             disabled={isEditable[user.id]}
                             className="btn btn-primary"
                             type="button"
-                            onClick={() => handleRecover(user.id)}
+                            onClick={() => {
+                              setSelectedUser({
+                                id: user.id,
+                                email: user.email,
+                                action: "Recover",
+                              });
+                              setShowConfirmation(true);
+                            }}
                           >
                             Recover
                           </button>
@@ -500,7 +575,14 @@ export default function UsersPage() {
                           <button
                             type="button"
                             className="btn btn-danger"
-                            onClick={() => deleteUser(user.id)}
+                            onClick={() => {
+                              setSelectedUser({
+                                id: user.id,
+                                email: user.email,
+                                action: "Delete",
+                              });
+                              setShowConfirmation(true);
+                            }}
                           >
                             Delete Permanently
                           </button>
@@ -526,7 +608,12 @@ export default function UsersPage() {
                 disabled={!isFieldChanged}
                 className="btn btn-success"
                 type="button"
-                onClick={handleSubmit}
+                onClick={() => {
+                  setSelectedUser({
+                    action: "Submit",
+                  });
+                  setShowConfirmation(true);
+                }}
               >
                 Save
               </button>
