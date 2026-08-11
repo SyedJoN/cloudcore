@@ -635,24 +635,6 @@ function ContextMenuContent({
               No manual role checking here.
           ================================================== */}
 
-          {!isDeleted &&
-            !canTrash &&
-            canDelete && (
-              <button
-                className="gd-context-item danger"
-                onClick={close(() =>
-                  onDelete(
-                    item,
-                    isGoogle
-                      ? "google"
-                      : "local",
-                  )
-                )}
-              >
-                <IconTrash size={18} />
-                Remove
-              </button>
-            )}
 
           {/* ==================================================
               GOOGLE DRIVE DELETE

@@ -1,4 +1,7 @@
 import { rm } from "fs/promises";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
 import path from "path";
 import { fileURLToPath } from "url";
 import Directory from "../models/directory.model.js";
@@ -29,6 +32,13 @@ import {
   updateResourceOwnership,
 } from "../utils/ownershipHelpers.js";
 import mongoose from "mongoose";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { ZipArchive } from "archiver";
+import { getFile } from "../services/s3/getFile.js";
+import Subscription from "../models/subscription.model.js";
+import { getFileSize } from "../services/s3/getFileSize.js";
+import { sanitizeFilename } from "../utils/sanitizeFileName.js";
+import { getSignedUploadUrl } from "../services/s3/upload.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const ROLE_PRIORITY = {
@@ -703,7 +713,6 @@ export const getDirectory = async (req, res, next) => {
               owners: roles.owners,
               permissions: roles.permissions,
               capabilities: roles.capabilities,
-
             };
           }),
         ),
@@ -719,7 +728,6 @@ export const getDirectory = async (req, res, next) => {
         owners,
         permissions,
         capabilities,
-
       };
       return res.status(200).json({
         ...parentDirWithRole,
@@ -781,8 +789,7 @@ export const getDirectory = async (req, res, next) => {
           ...file,
           owners: roles.owners,
           permissions: roles.permissions,
-              capabilities: roles.capabilities,
-
+          capabilities: roles.capabilities,
         };
       }),
     );
@@ -794,8 +801,7 @@ export const getDirectory = async (req, res, next) => {
           ...dir,
           owners: roles.owners,
           permissions: roles.permissions,
-              capabilities: roles.capabilities,
-
+          capabilities: roles.capabilities,
         };
       }),
     );
@@ -813,7 +819,6 @@ export const getDirectory = async (req, res, next) => {
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
-      
     });
   } catch (error) {
     next(error);
@@ -866,41 +871,38 @@ export const getTrashItems = async (req, res, next) => {
       (d) => !deletedDirIds.has(d.parentDirId?.toString()),
     );
 
-      const topLevelFilesWithResolvedRoles = await Promise.all(
+    const topLevelFilesWithResolvedRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-         const roles = await resolveRole(file, "file", userId, file.parentDirId);
+        const roles = await resolveRole(file, "file", userId, file.parentDirId);
         return {
           ...file,
           owners: roles.owners,
           permissions: roles.permissions,
-              capabilities: roles.capabilities,
-
+          capabilities: roles.capabilities,
         };
-      }
-      ),
+      }),
     );
 
     const topLevelDirsWithResolvedRoles = await Promise.all(
-       topLevelDirs.map(async (dir) => {
-         const roles = await resolveRole(dir, "folder", userId, dir.parentDirId);
+      topLevelDirs.map(async (dir) => {
+        const roles = await resolveRole(dir, "folder", userId, dir.parentDirId);
         return {
           ...dir,
           owners: roles.owners,
           permissions: roles.permissions,
-              capabilities: roles.capabilities,
-
-           };
-      }
-      ),
+          capabilities: roles.capabilities,
+        };
+      }),
     );
-    return res
-      .status(200)
-      .json({ ...parentDir, files: topLevelFilesWithResolvedRoles, directories: topLevelDirsWithResolvedRoles });
+    return res.status(200).json({
+      ...parentDir,
+      files: topLevelFilesWithResolvedRoles,
+      directories: topLevelDirsWithResolvedRoles,
+    });
   } catch (error) {
     next(error);
   }
 };
-
 
 export const getSharedWithMe = async (req, res, next) => {
   try {
@@ -916,11 +918,10 @@ export const getSharedWithMe = async (req, res, next) => {
     // GET EVERYTHING THE USER CAN ACCESS
     // =========================================================
 
-    const [allowedFileIds, allowedFolderIds] =
-      await Promise.all([
-        listObjects(userId, "file"),
-        listObjects(userId, "folder"),
-      ]);
+    const [allowedFileIds, allowedFolderIds] = await Promise.all([
+      listObjects(userId, "file"),
+      listObjects(userId, "folder"),
+    ]);
 
     // Normalize IDs once.
     const allowedFolderIdSet = new Set(
@@ -931,180 +932,120 @@ export const getSharedWithMe = async (req, res, next) => {
     // FETCH FILES + DIRECTORIES
     // =========================================================
 
-    const [files, directories] =
-      await Promise.all([
-        allowedFileIds.length
-          ? File.find({
-              _id: {
-                $in: allowedFileIds,
-              },
+    const [files, directories] = await Promise.all([
+      allowedFileIds.length
+        ? File.find({
+            _id: {
+              $in: allowedFileIds,
+            },
 
-              userId: {
-                $ne: userId,
-              },
-            })
-              .populate("parentDirId")
-              .populate(
-                "userId",
-                "name email avatar",
-              )
-              .populate("path", "name")
-              .lean()
-          : [],
+            userId: {
+              $ne: userId,
+            },
+          })
+            .populate("parentDirId")
+            .populate("userId", "name email avatar")
+            .populate("path", "name")
+            .lean()
+        : [],
 
-        allowedFolderIds.length
-          ? Directory.find({
-              _id: {
-                $in: allowedFolderIds,
-              },
+      allowedFolderIds.length
+        ? Directory.find({
+            _id: {
+              $in: allowedFolderIds,
+            },
 
-              userId: {
-                $ne: userId,
-              },
-            })
-              .populate(
-                "userId",
-                "name email avatar",
-              )
-              .populate("path", "name")
-              .lean()
-          : [],
-      ]);
+            userId: {
+              $ne: userId,
+            },
+          })
+            .populate("userId", "name email avatar")
+            .populate("path", "name")
+            .lean()
+        : [],
+    ]);
 
     const getParentId = (parentDirId) => {
       if (!parentDirId) {
         return null;
       }
 
-      if (
-        typeof parentDirId === "object" &&
-        parentDirId._id
-      ) {
+      if (typeof parentDirId === "object" && parentDirId._id) {
         return String(parentDirId._id);
       }
 
       return String(parentDirId);
     };
 
+    const topLevelFiles = files.filter((file) => {
+      const parentId = getParentId(file.parentDirId);
 
-    const topLevelFiles = files.filter(
-      (file) => {
-        const parentId = getParentId(
-          file.parentDirId,
-        );
+      return !parentId || !allowedFolderIdSet.has(parentId);
+    });
 
-        return (
-          !parentId ||
-          !allowedFolderIdSet.has(parentId)
-        );
-      },
-    );
+    const topLevelDirectories = directories.filter((directory) => {
+      const parentId = getParentId(directory.parentDirId);
 
-    const topLevelDirectories =
-      directories.filter((directory) => {
-        const parentId = getParentId(
-          directory.parentDirId,
-        );
+      return !parentId || !allowedFolderIdSet.has(parentId);
+    });
 
-        return (
-          !parentId ||
-          !allowedFolderIdSet.has(parentId)
-        );
-      });
-
-  
     const filesWithRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const roles = await resolveRole(
-          file,
-          "file",
-          userId,
-          file.parentDirId,
-        );
+        const roles = await resolveRole(file, "file", userId, file.parentDirId);
 
         return {
           ...file,
 
           owners: roles.owners,
 
-          permissions:
-            roles.permissions,
+          permissions: roles.permissions,
 
-          capabilities:
-            roles.capabilities,
+          capabilities: roles.capabilities,
 
-          currentUser:
-            roles.currentUser,
+          currentUser: roles.currentUser,
         };
       }),
     );
 
+    const directoriesWithRoles = await Promise.all(
+      topLevelDirectories.map(async (directory) => {
+        let parentDir = null;
 
+        if (directory.parentDirId) {
+          const parentId = getParentId(directory.parentDirId);
 
-    const directoriesWithRoles =
-      await Promise.all(
-        topLevelDirectories.map(
-          async (directory) => {
-          
+          if (parentId) {
+            parentDir = await Directory.findById(parentId)
+              .select("_id name parentDirId isPublic publicRole")
+              .lean();
+          }
+        }
 
-            let parentDir = null;
+        const roles = await resolveRole(directory, "folder", userId, parentDir);
 
-            if (directory.parentDirId) {
-              const parentId =
-                getParentId(
-                  directory.parentDirId,
-                );
+        return {
+          ...directory,
 
-              if (parentId) {
-                parentDir =
-                  await Directory.findById(
-                    parentId,
-                  )
-                    .select(
-                      "_id name parentDirId isPublic publicRole",
-                    )
-                    .lean();
-              }
-            }
+          owners: roles.owners,
 
-            const roles =
-              await resolveRole(
-                directory,
-                "folder",
-                userId,
-                parentDir,
-              );
+          permissions: roles.permissions,
 
-            return {
-              ...directory,
+          capabilities: roles.capabilities,
 
-              owners: roles.owners,
-
-              permissions:
-                roles.permissions,
-
-              capabilities:
-                roles.capabilities,
-
-              currentUser:
-                roles.currentUser,
-            };
-          },
-        ),
-      );
-
+          currentUser: roles.currentUser,
+        };
+      }),
+    );
 
     return res.status(200).json({
       files: filesWithRoles,
 
-      directories:
-        directoriesWithRoles,
+      directories: directoriesWithRoles,
     });
   } catch (error) {
     next(error);
   }
 };
-
 
 export const getStarredItems = async (req, res, next) => {
   try {
@@ -1860,5 +1801,895 @@ export const ownershipAction = async (req, res, next) => {
     return res.redirect(`${process.env.CLIENT_URL}/home?ownership=accepted`);
   } catch (error) {
     next(error);
+  }
+};
+export const downloadFolder = async (req, res, next) => {
+  let archive = null;
+  let cancelled = false;
+
+  try {
+    // =================================================
+    // AUTH
+    // =================================================
+
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    // =================================================
+    // FOLDER ID
+    // =================================================
+
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        message: "Missing folder id",
+      });
+    }
+
+    // =================================================
+    // FIND FOLDER
+    // =================================================
+
+    const folder = await Directory.findOne({
+      _id: id,
+      userId,
+      isDeleted: false,
+    }).lean();
+
+    if (!folder) {
+      return res.status(404).json({
+        message: "Folder not found",
+      });
+    }
+
+    // =================================================
+    // RESPONSE HEADERS
+    // =================================================
+
+    const zipName = `${folder.name || "folder"}.zip`.replace(
+      /[<>:"/\\|?*\x00-\x1F]/g,
+      "_",
+    );
+
+    res.setHeader("Content-Type", "application/zip");
+
+    res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+
+    archive = new ZipArchive({
+      zlib: {
+        level: 6,
+      },
+    });
+
+    const cancelDownload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      cancelled = true;
+
+      console.log("Folder download cancelled by client");
+
+      try {
+        archive.abort();
+      } catch {}
+
+      try {
+        if (!res.destroyed) {
+          res.destroy();
+        }
+      } catch {}
+    };
+
+    req.once("aborted", cancelDownload);
+
+    res.once("close", () => {
+      if (!res.writableFinished) {
+        cancelDownload();
+      }
+    });
+
+  
+    archive.on("error", (error) => {
+      if (cancelled) {
+        return;
+      }
+
+      console.error("ZIP error:", error);
+
+      if (!res.destroyed) {
+        res.destroy(error);
+      }
+    });
+
+
+    archive.pipe(res);
+
+    const directories = await Directory.find({
+      userId,
+      isDeleted: false,
+      path: folder._id,
+    })
+      .select("_id name parentDirId path")
+      .lean();
+
+
+    const directoryMap = new Map();
+
+    directoryMap.set(folder._id.toString(), folder.name);
+
+    for (const directory of directories) {
+      directoryMap.set(directory._id.toString(), directory.name);
+    }
+
+    const files = await File.find({
+      userId,
+      isDeleted: false,
+      isUploading: false,
+      path: folder._id,
+    })
+      .select("_id name extension size parentDirId path")
+      .lean();
+
+    console.log(`Folder "${folder.name}" contains ${files.length} files`);
+
+
+    for (const directory of directories) {
+      if (cancelled) {
+        return;
+      }
+
+      const relativePath = buildDirectoryPath(
+        directory,
+        folder._id,
+        directoryMap,
+      );
+
+      if (!relativePath) {
+        continue;
+      }
+
+      archive.append("", {
+        name: `${relativePath}/`,
+      });
+    }
+
+
+    let completed = 0;
+
+    for (const file of files) {
+      if (cancelled) {
+        return;
+      }
+
+     
+      const s3Key = `${file._id}${file.extension}`;
+
+    
+      const safeFileName = (file.name || "file").replace(
+        /[<>:"/\\|?*\x00-\x1F]/g,
+        "_",
+      );
+
+    
+
+      const folderPath = buildFilePath(file, folder._id, directoryMap);
+
+      const zipPath = folderPath
+        ? `${folderPath}/${safeFileName}`
+        : safeFileName;
+
+      console.log(`Adding ${completed + 1}/${files.length}: ${zipPath}`);
+
+  
+
+      const s3Response = await getFile(s3Key);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (!s3Response?.Body) {
+        console.log(`Skipping missing S3 object: ${s3Key}`);
+
+        continue;
+      }
+
+      await new Promise((resolve, reject) => {
+        const stream = s3Response.Body;
+
+        let finished = false;
+
+        const cleanup = () => {
+          stream.removeListener("end", onEnd);
+
+          stream.removeListener("error", onError);
+
+          stream.removeListener("aborted", onAborted);
+        };
+
+        const finish = () => {
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
+          cleanup();
+
+          resolve();
+        };
+
+        const onEnd = () => {
+          finish();
+        };
+
+        const onError = (error) => {
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
+          cleanup();
+
+          reject(error);
+        };
+
+        const onAborted = () => {
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
+          cleanup();
+
+          reject(new Error("S3 stream aborted"));
+        };
+
+        stream.once("end", onEnd);
+
+        stream.once("error", onError);
+
+        stream.once("aborted", onAborted);
+
+        archive.append(stream, {
+          name: zipPath,
+        });
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+
+
+      completed++;
+
+      const progress =
+        files.length > 0 ? Math.round((completed / files.length) * 100) : 100;
+
+      console.log(`ZIP progress: ${progress}%`);
+    }
+
+   
+    if (cancelled) {
+      return;
+    }
+
+    console.log("Finalizing folder ZIP...");
+
+    await new Promise((resolve, reject) => {
+      let settled = false;
+
+      const cleanup = () => {
+        archive.removeListener("error", onError);
+
+        res.removeListener("error", onResponseError);
+      };
+
+      const finish = () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+
+        cleanup();
+
+        resolve();
+      };
+
+      const onError = (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+
+        cleanup();
+
+        reject(error);
+      };
+
+      const onResponseError = (error) => {
+        onError(error);
+      };
+
+      archive.once("error", onError);
+
+      res.once("error", onResponseError);
+
+      archive.finalize();
+
+     
+      res.once("finish", finish);
+    });
+
+   
+    req.removeListener("aborted", cancelDownload);
+
+    console.log("Folder download completed");
+  } catch (error) {
+   
+
+    if (
+      cancelled ||
+      req.aborted ||
+      error?.code === "ECONNABORTED" ||
+      error?.code === "ABORTED" ||
+      error?.code === "QUEUECLOSED"
+    ) {
+      console.log("Folder download cancelled by client");
+
+      return;
+    }
+
+
+
+    if (res.headersSent) {
+      if (!res.destroyed) {
+        res.destroy();
+      }
+
+      return;
+    }
+
+    console.error("Folder download error:", error);
+
+    next(error);
+  }
+};
+
+const buildDirectoryPath = (directory, rootFolderId, directoryMap) => {
+  const pathIds = directory.path || [];
+
+  const rootIndex = pathIds.findIndex(
+    (id) => id.toString() === rootFolderId.toString(),
+  );
+
+  if (rootIndex === -1) {
+    return directory.name;
+  }
+
+  const ids = [...pathIds.slice(rootIndex + 1), directory._id];
+
+  return ids
+    .map((id) => directoryMap.get(id.toString()))
+    .filter(Boolean)
+    .join("/");
+};
+
+
+const buildFilePath = (file, rootFolderId, directoryMap) => {
+  const pathIds = file.path || [];
+
+  const rootIndex = pathIds.findIndex(
+    (id) => id.toString() === rootFolderId.toString(),
+  );
+
+  if (rootIndex === -1) {
+    return "";
+  }
+
+  return pathIds
+    .slice(rootIndex + 1)
+    .map((id) => directoryMap.get(id.toString()))
+    .filter(Boolean)
+    .join("/");
+};
+export const getDownloadProgress = async (req, res) => {
+  const { jobId } = req.params;
+
+  const job = downloadJobs.get(jobId);
+
+  if (!job) {
+    return res.status(404).json({
+      message: "Download job not found",
+    });
+  }
+
+  return res.json({
+    status: job.status,
+    progress: job.progress,
+    completed: job.completed,
+    total: job.total,
+    error: job.error,
+  });
+};
+
+export const initiateFolderUpload = async (req, res, next) => {
+  const createdFileIds = [];
+  const createdDirectoryIds = [];
+
+  try {
+    const userId = req.user._id;
+
+    const { files } = req.body;
+
+    
+    const parentDirId = req.body.parentDirId || null;
+
+    if (!Array.isArray(files) || !files.length) {
+      return res.status(400).json({
+        message: "No files provided",
+      });
+    }
+
+    let parentDir;
+
+    if (parentDirId) {
+      parentDir = await Directory.findOne({
+        _id: parentDirId,
+        userId,
+        isDeleted: false,
+      });
+    } else {
+   
+      parentDir = await Directory.findOne({
+        userId,
+        parentDirId: null,
+        isDeleted: false,
+      });
+    }
+
+    if (!parentDir) {
+      return res.status(404).json({
+        message: "Parent directory not found",
+      });
+    }
+
+
+    const subscription = await Subscription.findOne({
+      userId,
+    });
+
+    if (subscription && subscription.status !== "active") {
+      await updateUserPlan(userId, {
+        uploadLimit: 0,
+      });
+
+      return res.status(403).json({
+        message: "Your subscription is not active.",
+      });
+    }
+
+
+    const user = req.user;
+
+    const uploadLimit = Number(user.uploadLimit || 0);
+
+    const totalStorage = Number(user.totalStorage || 0);
+
+    const rootDir = await Directory.findOne({
+      userId,
+      parentDirId: null,
+      isDeleted: false,
+    }).lean();
+
+    if (!rootDir) {
+      return res.status(404).json({
+        message: "Root directory not found",
+      });
+    }
+
+    const totalStorageUsed = Number(rootDir.size || 0);
+
+    const totalStorageLeft = totalStorage - totalStorageUsed;
+
+  
+    let totalUploadSize = 0;
+
+    for (const file of files) {
+      const size = Number(file.size || 0);
+
+      if (!size || size < 0) {
+        return res.status(400).json({
+          message: `Invalid file size for ${file.name}`,
+        });
+      }
+
+      if (size > uploadLimit) {
+        return res.status(413).json({
+          message: `File ${file.name} exceeds your upload limit`,
+        });
+      }
+
+      totalUploadSize += size;
+    }
+
+
+    if (totalUploadSize > totalStorageLeft) {
+      const needed = totalUploadSize - totalStorageLeft;
+
+      return res.status(507).json({
+        message: `Storage is full. You need ${formatSize(needed)} more storage`,
+      });
+    }
+
+    const directoryCache = new Map();
+
+    // Root/current parent
+    directoryCache.set(String(parentDir._id), parentDir);
+
+   
+    const getOrCreateDirectory = async (directoryName, parent) => {
+      const cacheKey = `${parent._id}:${directoryName}`;
+
+
+      const cached = directoryCache.get(cacheKey);
+
+      if (cached) {
+        return cached;
+      }
+
+
+      let directory = await Directory.findOne({
+        name: directoryName,
+        parentDirId: parent._id,
+        userId,
+        isDeleted: false,
+      });
+
+      
+
+      if (!directory) {
+        const parentPath = Array.isArray(parent.path) ? parent.path : [];
+
+        directory = await Directory.create({
+          name: directoryName,
+
+          size: 0,
+
+          parentDirId: parent._id,
+
+          path: [...parentPath, parent._id],
+
+          userId,
+
+          isPublic: false,
+
+          isStarred: false,
+
+          isDeleted: false,
+
+          modifiedTime: new Date(),
+        });
+
+        createdDirectoryIds.push(directory._id);
+      }
+
+    
+
+      const fgaWrites = [
+        {
+          user: `user:${userId.toString()}`,
+
+          relation: "owner",
+
+          object: `folder:${directory._id.toString()}`,
+        },
+      ];
+
+    
+      if (directory.parentDirId) {
+        fgaWrites.push({
+          user: `folder:${directory.parentDirId.toString()}`,
+
+          relation: "parent",
+
+          object: `folder:${directory._id.toString()}`,
+        });
+      }
+
+     
+      await fgaClient.write({
+        writes: fgaWrites,
+      });
+
+      directoryCache.set(cacheKey, directory);
+
+      return directory;
+    };
+
+    
+
+    const resolveFileParent = async (relativePath) => {
+      const normalizedPath = String(relativePath || "")
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "")
+        .replace(/\/+/g, "/");
+
+      const parts = normalizedPath.split("/").filter(Boolean);
+
+     
+
+      if (!parts.length) {
+        return parentDir;
+      }
+
+      
+      parts.pop();
+
+      let current = parentDir;
+
+     
+
+      for (const rawFolderName of parts) {
+        const folderName = sanitizeFilename(rawFolderName) || "untitled";
+
+        current = await getOrCreateDirectory(folderName, current);
+      }
+
+      return current;
+    };
+
+
+    const uploadResults = [];
+
+    for (let index = 0; index < files.length; index++) {
+      const inputFile = files[index];
+
+  
+
+      const originalName = String(inputFile.name || "untitled");
+
+  
+
+      const relativePath = String(inputFile.relativePath || originalName)
+        .replace(/\\/g, "/")
+        .replace(/^\/+/, "")
+        .replace(/\/+/g, "/");
+
+    
+      const fileParentDir = await resolveFileParent(relativePath);
+
+     
+
+      const rawFileName = path.basename(originalName);
+
+      let fileName = sanitizeFilename(rawFileName) || "untitled";
+
+     
+
+      let extension = path.extname(fileName);
+
+      const contentType = inputFile.contentType || "application/octet-stream";
+
+     
+      if (!extension) {
+        const mimeExtension = contentType.includes("/")
+          ? contentType.split("/").pop()
+          : "";
+
+        if (mimeExtension && mimeExtension !== "octet-stream") {
+          extension = `.${mimeExtension}`;
+        }
+      }
+
+    
+
+      const currentPlan = user.plan;
+
+    
+
+      const parentPath = Array.isArray(fileParentDir.path)
+        ? fileParentDir.path
+        : [];
+
+      const filePath = [...parentPath, fileParentDir._id];
+
+      const uploadedFile = await File.create({
+        name: fileName,
+
+        extension: extension || "",
+
+        size: Number(inputFile.size || 0),
+
+        parentDirId: fileParentDir._id,
+
+        path: filePath,
+
+        userId,
+
+        currentPlan,
+
+        isUploading: true,
+
+        modifiedTime: new Date(),
+      });
+
+      createdFileIds.push(uploadedFile._id);
+
+
+      const s3Key = `${uploadedFile._id}${uploadedFile.extension}`;
+
+     
+
+      const uploadUrl = await getSignedUploadUrl(s3Key, contentType);
+
+    
+
+      uploadResults.push({
+        index,
+
+        fileId: uploadedFile._id,
+
+        uploadUrl,
+
+        contentType,
+
+        name: fileName,
+
+        size: Number(inputFile.size || 0),
+
+        relativePath,
+
+        parentDirId: fileParentDir._id,
+      });
+    }
+
+   
+    return res.status(200).json({
+      message: "Folder upload initialized",
+
+      parentDirId: parentDir._id,
+
+      files: uploadResults,
+    });
+  } catch (error) {
+    console.error("Folder upload initialization error:", error);
+
+
+    if (createdFileIds.length) {
+      await File.deleteMany({
+        _id: {
+          $in: createdFileIds,
+        },
+      }).catch(() => {});
+    }
+
+   
+    if (createdDirectoryIds.length) {
+      await Directory.deleteMany({
+        _id: {
+          $in: createdDirectoryIds,
+        },
+      }).catch(() => {});
+    }
+
+    return next(error);
+  }
+};
+
+
+export const completeFolderUpload = async (req, res, next) => {
+  try {
+    const { fileId } = req.body;
+
+    const userId = req.user._id;
+
+  
+    if (!fileId) {
+      return res.status(400).json({
+        message: "Missing fileId",
+      });
+    }
+
+  
+    const uploadedFile = await File.findOne({
+      _id: fileId,
+      userId,
+    });
+
+    if (!uploadedFile) {
+      return res.status(404).json({
+        message: "File not found in the backend",
+      });
+    }
+
+    
+
+    const s3Key = `${uploadedFile._id}${uploadedFile.extension}`;
+
+    
+
+    let contentLength;
+
+    try {
+      contentLength = await getFileSize(s3Key);
+    } catch (error) {
+      await deleteFileFromS3(s3Key).catch(() => {});
+
+      await uploadedFile.deleteOne().catch(() => {});
+
+      return res.status(404).json({
+        message: "Upload corrupted",
+      });
+    }
+
+
+    if (Number(uploadedFile.size) !== Number(contentLength)) {
+      await deleteFileFromS3(s3Key).catch(() => {});
+
+      await uploadedFile.deleteOne().catch(() => {});
+
+      return res.status(400).json({
+        message: "File size doesn't match",
+      });
+    }
+
+    try {
+      await fgaClient.write({
+        writes: [
+       
+          {
+            user: `user:${userId.toString()}`,
+
+            relation: "owner",
+
+            object: `file:${uploadedFile._id.toString()}`,
+          },
+
+      
+          {
+            user: `folder:${uploadedFile.parentDirId.toString()}`,
+
+            relation: "parent",
+
+            object: `file:${uploadedFile._id.toString()}`,
+          },
+        ],
+      });
+    } catch (error) {
+      await deleteFileFromS3(s3Key).catch(() => {});
+
+      await uploadedFile.deleteOne().catch(() => {});
+
+      return next(error);
+    }
+
+    uploadedFile.isUploading = false;
+
+    await uploadedFile.save();
+
+   
+    await updateParentDirSize(uploadedFile.parentDirId, uploadedFile.size);
+
+
+    return res.status(201).json({
+      message: "Folder file uploaded successfully",
+
+      fileId: uploadedFile._id,
+    });
+  } catch (error) {
+    return next(error);
   }
 };

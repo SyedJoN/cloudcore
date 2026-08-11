@@ -85,15 +85,12 @@ export default function SelectionBar({
 
   const canRead = capabilities.canRead === true;
 
-  const canWrite =
-    capabilities.canWrite === true || capabilities.canEdit === true;
-
   const canShare = capabilities.canShare === true;
 
   const canDownload = capabilities.canDownload === true;
 
   const canRename =
-    capabilities.canRename === true || capabilities.canEdit === true;
+    capabilities.canRename === true
 
   const canMove = capabilities.canMove === true;
 
@@ -183,7 +180,7 @@ export default function SelectionBar({
                 DOWNLOAD
             ------------------------------------------------ */}
 
-            {showFileActions && canDownload && (
+            {canDownload && (
               <button
                 className="gd-sel-action-btn"
                 title="Download"

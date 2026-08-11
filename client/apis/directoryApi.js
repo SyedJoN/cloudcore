@@ -30,3 +30,13 @@ export async function getStarredItems() {
 
 } 
 
+export async function initiateFolderUpload(data) {
+  const response = await axiosWithCreds.post("directory/uploads/initiate", data);
+  return response.data;
+}
+export async function completeFolderUpload(fileId) {
+  const response = await axiosWithCreds.post(`directory/uploads/complete`, {
+    fileId,
+  });
+  return response.data;
+}

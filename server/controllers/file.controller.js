@@ -230,6 +230,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
   const isRootLevelFile = type === "file" && isRootDirectory;
 
   const permissionMap = new Map();
+  
   const mergePermission = ({
     user,
     relation,
@@ -251,23 +252,14 @@ const resolveRole = async (item, type, userId, parentDir) => {
     if (!permission) {
       permission = {
         id: user._id,
-
         photoLink: user.avatar || null,
-
         displayName: user.name,
-
         type: "user",
-
         emailAddress: user.email,
-
         role: relation,
-
         directRole: source === "direct" ? relation : null,
-
         inheritedRole: source === "parent" ? relation : null,
-
         inherited: source === "parent",
-
         inheritedFrom:
           source === "parent"
             ? {
@@ -823,11 +815,11 @@ export const getFileById = async (req, res, next) => {
     if (!file) return res.status(404).json({ message: "File not found" });
 
     if (!file.isPublic && req.user?.role !== "superuser") {
-      // ✅ check if parent directory is public
+
       const parentDir = await Directory.findById(file.parentDirId).lean();
 
       if (!parentDir?.isPublic) {
-        // neither file nor parent is public — check FGA
+     
         if (!userId) {
           return res.status(403).json({ message: "Access denied" });
         }
@@ -895,7 +887,6 @@ export const getFileMetaById = async (req, res, next) => {
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
     const roles = await resolveRole(file, "file", userId, parentDir);
 
-    // 1. OWNER OR SUPERUSER → always owner
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
@@ -905,12 +896,11 @@ export const getFileMetaById = async (req, res, next) => {
       });
     }
 
-    // 2. PUBLIC ACCESS CHECK
     const isPublicallyAccessible = parentDir?.isPublic;
     file?.isPublic;
 
     if (!isPublicallyAccessible) {
-      // 3. NOT LOGGED IN + PRIVATE FILE
+
       if (!userId) {
         return res.status(403).json({
           message: "Access denied",
@@ -918,7 +908,7 @@ export const getFileMetaById = async (req, res, next) => {
         });
       }
 
-      // 4. ACL CHECK (FGA) — private file, logged-in user
+      
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: `user:${userId}`,
@@ -943,8 +933,7 @@ export const getFileMetaById = async (req, res, next) => {
       });
     }
 
-    // 5a. Logged-in user — run FGA check so explicit grants are honoured,
-    //     fall back to publicRole if FGA has no tuple for this user
+  
     if (userId) {
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
@@ -1111,12 +1100,12 @@ export const updateFile = async (req, res, next) => {
       const finalName = safeBase + ext;
       const isOwner = file.userId?.toString() === userId?.toString();
 
-      // 1. OWNER OR SUPERUSER — always allowed
+    
       if (req.user?.role === "superuser" || isOwner) {
         return await performRename(file, fileId, finalName, res);
       }
 
-      // 2. FGA CHECK
+
       const canWrite = await fgaClient.check({
         user: `user:${userId}`,
         role: "can_write",
@@ -1141,7 +1130,7 @@ export const updateFile = async (req, res, next) => {
         return await performRename(file, fileId, finalName, res);
       }
 
-      // 4. DENY
+  
       return res.status(403).json({
         message: "You don't have permission to rename this file",
       });
@@ -1151,7 +1140,7 @@ export const updateFile = async (req, res, next) => {
   }
 };
 
-// ── helper ────────────────────────────────────────────────────────────────────
+
 const performRename = async (file, fileId, fileName, res) => {
   const ext = file.extension;
 
@@ -1174,11 +1163,11 @@ export const softDeleteFile = async (req, res, next) => {
     const isOwner = file.userId.toString() === userId.toString();
 
     if (isOwner) {
-      // ✅ owner — soft delete the file
+      
       file.isDeleted = true;
       await file.save();
     } else {
-      // ✅ not owner — just remove from their shared view by revoking FGA tuple
+    
       await Promise.allSettled([
         fgaClient.write({
           deleteFile: [
@@ -1337,7 +1326,7 @@ export const toggleFilePublic = async (req, res, next) => {
     const isRestricted = access === "restricted";
 
     if (isRestricted) {
-      // ✅ delete all non-owner FGA tuples
+
       const object = `${type === "folder" ? "folder" : "file"}:${itemId}`;
       const tuples = await fgaClient.read({ tuple_key: { object } });
 
@@ -1383,10 +1372,6 @@ export const giveAccessById = async (req, res, next) => {
       });
     }
 
-    // ============================================================
-    // GOOGLE DRIVE
-    // ============================================================
-
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
 
@@ -1427,19 +1412,12 @@ export const giveAccessById = async (req, res, next) => {
       }
     }
 
-    // ============================================================
-    // VALIDATE TYPE
-    // ============================================================
-
     if (!["file", "folder"].includes(type)) {
       return res.status(400).json({
         message: "Invalid resource type",
       });
     }
 
-    // ============================================================
-    // LOAD ITEM
-    // ============================================================
 
     const Model = type === "folder" ? Directory : File;
 
@@ -1452,10 +1430,6 @@ export const giveAccessById = async (req, res, next) => {
         message: `${type} not found`,
       });
     }
-
-    // ============================================================
-    // ROOT DIRECTORY CANNOT BE USED AS PERMISSION SOURCE
-    // ============================================================
 
     if (type === "folder") {
       const owner = await User.findById(item.userId?._id || item.userId)
@@ -1471,10 +1445,6 @@ export const giveAccessById = async (req, res, next) => {
         });
       }
     }
-
-    // ============================================================
-    // HELPERS
-    // ============================================================
 
     const getParentId = (resource) => {
       if (!resource) return null;
@@ -1526,16 +1496,6 @@ export const giveAccessById = async (req, res, next) => {
       );
     };
 
-    /**
-     * Find the actual stored permission tuple for this user.
-     *
-     * IMPORTANT:
-     * We do NOT use check() here.
-     *
-     * check() evaluates inherited permissions.
-     * read() tells us whether the permission tuple is physically
-     * stored on this object.
-     */
     const findDirectPermission = async (object, userId) => {
       const result = await fgaClient.read({
         user: `user:${userId}`,
@@ -1553,27 +1513,6 @@ export const giveAccessById = async (req, res, next) => {
       return tuple?.key || null;
     };
 
-    /**
-     * Find where the user's permission actually originates.
-     *
-     * Example:
-     *
-     * root
-     *   └── Folder A   <- writer:user:123
-     *        └── Folder B
-     *             └── file.txt
-     *
-     * If file.txt is opened and the user changes
-     * Editor -> Viewer, the tuple that must change is:
-     *
-     *     writer user:123 folder:A
-     *
-     * NOT:
-     *
-     *     writer user:123 file.txt
-     *
-     * This reproduces the "change parent permission" behavior.
-     */
     const findPermissionSource = async ({
       resourceType,
       resourceId,
@@ -1585,7 +1524,6 @@ export const giveAccessById = async (req, res, next) => {
       while (currentId) {
         const currentObject = getObject(currentType, currentId);
 
-        // Look only for an actual stored tuple.
         const directPermission = await findDirectPermission(
           currentObject,
           userId,
@@ -1601,8 +1539,6 @@ export const giveAccessById = async (req, res, next) => {
           };
         }
 
-        // Files live inside a directory.
-        // Directories also point to their parent directory.
         const currentModel = currentType === "folder" ? Directory : File;
 
         const currentResource = await currentModel
@@ -1627,10 +1563,6 @@ export const giveAccessById = async (req, res, next) => {
       return null;
     };
 
-    // ============================================================
-    // PROCESS USERS
-    // ============================================================
-
     await Promise.all(
       usersArray.map(async (user) => {
         if (!user.id) {
@@ -1642,10 +1574,6 @@ export const giveAccessById = async (req, res, next) => {
         }
 
         const userId = user.id;
-
-        // --------------------------------------------------------
-        // FIRST: determine whether the permission is inherited
-        // --------------------------------------------------------
 
         const permissionSource = await findPermissionSource({
           resourceType: type,
@@ -1662,14 +1590,9 @@ export const giveAccessById = async (req, res, next) => {
           previousRole = permissionSource.role;
           inherited = !permissionSource.isCurrentObject;
         } else {
-          // No direct permission anywhere in the hierarchy.
-          // This is a new permission on the requested item.
+       
           targetObject = getObject(type, id);
         }
-
-        // --------------------------------------------------------
-        // ROOT PROTECTION
-        // --------------------------------------------------------
 
         if (inherited) {
           const sourceId = permissionSource.id;
@@ -1688,17 +1611,9 @@ export const giveAccessById = async (req, res, next) => {
           }
         }
 
-        // --------------------------------------------------------
-        // NOTHING TO CHANGE
-        // --------------------------------------------------------
-
         if (previousRole === user.role) {
           return;
         }
-
-        // --------------------------------------------------------
-        // REMOVE OLD ROLE FROM THE SOURCE
-        // --------------------------------------------------------
 
         if (previousRole) {
           await fgaClient.write({
@@ -1712,31 +1627,7 @@ export const giveAccessById = async (req, res, next) => {
           });
         }
 
-        // --------------------------------------------------------
-        // WRITE NEW ROLE TO THE SAME SOURCE
-        // --------------------------------------------------------
-        //
-        // This is the important part.
-        //
-        // If the file inherited "writer" from Folder A:
-        //
-        //     writer:user:123 -> folder:A
-        //
-        // changing Editor -> Viewer becomes:
-        //
-        //     reader:user:123 -> folder:A
-        //
-        // The file itself is NOT given an overriding permission.
-        //
-        // Therefore every child of Folder A immediately resolves
-        // the new role.
-        // --------------------------------------------------------
-
         await writeRole(targetObject, userId, user.role);
-
-        // --------------------------------------------------------
-        // SEND EMAIL ONLY FOR NEW ACCESS
-        // --------------------------------------------------------
 
         if (!permissionSource) {
           const userData = await User.findById(userId)
@@ -1770,10 +1661,6 @@ export const giveAccessById = async (req, res, next) => {
         });
       }),
     );
-
-    // ============================================================
-    // RESPONSE
-    // ============================================================
 
     return res.status(200).json({
       message: `${type} access updated successfully`,
@@ -1900,7 +1787,6 @@ export const fetchItemPermissions = async (req, res, next) => {
 
     const object = `${type === "folder" ? "folder" : "file"}:${id}`;
 
-    // ── read all pages ──────────────────────────────────────────
     let allTuples = [];
     let continuationToken = undefined;
 
@@ -1912,7 +1798,7 @@ export const fetchItemPermissions = async (req, res, next) => {
       allTuples = allTuples.concat(response.tuples);
       continuationToken = response.continuation_token;
     } while (continuationToken);
-    // ────────────────────────────────────────────────────────────
+
 
     const collaborators = allTuples
       .filter(
@@ -2022,7 +1908,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
 
     const drive = getDriveClient(drive_access_token);
 
-    // Get current file permissions
+
     const permissions = await drive.permissions.list({
       fileId,
       fields: "permissions(id,type,role,allowFileDiscovery)",
@@ -2032,7 +1918,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
       (p) => p.type === "anyone",
     );
 
-    // Check parent folder
+    
     const file = await drive.files.get({
       fileId,
       fields: "parents",
@@ -2065,7 +1951,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     let response;
 
     if (publicPermission) {
-      // Update existing anyone permission
+
       response = await drive.permissions.update({
         fileId,
         permissionId: publicPermission.id,
@@ -2075,13 +1961,13 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
         fields: "id,type,role,emailAddress,allowFileDiscovery",
       });
     } else {
-      // File is restricted. Create a new anyone permission.
+  
       response = await drive.permissions.create({
         fileId,
         requestBody: {
           type: "anyone",
           role,
-          allowFileDiscovery: false, // "Anyone with the link"
+          allowFileDiscovery: false,
         },
         fields: "id,type,role,emailAddress,allowFileDiscovery",
       });

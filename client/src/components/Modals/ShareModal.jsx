@@ -98,24 +98,12 @@ export default function ShareModal({
       : "file";
 
   const isOwner = item.owners?.[0].me === true;
-  const isViewer =
-    (!isOwner &&
-      item.permissions?.find((p) => p.role === "reader")?.id === user.id) ||
-    item?.publicRole === "reader";
+  const canChangeRole = item?.capabilities?.canChangeRole ?? true;
 
-  const isEditor =
-    type === "google"
-      ? isOwner || item.capabilities?.canEdit
-      : !isOwner && item.permissions?.find((p) => p.role === "writer")?.role;
-const canChangeRole =
-  item?.currentUser?.canChangeRole ??
-  item?.capabilities?.canChangeRole ??
-  false;
-
-console.log("canChangeRole", canChangeRole);
-const capabilities = item?.capabilities ?? {};
+  console.log("canChangeRole", canChangeRole);
+  const capabilities = item?.capabilities ?? {};
   const canShare = capabilities.canShare === true;
-const canEdit = capabilities.canEdit === true;
+  const canRename = capabilities.canRename === true;
   const { toast } = useToast();
 
   useEffect(() => {

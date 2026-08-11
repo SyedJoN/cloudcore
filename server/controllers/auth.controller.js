@@ -143,7 +143,6 @@ export const registerUser = async (req, res, next) => {
   }
 };
 
-
 export const loginUser = async (req, res, next) => {
   try {
     const { success, data, error } = loginSchema.safeParse(req.body);
@@ -492,14 +491,14 @@ export const googleAuth = async (req, res, next) => {
           relation: "owner",
           object: `folder:${dirId}`,
         };
-          if (fgaTuple) {
-      await fgaClient.write({
-        writes: [fgaTuple],
-      });
-    }
+        if (fgaTuple) {
+          await fgaClient.write({
+            writes: [fgaTuple],
+          });
+        }
       }
     });
-  
+
     // REDIS SESSION HANDLING
 
     const userSessions = await redisClient.ft.search(
@@ -573,7 +572,6 @@ export const googleAuth = async (req, res, next) => {
     session.endSession();
   }
 };
-
 
 export const githubAuth = async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -744,7 +742,7 @@ export const fetchGoogleDriveFiles = async (req, res, next) => {
     const response = await drive.files.list({
       pageSize: 1000,
       fields:
-        "files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,capabilities(canEdit, canDelete),permissions(id,type,role,emailAddress,displayName,permissionDetails, allowFileDiscovery))",
+        "files(id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,capabilities(canReadDrive, canEdit, canDelete, canShare, canCopy, canDownload, canRename, canAddChildren,canMoveItemWithinDrive),permissions(id,type,role,emailAddress,displayName,permissionDetails(permissionType,inheritedFrom,role,inherited),allowFileDiscovery,pendingOwner))",
       orderBy: "createdTime desc",
     });
 

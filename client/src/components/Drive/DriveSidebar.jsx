@@ -93,6 +93,7 @@ function NewMenu({
   onClose,
   onCreateFolder,
   onUploadFromDrive,
+  onUploadFolders,
   onUploadFiles,
   disabled,
 }) {
@@ -165,7 +166,14 @@ function NewMenu({
           <IconUpload size={18} />
           File upload
         </button>
-
+      <button
+          className="gd-context-item"
+          onClick={close(() => onUploadFolders())}
+          disabled={disabled}
+        >
+          <IconUpload size={18} />
+          Folder upload
+        </button>
         <button
           className="gd-context-item"
           onClick={close(() => onUploadFromDrive())}
@@ -218,6 +226,7 @@ export default function DriveSidebar({
   disabled,
   onCreateFolder,
   refreshCurrentDirectory,
+  onUploadFolders,
   onUploadFiles,
   showError,
   enqueueItem,
@@ -260,6 +269,7 @@ export default function DriveSidebar({
             onCreateFolder={onCreateFolder}
             onUploadFromDrive={() => setOpen(true)}
             onUploadFiles={onUploadFiles}
+            onUploadFolders={onUploadFolders}
             disabled={disabled}
           />
         )}

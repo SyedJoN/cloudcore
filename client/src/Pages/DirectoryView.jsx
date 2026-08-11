@@ -55,6 +55,8 @@ import {
 import { toggleItemStar } from "../../apis/resourceApi";
 import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
+import DownloadTray from "../Components/Drive/DownloadTray";
+import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -112,6 +114,9 @@ export default function DirectoryView({ route }) {
   const [showDetails, setShowDetails] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  const [downloadQueue, setDownloadQueue] = useState([]);
+  const [downloadProgressMap, setDownloadProgressMap] = useState({});
+  const downloadControllers = useRef({});
 
   const dirContext =
     location.state?.dirContext ||
@@ -220,7 +225,38 @@ export default function DirectoryView({ route }) {
     showError,
     onQueueComplete: refreshCurrentDirectory,
   });
+  const {
+    fileInputRef: folderInputRef,
+    uploadQueue: folderUploadQueue,
+    progressMap: folderProgressMap,
+    isUploading: isFolderUploading,
+    handleFolderSelect,
+    handleCancelUpload: handleCancelFolderUpload,
+  } = useFolderUploadQueue({
+    dirId,
+    showError,
+    onQueueComplete: refreshCurrentDirectory,
+  });
 
+  const combinedUploadQueue = [...uploadQueue, ...folderUploadQueue];
+
+  const combinedProgressMap = {
+    ...progressMap,
+    ...folderProgressMap,
+  };
+  const handleCancelCombinedUpload = async (tempId, fileId) => {
+    const isFolderUpload = folderUploadQueue.some(
+      (item) => item._id === tempId,
+    );
+
+    if (isFolderUpload) {
+      await handleCancelFolderUpload(tempId, fileId);
+
+      return;
+    }
+
+    await handleCancelUpload(tempId, fileId);
+  };
   const {
     selectedItems,
     contextItem,
@@ -527,7 +563,141 @@ export default function DirectoryView({ route }) {
       setError(error.message);
     }
   }
+  async function handleDownloadFolder(item) {
+    showError("");
+    const type = getResourceType(item);
 
+    if (type.startsWith("google")) {
+      window.open(
+        `https://drive.google.com/drive/folders/${item.id}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+    const fileId = item._id;
+
+    const controller = new AbortController();
+
+    downloadControllers.current[fileId] = controller;
+
+    setDownloadQueue((prev) => [...prev.filter((f) => f._id !== fileId), item]);
+
+    setDownloadProgressMap((prev) => ({
+      ...prev,
+      [fileId]: 0,
+    }));
+
+    try {
+      const response = await fetch(
+        `http://localhost:4000/directory/${fileId}/download`,
+        {
+          credentials: "include",
+          signal: controller.signal,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Download failed");
+      }
+
+      const contentLength = response.headers.get("Content-Length");
+
+      const total = Number(contentLength || 0);
+
+      const reader = response.body.getReader();
+
+      const chunks = [];
+
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        chunks.push(value);
+
+        received += value.length;
+
+        if (total > 0) {
+          const progress = Math.round((received / total) * 100);
+
+          setDownloadProgressMap((prev) => ({
+            ...prev,
+            [fileId]: progress,
+          }));
+        }
+      }
+
+      const blob = new Blob(chunks);
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+
+      a.href = url;
+
+      a.download = `${item.name}.zip`;
+
+      document.body.appendChild(a);
+
+      a.click();
+
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+
+      setDownloadProgressMap((prev) => ({
+        ...prev,
+        [fileId]: 100,
+      }));
+
+      // remove only AFTER download finishes
+      setTimeout(() => {
+        setDownloadQueue((prev) => prev.filter((f) => f._id !== fileId));
+
+        setDownloadProgressMap((prev) => {
+          const next = {
+            ...prev,
+          };
+
+          delete next[fileId];
+
+          return next;
+        });
+      }, 1000);
+    } catch (err) {
+      if (err.name === "AbortError") {
+        console.log("Download cancelled");
+      } else {
+        console.error("Download error:", err);
+
+        showError(err.message);
+      }
+
+      setDownloadQueue((prev) => prev.filter((f) => f._id !== fileId));
+
+      setDownloadProgressMap((prev) => {
+        const next = {
+          ...prev,
+        };
+
+        delete next[fileId];
+
+        return next;
+      });
+    } finally {
+      delete downloadControllers.current[fileId];
+    }
+  }
+  function handleCancelDownload(fileId) {
+    const controller = downloadControllers.current[fileId];
+
+    if (controller) {
+      controller.abort();
+    }
+  }
   function handleDownload(item) {
     try {
       if (isGoogleDrive && isGoogleDriveRoute) {
@@ -618,347 +788,264 @@ export default function DirectoryView({ route }) {
     }
   };
 
+  const handleSharedRoleUpdate = async (item, type, message) => {
+    setIsShareLoading(true);
 
-const handleSharedRoleUpdate = async (
-  item,
-  type,
-  message,
-) => {
-  setIsShareLoading(true);
+    try {
+      const result = await updateSharedAccess({
+        item,
+        type,
+        peopleWithAccess,
+        prevPermissions,
+        message,
+        grantAccessById,
+        revokeFileAccess,
+      });
 
-  try {
-    const result = await updateSharedAccess({
-      item,
-      type,
-      peopleWithAccess,
-      prevPermissions,
-      message,
-      grantAccessById,
-      revokeFileAccess,
-    });
+      if (!result.changed) {
+        setShareItem(null);
+        return;
+      }
 
-    if (!result.changed) {
-      setShareItem(null);
-      return;
-    }
+      const updatedPermissions = result.permissions ?? [];
 
-    const updatedPermissions =
-      result.permissions ?? [];
+      const currentUserId = String(user?.id ?? user?._id);
 
-    const currentUserId = String(
-      user?.id ?? user?._id,
-    );
+      // =========================================================
+      // FIND CURRENT USER IN OLD PERMISSIONS
+      // =========================================================
 
-    // =========================================================
-    // FIND CURRENT USER IN OLD PERMISSIONS
-    // =========================================================
-
-    const previousCurrentUserPermission = (
-      item?.permissions ??
-      prevPermissions ??
-      []
-    ).find(
-      (permission) =>
-        permission?.type === "user" &&
-        String(permission?.id) === currentUserId,
-    );
-
-    // =========================================================
-    // FIND CURRENT USER IN NEW PERMISSIONS
-    // =========================================================
-
-    const currentUserPermission =
-      updatedPermissions.find(
+      const previousCurrentUserPermission = (
+        item?.permissions ??
+        prevPermissions ??
+        []
+      ).find(
         (permission) =>
           permission?.type === "user" &&
           String(permission?.id) === currentUserId,
       );
 
-    const previousRole =
-      previousCurrentUserPermission?.role ??
-      item?.currentUser?.role ??
-      null;
+      // =========================================================
+      // FIND CURRENT USER IN NEW PERMISSIONS
+      // =========================================================
 
-    const newRole =
-      currentUserPermission?.role ??
-      previousRole;
-
-    const currentUserRoleChanged =
-      previousRole !== newRole;
-
-    // =========================================================
-    // KEEP EXISTING CURRENT USER CAPABILITIES
-    //
-    // If owner changes somebody else's permission:
-    //
-    //     owner capabilities MUST stay exactly the same.
-    // =========================================================
-
-    let newCapabilities =
-      item?.capabilities ?? {};
-
-    let newCurrentUser = item?.currentUser;
-
-    // =========================================================
-    // ONLY REBUILD CAPABILITIES IF MY ROLE CHANGED
-    // =========================================================
-
-    if (currentUserRoleChanged) {
-      const isOwner =
-        newRole === "owner";
-
-      const isWriter =
-        newRole === "writer" ||
-        isOwner;
-
-      const isReader =
-        newRole === "reader" ||
-        newRole === "writer" ||
-        isOwner;
-
-      let canChangeRole =
-        isOwner ||
-        isWriter;
-
-      // Root-level FILE:
-      // only owner can change permissions.
-      if (
-        type === "file" &&
-        item?.capabilities?.isRootLevelItem === true &&
-        !isOwner
-      ) {
-        canChangeRole = false;
-      }
-
-      newCapabilities = {
-        ...item?.capabilities,
-
-        canRead: isReader,
-
-        canWrite: isWriter,
-
-        canShare:
-          isOwner ||
-          isWriter,
-
-        canChangeRole,
-
-        canRename:
-          isOwner ||
-          isWriter,
-
-        canDownload: isReader,
-
-        canCopy: isReader,
-
-        canMove:
-          isOwner ||
-          isWriter,
-
-        canTrash: isOwner,
-
-        canDelete: isOwner,
-      };
-
-      if (type === "folder") {
-        newCapabilities.canAddChildren =
-          isOwner ||
-          isWriter;
-
-        newCapabilities.canRemoveChildren =
-          isOwner ||
-          isWriter;
-      }
-
-      newCurrentUser = {
-        ...(item?.currentUser ?? {}),
-
-        role: newRole,
-
-        directRole:
-          currentUserPermission?.directRole ??
-          null,
-
-        inheritedRole:
-          currentUserPermission?.inheritedRole ??
-          null,
-
-        inherited:
-          currentUserPermission?.inherited ??
-          false,
-
-        inheritedFrom:
-          currentUserPermission?.inheritedFrom ??
-          null,
-
-        capabilities:
-          newCapabilities,
-
-        canChangeRole,
-      };
-    }
-
-    // =========================================================
-    // PRESERVE PERMISSION UI DATA
-    //
-    // Backend may not return canChangeRole on every
-    // permission. Do not lose it.
-    // =========================================================
-
-    const oldPermissionMap = new Map(
-      (
-        item?.permissions ??
-        prevPermissions ??
-        []
-      ).map((permission) => [
-        String(permission?.id),
-        permission,
-      ]),
-    );
-
-    const finalPermissions =
-      updatedPermissions.map(
-        (permission) => {
-          const id = String(
-            permission?.id,
-          );
-
-          const oldPermission =
-            oldPermissionMap.get(id);
-
-          /*
-           * If backend supplied canChangeRole,
-           * use it.
-           *
-           * Otherwise preserve the old value.
-           */
-          const canChangeRole =
-            permission?.canChangeRole ??
-            oldPermission?.canChangeRole ??
-            false;
-
-          return {
-            ...oldPermission,
-            ...permission,
-
-            canChangeRole,
-          };
-        },
+      const currentUserPermission = updatedPermissions.find(
+        (permission) =>
+          permission?.type === "user" &&
+          String(permission?.id) === currentUserId,
       );
 
-    // =========================================================
-    // UPDATE RESOURCE
-    // =========================================================
+      const previousRole =
+        previousCurrentUserPermission?.role ?? item?.currentUser?.role ?? null;
 
-    const updateResource = (list) =>
-      list.map((resource) => {
-        const resourceId = String(
-          resource?._id ??
-          resource?.id,
-        );
+      const newRole = currentUserPermission?.role ?? previousRole;
 
+      const currentUserRoleChanged = previousRole !== newRole;
+
+      // =========================================================
+      // KEEP EXISTING CURRENT USER CAPABILITIES
+      //
+      // If owner changes somebody else's permission:
+      //
+      //     owner capabilities MUST stay exactly the same.
+      // =========================================================
+
+      let newCapabilities = item?.capabilities ?? {};
+
+      let newCurrentUser = item?.currentUser;
+
+      // =========================================================
+      // ONLY REBUILD CAPABILITIES IF MY ROLE CHANGED
+      // =========================================================
+
+      if (currentUserRoleChanged) {
+        const isOwner = newRole === "owner";
+
+        const isWriter = newRole === "writer" || isOwner;
+
+        const isReader =
+          newRole === "reader" || newRole === "writer" || isOwner;
+
+        let canChangeRole = isOwner || isWriter;
+
+        // Root-level FILE:
+        // only owner can change permissions.
         if (
-          resourceId !==
-          String(result.itemId)
+          type === "file" &&
+          item?.capabilities?.isRootLevelItem === true &&
+          !isOwner
         ) {
-          return resource;
+          canChangeRole = false;
         }
 
-        const nonUserPermissions = (
-          resource?.permissions ?? []
-        ).filter(
-          (permission) =>
-            permission?.type !== "user",
-        );
+        newCapabilities = {
+          ...item?.capabilities,
+
+          canRead: isReader,
+
+          canWrite: isWriter,
+
+          canShare: isOwner || isWriter,
+
+          canChangeRole,
+
+          canRename: isOwner || isWriter,
+
+          canDownload: isReader,
+
+          canCopy: isReader,
+
+          canMove: isOwner || isWriter,
+
+          canTrash: isOwner,
+
+          canDelete: isOwner,
+        };
+
+        if (type === "folder") {
+          newCapabilities.canAddChildren = isOwner || isWriter;
+
+          newCapabilities.canRemoveChildren = isOwner || isWriter;
+        }
+
+        newCurrentUser = {
+          ...(item?.currentUser ?? {}),
+
+          role: newRole,
+
+          directRole: currentUserPermission?.directRole ?? null,
+
+          inheritedRole: currentUserPermission?.inheritedRole ?? null,
+
+          inherited: currentUserPermission?.inherited ?? false,
+
+          inheritedFrom: currentUserPermission?.inheritedFrom ?? null,
+
+          capabilities: newCapabilities,
+
+          canChangeRole,
+        };
+      }
+
+      // =========================================================
+      // PRESERVE PERMISSION UI DATA
+      //
+      // Backend may not return canChangeRole on every
+      // permission. Do not lose it.
+      // =========================================================
+
+      const oldPermissionMap = new Map(
+        (item?.permissions ?? prevPermissions ?? []).map((permission) => [
+          String(permission?.id),
+          permission,
+        ]),
+      );
+
+      const finalPermissions = updatedPermissions.map((permission) => {
+        const id = String(permission?.id);
+
+        const oldPermission = oldPermissionMap.get(id);
 
         /*
-         * VERY IMPORTANT:
+         * If backend supplied canChangeRole,
+         * use it.
          *
-         * If I changed another user's role,
-         * preserve the resource's existing capabilities.
-         *
-         * Do NOT replace them with undefined.
+         * Otherwise preserve the old value.
          */
-
-        const finalCapabilities =
-          currentUserRoleChanged
-            ? newCapabilities
-            : resource?.capabilities ??
-              item?.capabilities ??
-              {};
-
-        const finalCurrentUser =
-          currentUserRoleChanged
-            ? newCurrentUser
-            : resource?.currentUser ??
-              item?.currentUser;
+        const canChangeRole =
+          permission?.canChangeRole ?? oldPermission?.canChangeRole ?? false;
 
         return {
-          ...resource,
+          ...oldPermission,
+          ...permission,
 
-          // Keep all non-user permissions.
-          permissions: [
-            ...nonUserPermissions,
-
-            ...finalPermissions,
-          ],
-
-          // ===================================================
-          // CURRENT USER CAPABILITIES
-          // ===================================================
-
-          capabilities:
-            finalCapabilities,
-
-          // ===================================================
-          // CURRENT USER
-          // ===================================================
-
-          currentUser:
-            finalCurrentUser,
+          canChangeRole,
         };
       });
 
-    // =========================================================
-    // UPDATE LISTS
-    // =========================================================
+      // =========================================================
+      // UPDATE RESOURCE
+      // =========================================================
 
-    setFilesList(updateResource);
-    setDirectoriesList(updateResource);
+      const updateResource = (list) =>
+        list.map((resource) => {
+          const resourceId = String(resource?._id ?? resource?.id);
 
-    // =========================================================
-    // SHARE MODAL STATE
-    // =========================================================
+          if (resourceId !== String(result.itemId)) {
+            return resource;
+          }
 
-    setPeopleWithAccess(
-      finalPermissions,
-    );
+          const nonUserPermissions = (resource?.permissions ?? []).filter(
+            (permission) => permission?.type !== "user",
+          );
 
-    setPrevPermissions(
-      finalPermissions,
-    );
+          /*
+           * VERY IMPORTANT:
+           *
+           * If I changed another user's role,
+           * preserve the resource's existing capabilities.
+           *
+           * Do NOT replace them with undefined.
+           */
 
-    setShareItem(null);
+          const finalCapabilities = currentUserRoleChanged
+            ? newCapabilities
+            : (resource?.capabilities ?? item?.capabilities ?? {});
 
-    toast({
-      message: "Access updated",
-      type: "success",
-    });
-  } catch (error) {
-    toast({
-      message:
-        error?.message ||
-        "Something went wrong!",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-};
+          const finalCurrentUser = currentUserRoleChanged
+            ? newCurrentUser
+            : (resource?.currentUser ?? item?.currentUser);
 
+          return {
+            ...resource,
 
+            // Keep all non-user permissions.
+            permissions: [...nonUserPermissions, ...finalPermissions],
 
+            // ===================================================
+            // CURRENT USER CAPABILITIES
+            // ===================================================
 
+            capabilities: finalCapabilities,
+
+            // ===================================================
+            // CURRENT USER
+            // ===================================================
+
+            currentUser: finalCurrentUser,
+          };
+        });
+
+      // =========================================================
+      // UPDATE LISTS
+      // =========================================================
+
+      setFilesList(updateResource);
+      setDirectoriesList(updateResource);
+
+      // =========================================================
+      // SHARE MODAL STATE
+      // =========================================================
+
+      setPeopleWithAccess(finalPermissions);
+
+      setPrevPermissions(finalPermissions);
+
+      setShareItem(null);
+
+      toast({
+        message: "Access updated",
+        type: "success",
+      });
+    } catch (error) {
+      toast({
+        message: error?.message || "Something went wrong!",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
 
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
@@ -1032,6 +1119,7 @@ const handleSharedRoleUpdate = async (
             dirContext={dirContext}
             onCreateFolder={() => setShowCreateDir(true)}
             onUploadFiles={() => fileInputRef.current?.click()}
+            onUploadFolders={() => folderInputRef.current?.click()}
           />
         )}
 
@@ -1178,7 +1266,11 @@ const handleSharedRoleUpdate = async (
         onDownload={() => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item && !item.isDirectory) handleDownload(item);
+            if (item && item.isDirectory) {
+              handleDownloadFolder(item);
+            } else {
+              handleDownload(item);
+            }
           });
           clearSelection();
         }}
@@ -1303,11 +1395,15 @@ const handleSharedRoleUpdate = async (
 
       <UploadTray
         dbFileId={dbFileId}
-        uploadingFiles={uploadQueue}
-        progressMap={progressMap}
-        onCancel={handleCancelUpload}
+        uploadingFiles={combinedUploadQueue}
+        progressMap={combinedProgressMap}
+        onCancel={handleCancelCombinedUpload}
       />
-
+      <DownloadTray
+        downloads={downloadQueue}
+        progressMap={downloadProgressMap}
+        onCancel={handleCancelDownload}
+      />
       <input
         ref={fileInputRef}
         type="file"
@@ -1315,6 +1411,17 @@ const handleSharedRoleUpdate = async (
         style={{ display: "none" }}
         onChange={handleFileSelect}
         disabled={isUploading}
+      />
+
+      <input
+        ref={folderInputRef}
+        type="file"
+        webkitdirectory=""
+        directory=""
+        multiple
+        hidden
+        onChange={handleFolderSelect}
+        disabled={isFolderUploading}
       />
     </div>
   );

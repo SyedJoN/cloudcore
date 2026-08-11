@@ -85,7 +85,7 @@ export default function FileViewer({
 
   const canRename = capabilities.canRename === true;
 
-  const canMove = capabilities.canMove === true;
+  const canMove = capabilities.canMove === true || capabilities.canMoveItemWithinDrive === true;
 
   const canTrash = capabilities.canTrash === true;
 
