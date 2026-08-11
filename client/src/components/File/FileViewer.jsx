@@ -10,6 +10,7 @@ import {
 } from "../Icons/Icons";
 import "./FileViewer.css";
 import UserAccountBar from "../UserAccountBar";
+
 import {
   OfficeViewer,
   UnknownViewer,
@@ -19,13 +20,14 @@ import {
   VideoViewer,
   ImageViewer,
 } from "../Viewers";
+
 import getCategory from "../../../Utils/getFileCategory";
 import { useAuth, useToast } from "../../Contexts";
 import getExt from "../../../Utils/getExtension";
 
 const BASE_URL = "http://localhost:4000";
 
-// ─── main FileViewer ─────────────────────────────────────────────────────────
+// ─── FileViewer ───────────────────────────────────────────────────────────────
 
 export default function FileViewer({
   item,
@@ -34,7 +36,6 @@ export default function FileViewer({
   onNavigate,
   files = [],
   isSharedRoute,
-  isDeleted,
   onSoftDelete,
   onRename,
   onDownload,
@@ -43,77 +44,190 @@ export default function FileViewer({
   onDeleteSuccess,
   meta = false,
 }) {
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const { toast } = useToast();
+
+  // ---------------------------------------------------------------------------
+  // BASIC ITEM INFO
+  // ---------------------------------------------------------------------------
+
+  const isDeleted = item?.isDeleted;
+
   const category = getCategory(item?.name || "");
-  const isGDrive = !!item?.webViewLink;
+
+  const isGDrive = Boolean(item?.webViewLink);
+
   const fileUrl = isGDrive
-    ? item.webContentLink || item.webViewLink
+    ? item?.webContentLink || item?.webViewLink
     : `${BASE_URL}/file/${item?._id}`;
 
+  // ---------------------------------------------------------------------------
+  // CAPABILITIES
+  //
+  // Backend is now the single source of truth for BOTH:
+  //   - local files
+  //   - Google Drive files
+  //
+  // Do not calculate permissions from owners/userRole/permissions here.
+  // ---------------------------------------------------------------------------
+
+  const capabilities = item?.capabilities ?? {};
+
+  const canRead = capabilities.canRead === true;
+
+  const canWrite = capabilities.canWrite === true;
+
+  const canShare = capabilities.canShare === true;
+
+  const canChangeRole = capabilities.canChangeRole === true;
+
+  const canDownload = capabilities.canDownload === true;
+
+  const canRename = capabilities.canRename === true;
+
+  const canMove = capabilities.canMove === true;
+
+  const canTrash = capabilities.canTrash === true;
+
+  const canDelete = capabilities.canDelete === true;
+
+  // ---------------------------------------------------------------------------
+  // NAVIGATION
+  // ---------------------------------------------------------------------------
+
   const currentIndex = files?.findIndex(
-    (f) => (f._id ?? f.id) === (item._id ?? item.id),
+    (file) => String(file?._id ?? file?.id) === String(item?._id ?? item?.id),
   );
+
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex < files.length - 1;
 
-  const isOwner = item.userRole === "owner";
-  const isViewer = item.userRole === "viewer" || item.publicRole === "viewer";
-  const canEdit = isOwner || !isViewer;
-  // keyboard navigation
+  const hasNext = currentIndex >= 0 && currentIndex < files.length - 1;
+
+  // ---------------------------------------------------------------------------
+  // KEYBOARD NAVIGATION
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
-    const handler = (e) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft" && hasPrev) onNavigate(files[currentIndex - 1]);
-      if (e.key === "ArrowRight" && hasNext)
-        onNavigate(files[currentIndex + 1]);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose, currentIndex, hasPrev, hasNext]);
+    const handler = (event) => {
+      if (event.key === "Escape") {
+        onClose?.();
+        return;
+      }
 
-  // Lock body scroll
+      if (event.key === "ArrowLeft" && hasPrev) {
+        onNavigate?.(files[currentIndex - 1]);
+        return;
+      }
+
+      if (event.key === "ArrowRight" && hasNext) {
+        onNavigate?.(files[currentIndex + 1]);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
+  }, [onClose, onNavigate, files, currentIndex, hasPrev, hasNext]);
+
+  // ---------------------------------------------------------------------------
+  // LOCK BODY SCROLL
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     document.body.classList.add("gd-overlay-open");
-    return () => document.body.classList.remove("gd-overlay-open");
+
+    return () => {
+      document.body.classList.remove("gd-overlay-open");
+    };
   }, []);
 
-  if (!item) return null;
+  // ---------------------------------------------------------------------------
+  // REFRESH USER
+  // ---------------------------------------------------------------------------
 
-  const renderViewer = (isGDrive) => {
+  useEffect(() => {
+    refreshUser?.();
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // COPY LINK
+  // ---------------------------------------------------------------------------
+
+  const handleCopyLink = async () => {
+    const url =
+      item?.webViewLink ??
+      (item?.isDirectory
+        ? `${window.location.origin}/directory/${item?._id}?usp=drive_link`
+        : `${window.location.origin}/file/${item?._id}?usp=drive_link`);
+
+    try {
+      await navigator.clipboard.writeText(url);
+
+      toast({
+        message: "Link copied to clipboard",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+
+      toast({
+        message: "Failed to copy link",
+        type: "error",
+      });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // VIEWER
+  // ---------------------------------------------------------------------------
+
+  const renderViewer = () => {
     if (isGDrive) {
       return (
         <div className="fv-pdf-stage">
           <iframe
             className="fv-pdf-frame"
-            src={`https://drive.google.com/file/d/${item.id}/preview`}
-            title={item.name}
+            src={`https://drive.google.com/file/d/${item?.id}/preview`}
+            title={item?.name}
             allow="autoplay"
           />
         </div>
       );
     }
+
     switch (category) {
       case "image":
-        return <ImageViewer url={fileUrl} name={item.name} />;
+        return <ImageViewer url={fileUrl} name={item?.name} />;
+
       case "video":
         return <VideoViewer url={fileUrl} />;
+
       case "audio":
-        return <AudioViewer url={fileUrl} name={item.name} />;
+        return <AudioViewer url={fileUrl} name={item?.name} />;
+
       case "pdf":
         return <PDFViewer url={fileUrl} />;
+
       case "text":
-        return <TextViewer url={fileUrl} name={item.name} />;
+        return <TextViewer url={fileUrl} name={item?.name} />;
+
       case "office-word":
       case "office-excel":
       case "office-ppt":
         return <OfficeViewer item={item} category={category} />;
+
       default:
         return <UnknownViewer item={item} />;
     }
   };
 
-  const ext = getExt(item.name).toUpperCase();
+  // ---------------------------------------------------------------------------
+  // FILE EXTENSION / BADGE
+  // ---------------------------------------------------------------------------
+
+  const ext = getExt(item?.name || "").toUpperCase();
 
   const categoryColors = {
     image: "#34a853",
@@ -126,30 +240,25 @@ export default function FileViewer({
     "office-ppt": "#c43e1c",
     unknown: "#5f6368",
   };
+
   const badgeColor = categoryColors[category] || "#5f6368";
 
-  useEffect(() => {
-    refreshUser();
-  }, []);
+  // ---------------------------------------------------------------------------
+  // ITEM CHECK
+  // ---------------------------------------------------------------------------
 
-  function handleCopyLink() {
-    const url =
-      item?.webViewLink ??
-      (item?.isDirectory
-        ? `${window.location.origin}/directory/${item?._id}?usp=drive_link`
-        : `${window.location.origin}/file/${item?._id}?usp=drive_link`);
-
-    navigator.clipboard.writeText(url).then(() => {
-      toast({ message: "Link copied to clipboard", type: "success" });
-    });
+  if (!item) {
+    return null;
   }
+
   return (
     <div className="fv-overlay z-500" onClick={onClose}>
       <div
         className={`fv-shell ${meta ? "fv-shell-full" : ""}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         {/* ── Top bar ── */}
+
         <div className={`fv-topbar ${meta ? "fv-topbar-full" : ""}`}>
           <div className="fv-topbar-left">
             {!meta && (
@@ -161,20 +270,28 @@ export default function FileViewer({
                 <IconClose size={20} />
               </button>
             )}
-            <span className="fv-ext-badge" style={{ background: badgeColor }}>
+
+            <span
+              className="fv-ext-badge"
+              style={{
+                background: badgeColor,
+              }}
+            >
               {ext || "FILE"}
             </span>
-            <span className="fv-filename" title={item.name}>
-              {item.name}
+
+            <span className="fv-filename" title={item?.name}>
+              {item?.name}
             </span>
           </div>
 
-          {/* ✅ prev/next arrows */}
+          {/* ── Previous / Next ── */}
+
           {files.length > 1 && (
             <div className="fv-nav-arrows">
               <button
                 className="fv-nav-btn gd-icon-btn"
-                onClick={() => hasPrev && onNavigate(files[currentIndex - 1])}
+                onClick={() => hasPrev && onNavigate?.(files[currentIndex - 1])}
                 disabled={!hasPrev}
                 title="Previous (←)"
               >
@@ -189,12 +306,14 @@ export default function FileViewer({
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
+
               <span className="fv-nav-count">
                 {currentIndex + 1} / {files.length}
               </span>
+
               <button
                 className="fv-nav-btn gd-icon-btn"
-                onClick={() => hasNext && onNavigate(files[currentIndex + 1])}
+                onClick={() => hasNext && onNavigate?.(files[currentIndex + 1])}
                 disabled={!hasNext}
                 title="Next (→)"
               >
@@ -211,139 +330,178 @@ export default function FileViewer({
               </button>
             </div>
           )}
+
           {meta && <UserAccountBar />}
         </div>
-        {/* ── Action bar ── */}
-        <div className="fv-topbar-actions">
-          {(isGDrive || !isDeleted) && (
-            <>
-              <button
-                className="fv-action-btn gd-icon-btn"
-                title="Download"
-                onClick={() => onDownload?.(item)}
-              >
-                <IconDownload size={20} />
-              </button>
-              <button
-                className="fv-action-btn gd-icon-btn"
-                title="Share"
-                onClick={() => onShare?.(item)}
-              >
-                <IconShare size={20} />
-              </button>
 
-              <button
-                className="fv-action-btn gd-icon-btn"
-                title="Copy link"
-                onClick={handleCopyLink}
-              >
-                <IconLink size={20} />
-              </button>
-            </>
+        {/* ── Action bar ── */}
+
+        <div className="fv-topbar-actions">
+          {/* Download */}
+
+          {!isDeleted && canDownload && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Download"
+              onClick={() => onDownload?.(item)}
+            >
+              <IconDownload size={20} />
+            </button>
           )}
-          {(isOwner || canEdit) && !isDeleted && (
-            <>
-              <button
-                className="fv-action-btn gd-icon-btn"
-                title="Rename"
-                onClick={() => onRename?.(item)}
-              >
-                <IconRename size={20} />
-              </button>
-              {!isGDrive && (
-                <button
-                  className="fv-action-btn gd-icon-btn fv-action-danger"
-                  title="Move to trash"
-                  onClick={async () => {
-                    await onSoftDelete?.(item);
-                    onDeleteSuccess?.(item._id);
-                    onClose();
-                  }}
-                >
-                  <IconTrash size={20} />
-                </button>
-              )}
-            </>
+
+          {/* Share */}
+
+          {!isDeleted && canShare && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Share"
+              onClick={() => onShare?.(item)}
+            >
+              <IconShare size={20} />
+            </button>
           )}
-          {isDeleted && !isGDrive && (
-            <>
-              <button
-                className="fv-action-btn gd-icon-btn"
-                title="Restore"
-                onClick={() => onRestore?.(item)}
-              >
-                <IconRestore size={20} />
-              </button>
-              <button
-                className="fv-action-btn gd-icon-btn fv-action-danger"
-                title="Delete Forever"
-                onClick={() => onDelete?.(item)}
-              >
-                <IconTrash size={20} />
-              </button>
-            </>
+
+          {/* Copy link */}
+
+          {!isDeleted && canRead && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Copy link"
+              onClick={handleCopyLink}
+            >
+              <IconLink size={20} />
+            </button>
           )}
-          {isGDrive && (
-            <>
-              <button
-                className="fv-action-btn gd-icon-btn fv-action-danger"
-                title="Delete Forever"
-                onClick={() => onDelete?.(item)}
-              >
-                <IconTrash size={20} />
-              </button>
-              <a
-                className="fv-action-btn gd-icon-btn"
-                href={item.webViewLink}
-                target="_blank"
-                rel="noreferrer"
-                title="Open in Google Drive"
-              >
-                <svg viewBox="0 0 87.3 78" width="20" height="20">
-                  <path
-                    d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-                    fill="#0066da"
-                  />
-                  <path
-                    d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
-                    fill="#00ac47"
-                  />
-                  <path
-                    d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-                    fill="#ea4335"
-                  />
-                  <path
-                    d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-                    fill="#00832d"
-                  />
-                  <path
-                    d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-                    fill="#2684fc"
-                  />
-                  <path
-                    d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-                    fill="#ffba00"
-                  />
-                </svg>
-              </a>
-            </>
+
+          {/* Rename */}
+
+          {!isDeleted && canRename && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Rename"
+              onClick={() => onRename?.(item)}
+            >
+              <IconRename size={20} />
+            </button>
+          )}
+
+          {/* Move local item to trash */}
+
+          {!isGDrive && !isDeleted && canTrash && (
+            <button
+              className="fv-action-btn gd-icon-btn fv-action-danger"
+              title="Move to trash"
+              onClick={async () => {
+                await onSoftDelete?.(item);
+
+                onDeleteSuccess?.(item?._id);
+
+                onClose?.();
+              }}
+            >
+              <IconTrash size={20} />
+            </button>
+          )}
+
+          {/* Restore */}
+
+          {isDeleted && canDelete && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Restore"
+              onClick={() => onRestore?.(item)}
+            >
+              <IconRestore size={20} />
+            </button>
+          )}
+
+          {/* Delete forever */}
+
+          {isDeleted && canDelete && (
+            <button
+              className="fv-action-btn gd-icon-btn fv-action-danger"
+              title="Delete Forever"
+              onClick={() => onDelete?.(item)}
+            >
+              <IconTrash size={20} />
+            </button>
+          )}
+
+          {/* Google Drive delete */}
+
+          {isGDrive && !isDeleted && canDelete && (
+            <button
+              className="fv-action-btn gd-icon-btn fv-action-danger"
+              title="Delete Forever"
+              onClick={() => onDelete?.(item)}
+            >
+              <IconTrash size={20} />
+            </button>
+          )}
+
+          {/* Open in Google Drive */}
+
+          {isGDrive && item?.webViewLink && (
+            <a
+              className="fv-action-btn gd-icon-btn"
+              href={item.webViewLink}
+              target="_blank"
+              rel="noreferrer"
+              title="Open in Google Drive"
+            >
+              <svg viewBox="0 0 87.3 78" width="20" height="20">
+                <path
+                  d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                  fill="#0066da"
+                />
+
+                <path
+                  d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z"
+                  fill="#00ac47"
+                />
+
+                <path
+                  d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+                  fill="#ea4335"
+                />
+
+                <path
+                  d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                  fill="#00832d"
+                />
+
+                <path
+                  d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                  fill="#2684fc"
+                />
+
+                <path
+                  d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                  fill="#ffba00"
+                />
+              </svg>
+            </a>
           )}
         </div>
+
         {/* ── Viewer area ── */}
+
         <div className={`fv-body ${meta ? "fv-body-full" : ""}`}>
-          {renderViewer(isGDrive)}
+          {renderViewer()}
         </div>
 
         {/* ── Bottom info bar ── */}
+
         <div className={`fv-infobar ${meta ? "fv-infobar-full" : ""}`}>
           <span className="fv-info-item">
-            {item.size
+            {item?.size
               ? item.size > 1024 * 1024
                 ? `${(item.size / 1024 / 1024).toFixed(1)} MB`
                 : `${(item.size / 1024).toFixed(1)} KB`
               : ""}
           </span>
-          {item.updatedAt && (
+
+          {item?.updatedAt && (
             <span className="fv-info-item">
               Modified{" "}
               {new Date(item.updatedAt).toLocaleDateString("en-US", {
@@ -353,7 +511,8 @@ export default function FileViewer({
               })}
             </span>
           )}
-          {item.modifiedTime && (
+
+          {item?.modifiedTime && (
             <span className="fv-info-item">
               Modified{" "}
               {new Date(item.modifiedTime).toLocaleDateString("en-US", {

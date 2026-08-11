@@ -28,6 +28,7 @@ import {
   updateOwnerStorage,
   updateResourceOwnership,
 } from "../utils/ownershipHelpers.js";
+import mongoose from "mongoose";
 
 const __filename = fileURLToPath(import.meta.url);
 const ROLE_PRIORITY = {
@@ -36,9 +37,76 @@ const ROLE_PRIORITY = {
   owner: 3,
 };
 const resolveRole = async (item, type, userId, parentDir) => {
-  const object = `${type === "folder" ? "folder" : "file"}:${item._id}`;
+  const objectType = type === "folder" ? "folder" : "file";
+  const object = `${objectType}:${item._id}`;
 
-  const getTuples = async (object) => {
+  const getIdString = (value) => {
+    if (!value) return null;
+
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (value?._id) {
+      return value._id.toString();
+    }
+
+    if (typeof value.toString === "function") {
+      const stringValue = value.toString();
+
+      if (stringValue !== "[object Object]") {
+        return stringValue;
+      }
+    }
+
+    return null;
+  };
+
+  const ROLE_PRIORITY = {
+    reader: 1,
+    writer: 2,
+    owner: 3,
+  };
+
+  const getCapabilities = (role) => {
+    const isOwner = role === "owner";
+    const isWriter = role === "writer" || isOwner;
+    const isReader = role === "reader" || role === "writer" || isOwner;
+
+    const capabilities = {
+      canRead: isReader,
+
+      canWrite: isWriter,
+
+      canShare: isWriter,
+
+      canChangeRole: isWriter,
+
+      canRename: isWriter,
+
+      canDownload: isReader,
+
+      canCopy: isReader,
+
+      canMove: isWriter,
+
+      canTrash: isOwner,
+
+      canDelete: isOwner,
+    };
+
+    if (type === "folder") {
+      capabilities.canAddChildren = isWriter;
+      capabilities.canRemoveChildren = isWriter;
+    } else {
+      capabilities.canAddChildren = false;
+      capabilities.canRemoveChildren = false;
+    }
+
+    return capabilities;
+  };
+
+  const getTuples = async (objectName) => {
     const allTuples = [];
     let continuationToken;
 
@@ -46,7 +114,7 @@ const resolveRole = async (item, type, userId, parentDir) => {
       const response = await fgaClient.read(
         {
           tuple_key: {
-            object,
+            object: objectName,
           },
         },
         continuationToken
@@ -57,54 +125,80 @@ const resolveRole = async (item, type, userId, parentDir) => {
       );
 
       allTuples.push(...(response.tuples || []));
+
       continuationToken = response.continuation_token;
     } while (continuationToken);
 
     return allTuples;
   };
 
-  const getCollaborators = (tuples, object) => {
+  const getCollaborators = (tuples, objectName) => {
     return tuples
       .filter(
         (tuple) =>
-          tuple.key.object === object &&
+          tuple.key.object === objectName &&
           tuple.key.user?.startsWith("user:") &&
           ["owner", "reader", "writer"].includes(tuple.key.relation),
       )
       .map((tuple) => ({
-        userId: tuple.key.user.split(":")[1],
+        userId: tuple.key.user.slice("user:".length),
         relation: tuple.key.relation,
       }));
   };
 
   const getUsers = async (collaborators) => {
-    if (!collaborators.length) return [];
+    if (!collaborators.length) {
+      return [];
+    }
+
+    const validUserIds = collaborators
+      .map((collaborator) => collaborator.userId)
+      .filter((id) => mongoose.isValidObjectId(id));
+
+    if (!validUserIds.length) {
+      return [];
+    }
 
     return User.find({
       _id: {
-        $in: collaborators.map((c) => c.userId),
+        $in: validUserIds,
       },
     })
       .select("name email avatar")
       .lean();
   };
 
-  const resolveObjectPermissions = async (object) => {
-    const tuples = await getTuples(object);
-    const collaborators = getCollaborators(tuples, object);
+  const resolveObjectPermissions = async (objectName) => {
+    const tuples = await getTuples(objectName);
 
-    if (!collaborators.length) return [];
+    const collaborators = getCollaborators(tuples, objectName);
+
+    if (!collaborators.length) {
+      return [];
+    }
 
     const users = await getUsers(collaborators);
 
-    const collaboratorMap = new Map(
-      collaborators.map((c) => [c.userId, c.relation]),
-    );
+    const relationMap = new Map();
 
-    return users.map((user) => ({
-      user,
-      relation: collaboratorMap.get(user._id.toString()),
-    }));
+    for (const collaborator of collaborators) {
+      relationMap.set(collaborator.userId, collaborator.relation);
+    }
+
+    return users
+      .map((user) => {
+        const relation = relationMap.get(user._id.toString());
+
+        if (!relation) {
+          return null;
+        }
+
+        return {
+          user,
+          relation,
+        };
+      })
+      .filter(Boolean);
   };
 
   const getAncestorDirectories = async (directory) => {
@@ -115,25 +209,40 @@ const resolveRole = async (item, type, userId, parentDir) => {
     while (current?._id) {
       ancestors.push(current);
 
-      if (!current.parentId) break;
+      const parentId = getIdString(current.parentDirId);
 
-      current = await Folder.findById(current.parentId)
-        .select("_id parentId isPublic publicRole")
+      if (!parentId) {
+        break;
+      }
+
+      current = await Directory.findById(parentId)
+        .select("_id name parentDirId isPublic publicRole")
         .lean();
     }
 
     return ancestors;
   };
 
-  const permissionMap = new Map();
+  const parentId = getIdString(parentDir?.parentDirId);
 
- 
-  const mergePermission = (
+  const isRootDirectory = Boolean(parentDir?._id) && !parentId;
+
+  const isRootLevelFile = type === "file" && isRootDirectory;
+
+  const permissionMap = new Map();
+  const mergePermission = ({
     user,
     relation,
-    source = "direct",
-  ) => {
-    if (!user?._id || !ROLE_PRIORITY[relation]) return;
+    source,
+    inheritedFrom = null,
+  }) => {
+    if (!user?._id) {
+      return;
+    }
+
+    if (!ROLE_PRIORITY[relation]) {
+      return;
+    }
 
     const id = user._id.toString();
 
@@ -142,14 +251,33 @@ const resolveRole = async (item, type, userId, parentDir) => {
     if (!permission) {
       permission = {
         id: user._id,
-        photoLink: user.avatar,
+
+        photoLink: user.avatar || null,
+
         displayName: user.name,
+
         type: "user",
+
         emailAddress: user.email,
+
         role: relation,
+
         directRole: source === "direct" ? relation : null,
+
         inheritedRole: source === "parent" ? relation : null,
+
         inherited: source === "parent",
+
+        inheritedFrom:
+          source === "parent"
+            ? {
+                id: inheritedFrom?._id || null,
+
+                name: inheritedFrom?.name || null,
+
+                role: relation,
+              }
+            : null,
       };
 
       permissionMap.set(id, permission);
@@ -157,143 +285,337 @@ const resolveRole = async (item, type, userId, parentDir) => {
       return;
     }
 
-
     if (source === "direct") {
       permission.directRole = relation;
     }
 
-  
     if (source === "parent") {
-      const currentInheritedPriority = permission.inheritedRole
+      const currentPriority = permission.inheritedRole
         ? ROLE_PRIORITY[permission.inheritedRole]
         : 0;
 
-      const incomingInheritedPriority =
-        ROLE_PRIORITY[relation];
+      const incomingPriority = ROLE_PRIORITY[relation];
 
-      if (
-        incomingInheritedPriority >
-        currentInheritedPriority
-      ) {
+      if (incomingPriority > currentPriority) {
         permission.inheritedRole = relation;
+
+        permission.inheritedFrom = {
+          id: inheritedFrom?._id || null,
+
+          name: inheritedFrom?.name || null,
+
+          role: relation,
+        };
       }
     }
 
-  const directPriority = permission.directRole
-  ? ROLE_PRIORITY[permission.directRole]
-  : 0;
+    const directPriority = permission.directRole
+      ? ROLE_PRIORITY[permission.directRole]
+      : 0;
 
-const inheritedPriority = permission.inheritedRole
-  ? ROLE_PRIORITY[permission.inheritedRole]
-  : 0;
+    const inheritedPriority = permission.inheritedRole
+      ? ROLE_PRIORITY[permission.inheritedRole]
+      : 0;
 
-if (inheritedPriority >= directPriority) {
-  permission.role = permission.inheritedRole;
-  permission.inherited = true;
-} else {
-  permission.role = permission.directRole;
-  permission.inherited = false;
-}
+    if (directPriority >= inheritedPriority) {
+      permission.role = permission.directRole;
+
+      permission.inherited = false;
+    } else {
+      permission.role = permission.inheritedRole;
+
+      permission.inherited = true;
+    }
   };
 
-  
-  const directPermissions =
-    await resolveObjectPermissions(object);
+  const directPermissions = await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
-    mergePermission(user, relation, "direct");
+    mergePermission({
+      user,
+      relation,
+      source: "direct",
+    });
   }
 
-  
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
     for (const ancestor of ancestors) {
       const parentObject = `folder:${ancestor._id}`;
 
-      const inheritedPermissions =
-        await resolveObjectPermissions(parentObject);
+      const inheritedPermissions = await resolveObjectPermissions(parentObject);
 
       for (const { user, relation } of inheritedPermissions) {
-        mergePermission(user, relation, "parent");
+        const inheritedRelation = relation === "owner" ? "writer" : relation;
+
+        mergePermission({
+          user,
+
+          relation: inheritedRelation,
+
+          source: "parent",
+
+          inheritedFrom: ancestor,
+        });
       }
     }
   }
 
-  const permissions = Array.from(
-    permissionMap.values(),
-  );
+  const permissions = Array.from(permissionMap.values());
 
- 
   const owners = permissions
-    .filter((permission) => permission.role === "owner")
+    .filter((permission) => permission.directRole === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
+
       kind: "drive#user",
-      me:
-        permission.id?.toString() ===
-        userId?.toString(),
+
+      me: permission.id?.toString() === userId?.toString(),
+
       permissionId: permission.id,
+
       emailAddress: permission.emailAddress,
+
       photoLink: permission.photoLink,
     }));
 
+  const currentUserId = getIdString(userId);
 
-  const isPublic = Boolean(
-    item.isPublic || parentDir?.isPublic,
+  const currentUserPermission = currentUserId
+    ? permissionMap.get(currentUserId)
+    : null;
+
+  const isPublic = Boolean(item?.isPublic);
+
+  const publicRole = isPublic ? item?.publicRole || "reader" : null;
+
+  const directRole = currentUserPermission?.directRole || null;
+
+  const inheritedRole = currentUserPermission?.inheritedRole || null;
+
+  const directPriority = directRole ? ROLE_PRIORITY[directRole] : 0;
+
+  const inheritedPriority = inheritedRole ? ROLE_PRIORITY[inheritedRole] : 0;
+
+  const publicPriority = publicRole ? ROLE_PRIORITY[publicRole] : 0;
+
+  const highestPriority = Math.max(
+    directPriority,
+    inheritedPriority,
+    publicPriority,
   );
 
-  let publicRole;
+  let currentRole = null;
 
-  if (item.isPublic) {
-    publicRole = item.publicRole;
-  } else if (parentDir?.isPublic) {
-    publicRole = parentDir.publicRole;
+  if (highestPriority > 0) {
+    if (publicPriority === highestPriority) {
+      currentRole = publicRole;
+    } else if (directPriority >= inheritedPriority) {
+      currentRole = directRole;
+    } else {
+      currentRole = inheritedRole;
+    }
   }
 
+  const isPublicEffective = Boolean(
+    currentRole && publicRole && publicPriority === highestPriority,
+  );
+
+  const isOwner = currentRole === "owner";
+
+  const isWriter = currentRole === "writer" || currentRole === "owner";
+
+  const isReader =
+    currentRole === "reader" ||
+    currentRole === "writer" ||
+    currentRole === "owner";
+
+  let canChangeRole = isOwner || isWriter;
+
+  if (isRootLevelFile && !isOwner) {
+    canChangeRole = false;
+  }
+
+  if (isPublicEffective && !isOwner && !directRole && !inheritedRole) {
+    canChangeRole = false;
+  }
+
+  const capabilities = getCapabilities(currentRole);
+
+  capabilities.canChangeRole = canChangeRole;
+
+  if (isPublicEffective && !directRole && !inheritedRole) {
+    capabilities.canChangeRole = false;
+  }
+
+  if (type === "folder") {
+    capabilities.canAddChildren = isWriter;
+
+    capabilities.canRemoveChildren = isWriter;
+  }
+
+  const permissionsWithCapabilities = permissions.map((permission) => ({
+    ...permission,
+
+    capabilities: getCapabilities(permission.role),
+
+    canChangeRole,
+  }));
+
   if (isPublic) {
-    permissions.push({
+    const publicCapabilities = getCapabilities(publicRole);
+
+    publicCapabilities.canChangeRole = false;
+
+    permissionsWithCapabilities.push({
       id: "anyoneWithLink",
+
       type: "anyone",
-      role: publicRole || "reader",
-      inherited: !item.isPublic,
+
+      role: publicRole,
+
+      capabilities: publicCapabilities,
+
+      inherited: false,
+
+      inheritedFrom: null,
+
+      canChangeRole: false,
     });
   }
 
-  
-  permissions.push({
+  permissionsWithCapabilities.push({
     id: "superuser",
-    role: "superuser",
-    type: "superuser",
-  });
 
+    role: "superuser",
+
+    type: "superuser",
+
+    capabilities: {
+      canRead: true,
+      canWrite: true,
+      canShare: true,
+      canChangeRole: false,
+      canRename: true,
+      canDownload: true,
+      canCopy: true,
+      canMove: true,
+      canTrash: true,
+      canDelete: true,
+
+      ...(type === "folder"
+        ? {
+            canAddChildren: true,
+            canRemoveChildren: true,
+          }
+        : {
+            canAddChildren: false,
+            canRemoveChildren: false,
+          }),
+    },
+
+    canChangeRole: false,
+  });
 
   const ownership = await Ownership.findOne({
     itemId: item?._id,
+  }).lean();
+
+  const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
+
+  const updatedPermissions = permissionsWithCapabilities.map((permission) => {
+    const permissionId = getIdString(permission.id);
+
+    if (ownership?.status === "pending" && permissionId === ownerId) {
+      return {
+        ...permission,
+
+        transferStatus: ownership.status,
+      };
+    }
+
+    return permission;
   });
 
-  const updatedPermissions = permissions.map(
-    (permission) => {
-      const permissionId = permission.id?.toString();
-      const ownerId = ownership?.toUser?.toString();
+  const currentUser =
+    currentUserPermission || currentRole
+      ? {
+          role: currentRole,
 
-      if (
-        ownership?.status === "pending" &&
-        permissionId === ownerId
-      ) {
-        return {
-          ...permission,
-          transferStatus: ownership.status,
+          directRole,
+
+          inheritedRole,
+
+          inherited:
+            currentRole === inheritedRole && inheritedPriority > directPriority,
+
+          inheritedFrom:
+            currentRole === inheritedRole && inheritedPriority > directPriority
+              ? currentUserPermission?.inheritedFrom || null
+              : null,
+
+          publicRole: isPublicEffective ? publicRole : null,
+
+          isPublic: isPublicEffective,
+
+          capabilities,
+
+          canChangeRole,
+        }
+      : {
+          role: null,
+
+          directRole: null,
+
+          inheritedRole: null,
+
+          inherited: false,
+
+          inheritedFrom: null,
+
+          publicRole: null,
+
+          isPublic: false,
+
+          capabilities: {
+            canRead: false,
+            canWrite: false,
+            canShare: false,
+            canChangeRole: false,
+            canRename: false,
+            canDownload: false,
+            canCopy: false,
+            canMove: false,
+            canTrash: false,
+            canDelete: false,
+
+            ...(type === "folder"
+              ? {
+                  canAddChildren: false,
+                  canRemoveChildren: false,
+                }
+              : {
+                  canAddChildren: false,
+                  canRemoveChildren: false,
+                }),
+          },
+
+          canChangeRole: false,
         };
-      }
-
-      return permission;
-    },
-  );
 
   return {
     permissions: updatedPermissions,
+
     owners,
+
+    capabilities,
+
+    currentUser,
+
+    isRootLevelFile,
+
+    isRootDirectory,
   };
 };
 
@@ -369,6 +691,7 @@ export const getDirectory = async (req, res, next) => {
               ...f,
               owners: roles.owners,
               permissions: roles.permissions,
+              capabilities: roles.capabilities,
             };
           }),
         ),
@@ -379,11 +702,13 @@ export const getDirectory = async (req, res, next) => {
               ...d,
               owners: roles.owners,
               permissions: roles.permissions,
+              capabilities: roles.capabilities,
+
             };
           }),
         ),
       ]);
-      const { owners, permissions } = await resolveRole(
+      const { owners, permissions, capabilities } = await resolveRole(
         parentDir,
         "folder",
         userId,
@@ -393,6 +718,8 @@ export const getDirectory = async (req, res, next) => {
         ...parentDirData,
         owners,
         permissions,
+        capabilities,
+
       };
       return res.status(200).json({
         ...parentDirWithRole,
@@ -454,6 +781,8 @@ export const getDirectory = async (req, res, next) => {
           ...file,
           owners: roles.owners,
           permissions: roles.permissions,
+              capabilities: roles.capabilities,
+
         };
       }),
     );
@@ -465,10 +794,12 @@ export const getDirectory = async (req, res, next) => {
           ...dir,
           owners: roles.owners,
           permissions: roles.permissions,
+              capabilities: roles.capabilities,
+
         };
       }),
     );
-    const { owners, permissions } = await resolveRole(
+    const { owners, permissions, capabilities } = await resolveRole(
       parentDir,
       "folder",
       userId,
@@ -478,9 +809,11 @@ export const getDirectory = async (req, res, next) => {
       ...parentDir,
       owners,
       permissions,
+      capabilities,
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
+      
     });
   } catch (error) {
     next(error);
@@ -533,84 +866,246 @@ export const getTrashItems = async (req, res, next) => {
       (d) => !deletedDirIds.has(d.parentDirId?.toString()),
     );
 
-    return res
-      .status(200)
-      .json({ ...parentDir, files: topLevelFiles, directories: topLevelDirs });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getSharedWithMe = async (req, res, next) => {
-  try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(403).json({ message: "Access denied" });
-
-    const [allowedFileIds, allowedFolderIds] = await Promise.all([
-      listObjects(userId, "file"),
-      listObjects(userId, "folder"),
-    ]);
-
-    const [files, directories] = await Promise.all([
-      allowedFileIds.length
-        ? File.find({
-            _id: { $in: allowedFileIds },
-            userId: { $ne: userId },
-          })
-            .populate("parentDirId")
-            .populate("userId", "name email avatar")
-            .populate("path", "name")
-            .lean()
-        : [],
-      allowedFolderIds.length
-        ? Directory.find({
-            _id: { $in: allowedFolderIds },
-            userId: { $ne: userId },
-          })
-            .populate("userId", "name email avatar")
-            .populate("path", "name")
-            .lean()
-        : [],
-    ]);
-
-    // only show top-level shared items, not children of shared folders
-    const topLevelFiles = files.filter(
-      (file) => !allowedFolderIds.includes(file.parentDirId?.toString()),
-    );
-
-    const topLevelDirs = directories.filter(
-      (dir) => !allowedFolderIds.includes(dir.parentDirId.toString()),
-    );
-
-    const filesWithRoles = await Promise.all(
+      const topLevelFilesWithResolvedRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const roles = await resolveRole(file, "file", userId, file.parentDirId);
+         const roles = await resolveRole(file, "file", userId, file.parentDirId);
         return {
           ...file,
           owners: roles.owners,
           permissions: roles.permissions,
+              capabilities: roles.capabilities,
+
         };
-      }),
+      }
+      ),
     );
 
-    const directoriesWithRoles = await Promise.all(
-      topLevelDirs.map(async (dir) => {
-        const roles = await resolveRole(dir, "folder", userId);
+    const topLevelDirsWithResolvedRoles = await Promise.all(
+       topLevelDirs.map(async (dir) => {
+         const roles = await resolveRole(dir, "folder", userId, dir.parentDirId);
         return {
           ...dir,
           owners: roles.owners,
           permissions: roles.permissions,
-        };
-      }),
-    );
+              capabilities: roles.capabilities,
 
+           };
+      }
+      ),
+    );
     return res
       .status(200)
-      .json({ files: filesWithRoles, directories: directoriesWithRoles });
+      .json({ ...parentDir, files: topLevelFilesWithResolvedRoles, directories: topLevelDirsWithResolvedRoles });
   } catch (error) {
     next(error);
   }
 };
+
+
+export const getSharedWithMe = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(403).json({
+        message: "Access denied",
+      });
+    }
+
+    // =========================================================
+    // GET EVERYTHING THE USER CAN ACCESS
+    // =========================================================
+
+    const [allowedFileIds, allowedFolderIds] =
+      await Promise.all([
+        listObjects(userId, "file"),
+        listObjects(userId, "folder"),
+      ]);
+
+    // Normalize IDs once.
+    const allowedFolderIdSet = new Set(
+      allowedFolderIds.map((id) => String(id)),
+    );
+
+    // =========================================================
+    // FETCH FILES + DIRECTORIES
+    // =========================================================
+
+    const [files, directories] =
+      await Promise.all([
+        allowedFileIds.length
+          ? File.find({
+              _id: {
+                $in: allowedFileIds,
+              },
+
+              userId: {
+                $ne: userId,
+              },
+            })
+              .populate("parentDirId")
+              .populate(
+                "userId",
+                "name email avatar",
+              )
+              .populate("path", "name")
+              .lean()
+          : [],
+
+        allowedFolderIds.length
+          ? Directory.find({
+              _id: {
+                $in: allowedFolderIds,
+              },
+
+              userId: {
+                $ne: userId,
+              },
+            })
+              .populate(
+                "userId",
+                "name email avatar",
+              )
+              .populate("path", "name")
+              .lean()
+          : [],
+      ]);
+
+    const getParentId = (parentDirId) => {
+      if (!parentDirId) {
+        return null;
+      }
+
+      if (
+        typeof parentDirId === "object" &&
+        parentDirId._id
+      ) {
+        return String(parentDirId._id);
+      }
+
+      return String(parentDirId);
+    };
+
+
+    const topLevelFiles = files.filter(
+      (file) => {
+        const parentId = getParentId(
+          file.parentDirId,
+        );
+
+        return (
+          !parentId ||
+          !allowedFolderIdSet.has(parentId)
+        );
+      },
+    );
+
+    const topLevelDirectories =
+      directories.filter((directory) => {
+        const parentId = getParentId(
+          directory.parentDirId,
+        );
+
+        return (
+          !parentId ||
+          !allowedFolderIdSet.has(parentId)
+        );
+      });
+
+  
+    const filesWithRoles = await Promise.all(
+      topLevelFiles.map(async (file) => {
+        const roles = await resolveRole(
+          file,
+          "file",
+          userId,
+          file.parentDirId,
+        );
+
+        return {
+          ...file,
+
+          owners: roles.owners,
+
+          permissions:
+            roles.permissions,
+
+          capabilities:
+            roles.capabilities,
+
+          currentUser:
+            roles.currentUser,
+        };
+      }),
+    );
+
+
+
+    const directoriesWithRoles =
+      await Promise.all(
+        topLevelDirectories.map(
+          async (directory) => {
+          
+
+            let parentDir = null;
+
+            if (directory.parentDirId) {
+              const parentId =
+                getParentId(
+                  directory.parentDirId,
+                );
+
+              if (parentId) {
+                parentDir =
+                  await Directory.findById(
+                    parentId,
+                  )
+                    .select(
+                      "_id name parentDirId isPublic publicRole",
+                    )
+                    .lean();
+              }
+            }
+
+            const roles =
+              await resolveRole(
+                directory,
+                "folder",
+                userId,
+                parentDir,
+              );
+
+            return {
+              ...directory,
+
+              owners: roles.owners,
+
+              permissions:
+                roles.permissions,
+
+              capabilities:
+                roles.capabilities,
+
+              currentUser:
+                roles.currentUser,
+            };
+          },
+        ),
+      );
+
+
+    return res.status(200).json({
+      files: filesWithRoles,
+
+      directories:
+        directoriesWithRoles,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export const getStarredItems = async (req, res, next) => {
   try {
     const userId = req.user?._id;

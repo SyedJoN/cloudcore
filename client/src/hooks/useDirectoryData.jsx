@@ -94,12 +94,7 @@ export function useDirectoryData({
           setFilesList(files);
           return;
         }
-        setIsDeleted(
-          !isRecentRoute
-            ? data.directories.some((d) => d.isDeleted) ||
-                data.files.some((f) => f.isDeleted)
-            : data.files.some((f) => f.isDeleted),
-        );
+       
         if (!isRecentRoute) {
           setDirectoriesList([...data.directories].reverse());
         }

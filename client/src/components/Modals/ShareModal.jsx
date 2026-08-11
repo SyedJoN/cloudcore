@@ -107,8 +107,15 @@ export default function ShareModal({
     type === "google"
       ? isOwner || item.capabilities?.canEdit
       : !isOwner && item.permissions?.find((p) => p.role === "writer")?.role;
+const canChangeRole =
+  item?.currentUser?.canChangeRole ??
+  item?.capabilities?.canChangeRole ??
+  false;
 
-  const isInherited = item?.permissions?.some((p) => p.inherited === true);
+console.log("canChangeRole", canChangeRole);
+const capabilities = item?.capabilities ?? {};
+  const canShare = capabilities.canShare === true;
+const canEdit = capabilities.canEdit === true;
   const { toast } = useToast();
 
   useEffect(() => {
@@ -452,7 +459,7 @@ export default function ShareModal({
     setTimeout(() => setCopyFeedback(false), 2000);
   }
 
-  if (!(isOwner || isEditor)) {
+  if (!canShare) {
     return (
       <>
         <div className="gd-modal-overlay confirmation-tab">
@@ -1055,7 +1062,7 @@ export default function ShareModal({
                             </div>
                             <div className="gd-share-role-select">
                               <MouseTooltip
-                                disabled={isInherited}
+                                disabled={!canChangeRole}
                                 message="Can't reduce permission because it's set on a parent folder"
                               >
                                 <button
@@ -1063,31 +1070,31 @@ export default function ShareModal({
                                     (personRefs.current[idx] = { current: el })
                                   }
                                   className="gd-share-person-role-btn"
-                                  aria-disabled={isInherited}
+                                  aria-disabled={!canChangeRole}
                                   onClick={(e) => {
-                                    if (isInherited) return;
+                                    if (!canChangeRole) return;
                                     e.stopPropagation();
                                     setOpenDropdown(
                                       openDropdown === idx ? null : idx,
                                     );
                                   }}
                                   style={{
-                                    opacity: isInherited ? 0.5 : 1,
-                                    cursor: isInherited
+                                    opacity: !canChangeRole ? 0.5 : 1,
+                                    cursor: !canChangeRole
                                       ? "not-allowed"
                                       : "pointer",
-                                    pointerEvents: isInherited
+                                    pointerEvents: !canChangeRole
                                       ? "none"
                                       : "auto",
                                   }}
                                 >
                                   {ROLE_LABEL[person.role]}{" "}
-                                  {!isInherited && (
+                                  {canChangeRole && (
                                     <IconChevronDown size={12} />
                                   )}
                                 </button>
                               </MouseTooltip>
-                              {openDropdown === idx && !isInherited && (
+                              {openDropdown === idx && (
                                 <RoleDropdown
                                   isOwnerPending={
                                     person.transferStatus === "pending"
