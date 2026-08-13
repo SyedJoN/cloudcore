@@ -39,330 +39,52 @@ import Subscription from "../models/subscription.model.js";
 import { getFileSize } from "../services/s3/getFileSize.js";
 import { sanitizeFilename } from "../utils/sanitizeFileName.js";
 import { getSignedUploadUrl } from "../services/s3/upload.js";
+import { resolveObjectPermissions } from "../utils/permissions/resolveObjectPermissions.js";
+import { mergePermission } from "../utils/permissions/mergePermission.js";
+import { getAncestorDirectories } from "../utils/permissions/getAncestorDirectories.js";
+import { getIdString } from "../utils/permissions/getIdString.js";
+import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
+import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 
 const __filename = fileURLToPath(import.meta.url);
-const ROLE_PRIORITY = {
-  reader: 1,
-  writer: 2,
-  owner: 3,
-};
-const resolveRole = async (item, type, userId, parentDir) => {
+
+const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const objectType = type === "folder" ? "folder" : "file";
+
   const object = `${objectType}:${item._id}`;
 
-  const getIdString = (value) => {
-    if (!value) return null;
-
-    if (typeof value === "string") {
-      return value;
-    }
-
-    if (value?._id) {
-      return value._id.toString();
-    }
-
-    if (typeof value.toString === "function") {
-      const stringValue = value.toString();
-
-      if (stringValue !== "[object Object]") {
-        return stringValue;
-      }
-    }
-
-    return null;
-  };
-
-  const ROLE_PRIORITY = {
-    reader: 1,
-    writer: 2,
-    owner: 3,
-  };
-
-  const getCapabilities = (role) => {
-    const isOwner = role === "owner";
-    const isWriter = role === "writer" || isOwner;
-    const isReader = role === "reader" || role === "writer" || isOwner;
-
-    const capabilities = {
-      canRead: isReader,
-
-      canWrite: isWriter,
-
-      canShare: isWriter,
-
-      canChangeRole: isWriter,
-
-      canRename: isWriter,
-
-      canDownload: isReader,
-
-      canCopy: isReader,
-
-      canMove: isWriter,
-
-      canTrash: isOwner,
-
-      canDelete: isOwner,
-    };
-
-    if (type === "folder") {
-      capabilities.canAddChildren = isWriter;
-      capabilities.canRemoveChildren = isWriter;
-    } else {
-      capabilities.canAddChildren = false;
-      capabilities.canRemoveChildren = false;
-    }
-
-    return capabilities;
-  };
-
-  const getTuples = async (objectName) => {
-    const allTuples = [];
-    let continuationToken;
-
-    do {
-      const response = await fgaClient.read(
-        {
-          tuple_key: {
-            object: objectName,
-          },
-        },
-        continuationToken
-          ? {
-              continuationToken,
-            }
-          : undefined,
-      );
-
-      allTuples.push(...(response.tuples || []));
-
-      continuationToken = response.continuation_token;
-    } while (continuationToken);
-
-    return allTuples;
-  };
-
-  const getCollaborators = (tuples, objectName) => {
-    return tuples
-      .filter(
-        (tuple) =>
-          tuple.key.object === objectName &&
-          tuple.key.user?.startsWith("user:") &&
-          ["owner", "reader", "writer"].includes(tuple.key.relation),
-      )
-      .map((tuple) => ({
-        userId: tuple.key.user.slice("user:".length),
-        relation: tuple.key.relation,
-      }));
-  };
-
-  const getUsers = async (collaborators) => {
-    if (!collaborators.length) {
-      return [];
-    }
-
-    const validUserIds = collaborators
-      .map((collaborator) => collaborator.userId)
-      .filter((id) => mongoose.isValidObjectId(id));
-
-    if (!validUserIds.length) {
-      return [];
-    }
-
-    return User.find({
-      _id: {
-        $in: validUserIds,
-      },
-    })
-      .select("name email avatar")
-      .lean();
-  };
-
-  const resolveObjectPermissions = async (objectName) => {
-    const tuples = await getTuples(objectName);
-
-    const collaborators = getCollaborators(tuples, objectName);
-
-    if (!collaborators.length) {
-      return [];
-    }
-
-    const users = await getUsers(collaborators);
-
-    const relationMap = new Map();
-
-    for (const collaborator of collaborators) {
-      relationMap.set(collaborator.userId, collaborator.relation);
-    }
-
-    return users
-      .map((user) => {
-        const relation = relationMap.get(user._id.toString());
-
-        if (!relation) {
-          return null;
-        }
-
-        return {
-          user,
-          relation,
-        };
-      })
-      .filter(Boolean);
-  };
-
-  const getAncestorDirectories = async (directory) => {
-    const ancestors = [];
-
-    let current = directory;
-
-    while (current?._id) {
-      ancestors.push(current);
-
-      const parentId = getIdString(current.parentDirId);
-
-      if (!parentId) {
-        break;
-      }
-
-      current = await Directory.findById(parentId)
-        .select("_id name parentDirId isPublic publicRole")
-        .lean();
-    }
-
-    return ancestors;
-  };
-
-  const parentId = getIdString(parentDir?.parentDirId);
-
-  const isRootDirectory = Boolean(parentDir?._id) && !parentId;
-
-  const isRootLevelFile = type === "file" && isRootDirectory;
-
-  const permissionMap = new Map();
-  const mergePermission = ({
-    user,
-    relation,
-    source,
-    inheritedFrom = null,
-  }) => {
-    if (!user?._id) {
-      return;
-    }
-
-    if (!ROLE_PRIORITY[relation]) {
-      return;
-    }
-
-    const id = user._id.toString();
-
-    let permission = permissionMap.get(id);
-
-    if (!permission) {
-      permission = {
-        id: user._id,
-
-        photoLink: user.avatar || null,
-
-        displayName: user.name,
-
-        type: "user",
-
-        emailAddress: user.email,
-
-        role: relation,
-
-        directRole: source === "direct" ? relation : null,
-
-        inheritedRole: source === "parent" ? relation : null,
-
-        inherited: source === "parent",
-
-        inheritedFrom:
-          source === "parent"
-            ? {
-                id: inheritedFrom?._id || null,
-
-                name: inheritedFrom?.name || null,
-
-                role: relation,
-              }
-            : null,
-      };
-
-      permissionMap.set(id, permission);
-
-      return;
-    }
-
-    if (source === "direct") {
-      permission.directRole = relation;
-    }
-
-    if (source === "parent") {
-      const currentPriority = permission.inheritedRole
-        ? ROLE_PRIORITY[permission.inheritedRole]
-        : 0;
-
-      const incomingPriority = ROLE_PRIORITY[relation];
-
-      if (incomingPriority > currentPriority) {
-        permission.inheritedRole = relation;
-
-        permission.inheritedFrom = {
-          id: inheritedFrom?._id || null,
-
-          name: inheritedFrom?.name || null,
-
-          role: relation,
-        };
-      }
-    }
-
-    const directPriority = permission.directRole
-      ? ROLE_PRIORITY[permission.directRole]
-      : 0;
-
-    const inheritedPriority = permission.inheritedRole
-      ? ROLE_PRIORITY[permission.inheritedRole]
-      : 0;
-
-    if (directPriority >= inheritedPriority) {
-      permission.role = permission.directRole;
-
-      permission.inherited = false;
-    } else {
-      permission.role = permission.inheritedRole;
-
-      permission.inherited = true;
-    }
-  };
+  // Direct permissions
 
   const directPermissions = await resolveObjectPermissions(object);
+  const permissionMap = new Map();
 
   for (const { user, relation } of directPermissions) {
     mergePermission({
+      permissionMap,
       user,
       relation,
       source: "direct",
+      isShared,
     });
   }
+
+  // Inherited permissions
 
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
     for (const ancestor of ancestors) {
-      const parentObject = `folder:${ancestor._id}`;
-
-      const inheritedPermissions = await resolveObjectPermissions(parentObject);
+      const inheritedPermissions = await resolveObjectPermissions(
+        `folder:${ancestor._id}`,
+      );
 
       for (const { user, relation } of inheritedPermissions) {
-        const inheritedRelation = relation === "owner" ? "writer" : relation;
-
         mergePermission({
+          permissionMap,
+
           user,
 
-          relation: inheritedRelation,
+          relation: relation,
 
           source: "parent",
 
@@ -374,8 +96,10 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   const permissions = Array.from(permissionMap.values());
 
+  // Owners
+
   const owners = permissions
-    .filter((permission) => permission.directRole === "owner")
+    .filter((permission) => permission.role === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
 
@@ -400,9 +124,11 @@ const resolveRole = async (item, type, userId, parentDir) => {
 
   const publicRole = isPublic ? item?.publicRole || "reader" : null;
 
-  const directRole = currentUserPermission?.directRole || null;
+  const directRole =
+    currentUserPermission?.permissionDetails?.[0].directRole || null;
 
-  const inheritedRole = currentUserPermission?.inheritedRole || null;
+  const inheritedRole =
+    currentUserPermission?.permissionDetails?.[0].inheritedRole || null;
 
   const directPriority = directRole ? ROLE_PRIORITY[directRole] : 0;
 
@@ -432,49 +158,32 @@ const resolveRole = async (item, type, userId, parentDir) => {
     currentRole && publicRole && publicPriority === highestPriority,
   );
 
+  // Root checks
+
+  const parentId = getIdString(parentDir?.parentDirId);
+
+  const isRootDirectory = Boolean(parentDir?._id) && !parentId;
+
+  const isRootLevelFile = type === "file" && isRootDirectory;
+
+  // Current user capabilities
+
   const isOwner = currentRole === "owner";
 
   const isWriter = currentRole === "writer" || currentRole === "owner";
 
-  const isReader =
-    currentRole === "reader" ||
-    currentRole === "writer" ||
-    currentRole === "owner";
-
   let canChangeRole = isOwner || isWriter;
 
-  if (isRootLevelFile && !isOwner) {
-    canChangeRole = false;
-  }
-
-  if (isPublicEffective && !isOwner && !directRole && !inheritedRole) {
-    canChangeRole = false;
-  }
-
-  const capabilities = getCapabilities(currentRole);
-
-  capabilities.canChangeRole = canChangeRole;
-
-  if (isPublicEffective && !directRole && !inheritedRole) {
-    capabilities.canChangeRole = false;
-  }
-
-  if (type === "folder") {
-    capabilities.canAddChildren = isWriter;
-
-    capabilities.canRemoveChildren = isWriter;
-  }
-
+  // Add capabilities to each user
   const permissionsWithCapabilities = permissions.map((permission) => ({
     ...permission,
-
-    capabilities: getCapabilities(permission.role),
-
-    canChangeRole,
+    capabilities: getCapabilities(permission.role, type, isRootLevelFile),
   }));
 
+  // Public / anyone permission
+
   if (isPublic) {
-    const publicCapabilities = getCapabilities(publicRole);
+    const publicCapabilities = getCapabilities(publicRole, type, isRootLevelFile);
 
     publicCapabilities.canChangeRole = false;
 
@@ -490,43 +199,10 @@ const resolveRole = async (item, type, userId, parentDir) => {
       inherited: false,
 
       inheritedFrom: null,
-
-      canChangeRole: false,
     });
   }
 
-  permissionsWithCapabilities.push({
-    id: "superuser",
-
-    role: "superuser",
-
-    type: "superuser",
-
-    capabilities: {
-      canRead: true,
-      canWrite: true,
-      canShare: true,
-      canChangeRole: false,
-      canRename: true,
-      canDownload: true,
-      canCopy: true,
-      canMove: true,
-      canTrash: true,
-      canDelete: true,
-
-      ...(type === "folder"
-        ? {
-            canAddChildren: true,
-            canRemoveChildren: true,
-          }
-        : {
-            canAddChildren: false,
-            canRemoveChildren: false,
-          }),
-    },
-
-    canChangeRole: false,
-  });
+  // Ownership transfer
 
   const ownership = await Ownership.findOne({
     itemId: item?._id,
@@ -540,88 +216,19 @@ const resolveRole = async (item, type, userId, parentDir) => {
     if (ownership?.status === "pending" && permissionId === ownerId) {
       return {
         ...permission,
-
-        transferStatus: ownership.status,
+        pendingOwner: true,
       };
     }
 
     return permission;
   });
 
-  const currentUser =
-    currentUserPermission || currentRole
-      ? {
-          role: currentRole,
-
-          directRole,
-
-          inheritedRole,
-
-          inherited:
-            currentRole === inheritedRole && inheritedPriority > directPriority,
-
-          inheritedFrom:
-            currentRole === inheritedRole && inheritedPriority > directPriority
-              ? currentUserPermission?.inheritedFrom || null
-              : null,
-
-          publicRole: isPublicEffective ? publicRole : null,
-
-          isPublic: isPublicEffective,
-
-          capabilities,
-
-          canChangeRole,
-        }
-      : {
-          role: null,
-
-          directRole: null,
-
-          inheritedRole: null,
-
-          inherited: false,
-
-          inheritedFrom: null,
-
-          publicRole: null,
-
-          isPublic: false,
-
-          capabilities: {
-            canRead: false,
-            canWrite: false,
-            canShare: false,
-            canChangeRole: false,
-            canRename: false,
-            canDownload: false,
-            canCopy: false,
-            canMove: false,
-            canTrash: false,
-            canDelete: false,
-
-            ...(type === "folder"
-              ? {
-                  canAddChildren: false,
-                  canRemoveChildren: false,
-                }
-              : {
-                  canAddChildren: false,
-                  canRemoveChildren: false,
-                }),
-          },
-
-          canChangeRole: false,
-        };
+  // Final response
 
   return {
     permissions: updatedPermissions,
 
     owners,
-
-    capabilities,
-
-    currentUser,
 
     isRootLevelFile,
 
@@ -696,28 +303,25 @@ export const getDirectory = async (req, res, next) => {
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
           files.map(async (f) => {
-            const roles = await resolveRole(f, "file", userId, parentDir);
+            const permissions = await resolveRole(f, "file", userId, parentDir);
             return {
               ...f,
-              owners: roles.owners,
-              permissions: roles.permissions,
-              capabilities: roles.capabilities,
+              ...permissions,
             };
           }),
         ),
         Promise.all(
           directories.map(async (d) => {
-            const roles = await resolveRole(d, "folder", userId, parentDir);
+            const permissions = await resolveRole(d, "folder", userId, parentDir);
             return {
               ...d,
               owners: roles.owners,
-              permissions: roles.permissions,
-              capabilities: roles.capabilities,
+              ...permissions
             };
           }),
         ),
       ]);
-      const { owners, permissions, capabilities } = await resolveRole(
+      const permissions = await resolveRole(
         parentDir,
         "folder",
         userId,
@@ -725,9 +329,7 @@ export const getDirectory = async (req, res, next) => {
       );
       const parentDirWithRole = {
         ...parentDirData,
-        owners,
-        permissions,
-        capabilities,
+        ...permissions
       };
       return res.status(200).json({
         ...parentDirWithRole,
@@ -784,28 +386,24 @@ export const getDirectory = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const roles = await resolveRole(file, "file", userId, parentDir);
+        const permissions = await resolveRole(file, "file", userId, parentDir);
         return {
           ...file,
-          owners: roles.owners,
-          permissions: roles.permissions,
-          capabilities: roles.capabilities,
+          ...permissions
         };
       }),
     );
 
     const directoriesWithRoles = await Promise.all(
       directories.map(async (dir) => {
-        const roles = await resolveRole(dir, "folder", userId, parentDir);
+        const permissions = await resolveRole(dir, "folder", userId, parentDir);
         return {
           ...dir,
-          owners: roles.owners,
-          permissions: roles.permissions,
-          capabilities: roles.capabilities,
+          ...permissions
         };
       }),
     );
-    const { owners, permissions, capabilities } = await resolveRole(
+    const permissions = await resolveRole(
       parentDir,
       "folder",
       userId,
@@ -813,9 +411,6 @@ export const getDirectory = async (req, res, next) => {
     );
     return res.status(200).json({
       ...parentDir,
-      owners,
-      permissions,
-      capabilities,
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
@@ -873,24 +468,20 @@ export const getTrashItems = async (req, res, next) => {
 
     const topLevelFilesWithResolvedRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const roles = await resolveRole(file, "file", userId, file.parentDirId);
+        const permissions = await resolveRole(file, "file", userId, file.parentDirId);
         return {
           ...file,
-          owners: roles.owners,
-          permissions: roles.permissions,
-          capabilities: roles.capabilities,
+          ...permissions
         };
       }),
     );
 
     const topLevelDirsWithResolvedRoles = await Promise.all(
       topLevelDirs.map(async (dir) => {
-        const roles = await resolveRole(dir, "folder", userId, dir.parentDirId);
+        const permissions = await resolveRole(dir, "folder", userId, dir.parentDirId);
         return {
           ...dir,
-          owners: roles.owners,
-          permissions: roles.permissions,
-          capabilities: roles.capabilities,
+          ...permissions
         };
       }),
     );
@@ -991,18 +582,17 @@ export const getSharedWithMe = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const roles = await resolveRole(file, "file", userId, file.parentDirId);
+        const permissions = await resolveRole(
+          file,
+          "file",
+          userId,
+          file.parentDirId,
+          true,
+        );
 
         return {
           ...file,
-
-          owners: roles.owners,
-
-          permissions: roles.permissions,
-
-          capabilities: roles.capabilities,
-
-          currentUser: roles.currentUser,
+          ...permissions
         };
       }),
     );
@@ -1021,25 +611,23 @@ export const getSharedWithMe = async (req, res, next) => {
           }
         }
 
-        const roles = await resolveRole(directory, "folder", userId, parentDir);
+        const permissions = await resolveRole(
+          directory,
+          "folder",
+          userId,
+          parentDir,
+          true,
+        );
 
         return {
           ...directory,
-
-          owners: roles.owners,
-
-          permissions: roles.permissions,
-
-          capabilities: roles.capabilities,
-
-          currentUser: roles.currentUser,
+          ...permissions
         };
       }),
     );
 
     return res.status(200).json({
       files: filesWithRoles,
-
       directories: directoriesWithRoles,
     });
   } catch (error) {
@@ -1099,21 +687,48 @@ export const getStarredItems = async (req, res, next) => {
     );
 
     const sharedFilesWithRoles = await Promise.all(
-      topLevelSharedFiles.map(async (file) =>
-        resolveRole(file, "file", userId),
-      ),
+      topLevelSharedFiles.map(async (file) => {
+        const permissions = await resolveRole(file, "file", userId);
+        return {
+          ...file,
+          ...permissions,
+        };
+      }),
     );
 
     const sharedDirectoriesWithRoles = await Promise.all(
-      topLevelSharedDirs.map(async (dir) => resolveRole(dir, "folder", userId)),
+      topLevelSharedDirs.map(async (dir) => {
+        const permissions = await resolveRole(dir, "folder", userId);
+        return {
+          ...dir,
+          ...permissions,
+        };
+      }),
     );
 
     const filesWithRoles = await Promise.all(
-      files.map(async (file) => resolveRole(file, "file", userId)),
+      files.map(async (file) => {
+        const roles = await resolveRole(
+          file,
+          "file",
+          userId,
+          file.parentDirId,
+        );
+         return {
+          ...file,
+          ...permissions,
+        };
+      }),
     );
 
     const directoriesWithRoles = await Promise.all(
-      directories.map(async (dir) => resolveRole(dir, "folder", userId)),
+      directories.map(async (dir) => {
+        const permissions = await resolveRole(dir, "folder", userId);
+        return {
+          ...dir,
+          ...permissions,
+        };
+      }),
     );
 
     return res.status(200).json({
@@ -1808,10 +1423,7 @@ export const downloadFolder = async (req, res, next) => {
   let cancelled = false;
 
   try {
-    // =================================================
-    // AUTH
-    // =================================================
-
+   
     const userId = req.user?._id;
 
     if (!userId) {
@@ -1819,10 +1431,6 @@ export const downloadFolder = async (req, res, next) => {
         message: "Unauthorized",
       });
     }
-
-    // =================================================
-    // FOLDER ID
-    // =================================================
 
     const { id } = req.params;
 
@@ -1832,9 +1440,6 @@ export const downloadFolder = async (req, res, next) => {
       });
     }
 
-    // =================================================
-    // FIND FOLDER
-    // =================================================
 
     const folder = await Directory.findOne({
       _id: id,
@@ -1847,10 +1452,6 @@ export const downloadFolder = async (req, res, next) => {
         message: "Folder not found",
       });
     }
-
-    // =================================================
-    // RESPONSE HEADERS
-    // =================================================
 
     const zipName = `${folder.name || "folder"}.zip`.replace(
       /[<>:"/\\|?*\x00-\x1F]/g,
@@ -1895,7 +1496,6 @@ export const downloadFolder = async (req, res, next) => {
       }
     });
 
-  
     archive.on("error", (error) => {
       if (cancelled) {
         return;
@@ -1908,7 +1508,6 @@ export const downloadFolder = async (req, res, next) => {
       }
     });
 
-
     archive.pipe(res);
 
     const directories = await Directory.find({
@@ -1918,7 +1517,6 @@ export const downloadFolder = async (req, res, next) => {
     })
       .select("_id name parentDirId path")
       .lean();
-
 
     const directoryMap = new Map();
 
@@ -1938,7 +1536,6 @@ export const downloadFolder = async (req, res, next) => {
       .lean();
 
     console.log(`Folder "${folder.name}" contains ${files.length} files`);
-
 
     for (const directory of directories) {
       if (cancelled) {
@@ -1960,7 +1557,6 @@ export const downloadFolder = async (req, res, next) => {
       });
     }
 
-
     let completed = 0;
 
     for (const file of files) {
@@ -1968,16 +1564,12 @@ export const downloadFolder = async (req, res, next) => {
         return;
       }
 
-     
       const s3Key = `${file._id}${file.extension}`;
 
-    
       const safeFileName = (file.name || "file").replace(
         /[<>:"/\\|?*\x00-\x1F]/g,
         "_",
       );
-
-    
 
       const folderPath = buildFilePath(file, folder._id, directoryMap);
 
@@ -1986,8 +1578,6 @@ export const downloadFolder = async (req, res, next) => {
         : safeFileName;
 
       console.log(`Adding ${completed + 1}/${files.length}: ${zipPath}`);
-
-  
 
       const s3Response = await getFile(s3Key);
 
@@ -2069,8 +1659,6 @@ export const downloadFolder = async (req, res, next) => {
         return;
       }
 
-
-
       completed++;
 
       const progress =
@@ -2079,7 +1667,6 @@ export const downloadFolder = async (req, res, next) => {
       console.log(`ZIP progress: ${progress}%`);
     }
 
-   
     if (cancelled) {
       return;
     }
@@ -2129,17 +1716,13 @@ export const downloadFolder = async (req, res, next) => {
 
       archive.finalize();
 
-     
       res.once("finish", finish);
     });
 
-   
     req.removeListener("aborted", cancelDownload);
 
     console.log("Folder download completed");
   } catch (error) {
-   
-
     if (
       cancelled ||
       req.aborted ||
@@ -2151,8 +1734,6 @@ export const downloadFolder = async (req, res, next) => {
 
       return;
     }
-
-
 
     if (res.headersSent) {
       if (!res.destroyed) {
@@ -2186,7 +1767,6 @@ const buildDirectoryPath = (directory, rootFolderId, directoryMap) => {
     .filter(Boolean)
     .join("/");
 };
-
 
 const buildFilePath = (file, rootFolderId, directoryMap) => {
   const pathIds = file.path || [];
@@ -2234,7 +1814,6 @@ export const initiateFolderUpload = async (req, res, next) => {
 
     const { files } = req.body;
 
-    
     const parentDirId = req.body.parentDirId || null;
 
     if (!Array.isArray(files) || !files.length) {
@@ -2252,7 +1831,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         isDeleted: false,
       });
     } else {
-   
       parentDir = await Directory.findOne({
         userId,
         parentDirId: null,
@@ -2265,7 +1843,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         message: "Parent directory not found",
       });
     }
-
 
     const subscription = await Subscription.findOne({
       userId,
@@ -2280,7 +1857,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         message: "Your subscription is not active.",
       });
     }
-
 
     const user = req.user;
 
@@ -2304,7 +1880,6 @@ export const initiateFolderUpload = async (req, res, next) => {
 
     const totalStorageLeft = totalStorage - totalStorageUsed;
 
-  
     let totalUploadSize = 0;
 
     for (const file of files) {
@@ -2325,7 +1900,6 @@ export const initiateFolderUpload = async (req, res, next) => {
       totalUploadSize += size;
     }
 
-
     if (totalUploadSize > totalStorageLeft) {
       const needed = totalUploadSize - totalStorageLeft;
 
@@ -2339,10 +1913,8 @@ export const initiateFolderUpload = async (req, res, next) => {
     // Root/current parent
     directoryCache.set(String(parentDir._id), parentDir);
 
-   
     const getOrCreateDirectory = async (directoryName, parent) => {
       const cacheKey = `${parent._id}:${directoryName}`;
-
 
       const cached = directoryCache.get(cacheKey);
 
@@ -2350,15 +1922,12 @@ export const initiateFolderUpload = async (req, res, next) => {
         return cached;
       }
 
-
       let directory = await Directory.findOne({
         name: directoryName,
         parentDirId: parent._id,
         userId,
         isDeleted: false,
       });
-
-      
 
       if (!directory) {
         const parentPath = Array.isArray(parent.path) ? parent.path : [];
@@ -2386,8 +1955,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         createdDirectoryIds.push(directory._id);
       }
 
-    
-
       const fgaWrites = [
         {
           user: `user:${userId.toString()}`,
@@ -2398,7 +1965,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         },
       ];
 
-    
       if (directory.parentDirId) {
         fgaWrites.push({
           user: `folder:${directory.parentDirId.toString()}`,
@@ -2409,7 +1975,6 @@ export const initiateFolderUpload = async (req, res, next) => {
         });
       }
 
-     
       await fgaClient.write({
         writes: fgaWrites,
       });
@@ -2419,8 +1984,6 @@ export const initiateFolderUpload = async (req, res, next) => {
       return directory;
     };
 
-    
-
     const resolveFileParent = async (relativePath) => {
       const normalizedPath = String(relativePath || "")
         .replace(/\\/g, "/")
@@ -2429,18 +1992,13 @@ export const initiateFolderUpload = async (req, res, next) => {
 
       const parts = normalizedPath.split("/").filter(Boolean);
 
-     
-
       if (!parts.length) {
         return parentDir;
       }
 
-      
       parts.pop();
 
       let current = parentDir;
-
-     
 
       for (const rawFolderName of parts) {
         const folderName = sanitizeFilename(rawFolderName) || "untitled";
@@ -2451,39 +2009,28 @@ export const initiateFolderUpload = async (req, res, next) => {
       return current;
     };
 
-
     const uploadResults = [];
 
     for (let index = 0; index < files.length; index++) {
       const inputFile = files[index];
 
-  
-
       const originalName = String(inputFile.name || "untitled");
-
-  
 
       const relativePath = String(inputFile.relativePath || originalName)
         .replace(/\\/g, "/")
         .replace(/^\/+/, "")
         .replace(/\/+/g, "/");
 
-    
       const fileParentDir = await resolveFileParent(relativePath);
-
-     
 
       const rawFileName = path.basename(originalName);
 
       let fileName = sanitizeFilename(rawFileName) || "untitled";
 
-     
-
       let extension = path.extname(fileName);
 
       const contentType = inputFile.contentType || "application/octet-stream";
 
-     
       if (!extension) {
         const mimeExtension = contentType.includes("/")
           ? contentType.split("/").pop()
@@ -2494,11 +2041,7 @@ export const initiateFolderUpload = async (req, res, next) => {
         }
       }
 
-    
-
       const currentPlan = user.plan;
-
-    
 
       const parentPath = Array.isArray(fileParentDir.path)
         ? fileParentDir.path
@@ -2528,14 +2071,9 @@ export const initiateFolderUpload = async (req, res, next) => {
 
       createdFileIds.push(uploadedFile._id);
 
-
       const s3Key = `${uploadedFile._id}${uploadedFile.extension}`;
 
-     
-
       const uploadUrl = await getSignedUploadUrl(s3Key, contentType);
-
-    
 
       uploadResults.push({
         index,
@@ -2556,7 +2094,6 @@ export const initiateFolderUpload = async (req, res, next) => {
       });
     }
 
-   
     return res.status(200).json({
       message: "Folder upload initialized",
 
@@ -2567,7 +2104,6 @@ export const initiateFolderUpload = async (req, res, next) => {
   } catch (error) {
     console.error("Folder upload initialization error:", error);
 
-
     if (createdFileIds.length) {
       await File.deleteMany({
         _id: {
@@ -2576,7 +2112,6 @@ export const initiateFolderUpload = async (req, res, next) => {
       }).catch(() => {});
     }
 
-   
     if (createdDirectoryIds.length) {
       await Directory.deleteMany({
         _id: {
@@ -2589,21 +2124,18 @@ export const initiateFolderUpload = async (req, res, next) => {
   }
 };
 
-
 export const completeFolderUpload = async (req, res, next) => {
   try {
     const { fileId } = req.body;
 
     const userId = req.user._id;
 
-  
     if (!fileId) {
       return res.status(400).json({
         message: "Missing fileId",
       });
     }
 
-  
     const uploadedFile = await File.findOne({
       _id: fileId,
       userId,
@@ -2615,11 +2147,7 @@ export const completeFolderUpload = async (req, res, next) => {
       });
     }
 
-    
-
     const s3Key = `${uploadedFile._id}${uploadedFile.extension}`;
-
-    
 
     let contentLength;
 
@@ -2635,7 +2163,6 @@ export const completeFolderUpload = async (req, res, next) => {
       });
     }
 
-
     if (Number(uploadedFile.size) !== Number(contentLength)) {
       await deleteFileFromS3(s3Key).catch(() => {});
 
@@ -2649,7 +2176,6 @@ export const completeFolderUpload = async (req, res, next) => {
     try {
       await fgaClient.write({
         writes: [
-       
           {
             user: `user:${userId.toString()}`,
 
@@ -2658,7 +2184,6 @@ export const completeFolderUpload = async (req, res, next) => {
             object: `file:${uploadedFile._id.toString()}`,
           },
 
-      
           {
             user: `folder:${uploadedFile.parentDirId.toString()}`,
 
@@ -2680,9 +2205,7 @@ export const completeFolderUpload = async (req, res, next) => {
 
     await uploadedFile.save();
 
-   
     await updateParentDirSize(uploadedFile.parentDirId, uploadedFile.size);
-
 
     return res.status(201).json({
       message: "Folder file uploaded successfully",

@@ -111,8 +111,7 @@ export const updateResourceOwnership = async ({
   newOwnerRootId,
 }) => {
   const newPath = [
-    newOwnerRootId,
-    item._id,
+    newOwnerRootId
   ];
 
   item.userId = newOwnerId;

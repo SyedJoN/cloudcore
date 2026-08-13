@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowUpOnSquareIcon,
+  ArrowUpOnSquareStackIcon,
+  FolderPlusIcon,
   HomeIcon,
   InboxStackIcon,
   ShareIcon,
@@ -152,7 +155,7 @@ function NewMenu({
           className="gd-context-item"
           onClick={close(() => onCreateFolder())}
         >
-          <IconNewFolder size={18} />
+          <FolderPlusIcon className="text-black w-5 h-5" />
           New folder
         </button>
 
@@ -163,7 +166,7 @@ function NewMenu({
           onClick={close(() => onUploadFiles())}
           disabled={disabled}
         >
-          <IconUpload size={18} />
+          <ArrowUpOnSquareIcon className="text-black w-5 h-5" />
           File upload
         </button>
       <button
@@ -171,7 +174,7 @@ function NewMenu({
           onClick={close(() => onUploadFolders())}
           disabled={disabled}
         >
-          <IconUpload size={18} />
+          <ArrowUpOnSquareStackIcon className="text-black w-5 h-5" />
           Folder upload
         </button>
         <button

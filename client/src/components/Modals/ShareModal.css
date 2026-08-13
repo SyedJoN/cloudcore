@@ -172,6 +172,7 @@
   z-index: 2000;
   animation: ctx-appear 0.1s ease;
 }
+
 .gd-role-option {
   display: flex;
   position: relative;
@@ -187,10 +188,14 @@
   text-align: left;
   transition: background var(--transition);
 }
+.gd-role-option:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
 .gd-role-option.remove {
   padding-left: 16px;
 }
-.gd-role-option:hover {
+.gd-role-option:hover:not(:disabled) {
   background: var(--btn-bg-medium);
 }
 

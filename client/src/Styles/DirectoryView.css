@@ -307,7 +307,7 @@ body {
   margin: 0 8px 12px 8px;
   padding: 0 18px 0 8px;
   height: 56px;
-  background: var(--surface-container-dark);
+  background: var(--surface-white);
   border: none;
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -820,7 +820,6 @@ body {
   color: #d93025;
 }
 .gd-context-item svg {
-  color: var(--text-secondary);
   flex-shrink: 0;
 }
 .gd-context-divider {

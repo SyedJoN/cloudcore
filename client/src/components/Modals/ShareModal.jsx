@@ -98,10 +98,10 @@ export default function ShareModal({
       : "file";
 
   const isOwner = item.owners?.[0].me === true;
-  const canChangeRole = item?.capabilities?.canChangeRole ?? true;
+  const capabilities =
+    item.permissions?.find((p) => p.id === user.id)?.capabilities || {};
 
-  console.log("canChangeRole", canChangeRole);
-  const capabilities = item?.capabilities ?? {};
+  const canChangeRole = capabilities?.canChangeRole ?? true;
   const canShare = capabilities.canShare === true;
   const canRename = capabilities.canRename === true;
   const { toast } = useToast();
@@ -120,13 +120,20 @@ export default function ShareModal({
   }, [item]);
 
   useEffect(() => {
+    const previous = prevPermissions ?? [];
+    const current = peopleWithAccess ?? [];
+
     const equal =
-      prevPermissions?.length === peopleWithAccess?.length &&
-      prevPermissions?.every(
-        (prev, index) =>
-          prev.id === peopleWithAccess[index].id &&
-          prev.role === peopleWithAccess[index].role,
-      );
+      previous.length === current.length &&
+      previous.every((prev) => {
+        const prevId = String(prev?.id ?? prev?._id);
+
+        const currentPermission = current.find(
+          (p) => String(p?.id ?? p?._id) === prevId,
+        );
+
+        return currentPermission?.role === prev?.role;
+      });
 
     setIsChanged(!equal);
   }, [prevPermissions, peopleWithAccess]);
@@ -380,18 +387,63 @@ export default function ShareModal({
         type,
       });
       const update = () => {
-        setShareItem((currentItem) => ({
-          ...currentItem,
-          permissions: (currentItem.permissions ?? []).map((p) =>
-            String(p.id ?? p._id) === String(person.id ?? person._id)
-              ? {
-                  ...p,
-                  transferStatus: "pending",
-                }
-              : p,
-          ),
-        }));
+        const updatePermissions = (resource) => {
+          if (!resource?.permissions) {
+            return resource;
+          }
+
+          return {
+            ...resource,
+
+            permissions: resource.permissions.map((permission) =>
+              String(permission?.id ?? permission?._id) ===
+              String(person?.id ?? person?._id)
+                ? {
+                    ...permission,
+                    pendingOwner: true,
+                  }
+                : permission,
+            ),
+          };
+        };
+
+        setShareItem((currentItem) => {
+          if (!currentItem) {
+            return currentItem;
+          }
+
+          return updatePermissions(currentItem);
+        });
+
+        setFilesList((prev) =>
+          prev.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
+
+            const itemId = String(item?._id ?? item?.id);
+
+            if (resourceId !== itemId) {
+              return resource;
+            }
+
+            return updatePermissions(resource);
+          }),
+        );
+
+        setDirectoriesList((prev) =>
+          prev.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
+
+            const itemId = String(item?._id ?? item?.id);
+
+            if (resourceId !== itemId) {
+              return resource;
+            }
+
+            return updatePermissions(resource);
+          }),
+        );
       };
+
       update();
       setOpenDropdown(null);
       toast({ message, type: "success" });
@@ -401,6 +453,7 @@ export default function ShareModal({
       setIsShareLoading(false);
     }
   }
+
   async function cancelOwnershipTransferMail(person) {
     try {
       setIsShareLoading(true);
@@ -410,18 +463,62 @@ export default function ShareModal({
       });
 
       const update = () => {
-        setShareItem((currentItem) => ({
-          ...currentItem,
-          permissions: (currentItem.permissions ?? []).map((p) =>
-            String(p.id ?? p._id) === String(person.id ?? person._id)
-              ? {
-                  ...p,
-                  transferStatus: null,
-                }
-              : p,
-          ),
-        }));
+        const updatePermissions = (resource) => {
+          if (!resource?.permissions) {
+            return resource;
+          }
+          const permissions = resource.permissions.map((permission) => {
+            const isTarget = String(permission?.id) === String(person?.id);
+
+            if (!isTarget) {
+              return permission;
+            }
+            const { pendingOwner, ...cleanPermission } = permission;
+            return cleanPermission;
+          });
+          return {
+            ...resource,
+            permissions,
+          };
+        };
+
+        setShareItem((currentItem) => {
+          if (!currentItem) {
+            return currentItem;
+          }
+
+          return updatePermissions(currentItem);
+        });
+
+        setFilesList((prev) =>
+          prev.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
+
+            const itemId = String(item?._id ?? item?.id);
+
+            if (resourceId !== itemId) {
+              return resource;
+            }
+
+            return updatePermissions(resource);
+          }),
+        );
+
+        setDirectoriesList((prev) =>
+          prev.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
+
+            const itemId = String(item?._id ?? item?.id);
+
+            if (resourceId !== itemId) {
+              return resource;
+            }
+
+            return updatePermissions(resource);
+          }),
+        );
       };
+
       update();
       setOpenDropdown(null);
       toast({ message, type: "success" });
@@ -1044,8 +1141,7 @@ export default function ShareModal({
                                 {person.emailAddress}
                               </div>
                               <div className="gd-share-person-pending-owner">
-                                {person.transferStatus === "pending" &&
-                                  "Pending owner"}
+                                {person.pendingOwner && "Pending owner"}
                               </div>
                             </div>
                             <div className="gd-share-role-select">
@@ -1084,9 +1180,8 @@ export default function ShareModal({
                               </MouseTooltip>
                               {openDropdown === idx && (
                                 <RoleDropdown
-                                  isOwnerPending={
-                                    person.transferStatus === "pending"
-                                  }
+                                  isChanged={isChanged}
+                                  isOwnerPending={person.pendingOwner}
                                   onTransfer={() =>
                                     sendOwnershipTransferMail(person)
                                   }

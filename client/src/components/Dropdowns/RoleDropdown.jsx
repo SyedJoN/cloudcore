@@ -11,6 +11,7 @@ import {
   DRIVE_ROLES,
 } from "../../../Utils/displayUtils";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import MouseTooltip from "../Tooltip/Tooltip";
 
 const ROLES = ["viewer", "editor"];
 
@@ -24,6 +25,7 @@ export default function RoleDropdown({
   onClose,
   isOwner = false,
   showRemove = false,
+  isChanged = false,
 }) {
   const dropdownRef = useRef(null);
 
@@ -122,30 +124,37 @@ export default function RoleDropdown({
             </button>
           );
         })}
-
-        {showRemove && (
+        {isOwner && (
           <>
             <div className="gd-context-divider" />
-
+          <MouseTooltip
+            disabled={isChanged}
+            message="Disabled because other changes are pending"
+          >
             <button
+              disabled={isChanged}
               type="button"
               className="gd-role-option remove"
-              style={{
-                color: "#d93025",
-              }}
-              onClick={() => onChange("remove")}
+              onClick={() => (isOwnerPending ? onCancel() : onTransfer())}
             >
-              Remove access
+              {isOwnerPending
+                ? "Cancel ownership transfer"
+                : "Transfer ownership"}
             </button>
+          </MouseTooltip>
           </>
+
         )}
-        {isOwner && (
+        {showRemove && (
           <button
             type="button"
             className="gd-role-option remove"
-            onClick={() => (isOwnerPending ? onCancel() : onTransfer())}
+            style={{
+              color: "#d93025",
+            }}
+            onClick={() => onChange("remove")}
           >
-            {isOwnerPending ? "Cancel ownership" : "Transfer ownership"}
+            Remove access
           </button>
         )}
       </div>

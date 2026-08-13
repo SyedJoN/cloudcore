@@ -567,6 +567,7 @@ export default function DirectoryView({ route }) {
     showError("");
     const type = getResourceType(item);
 
+    // for google drive folders
     if (type.startsWith("google")) {
       window.open(
         `https://drive.google.com/drive/folders/${item.id}`,
@@ -711,6 +712,7 @@ export default function DirectoryView({ route }) {
         document.body.removeChild(a);
         return;
       }
+      // local S3 file
       window.location.href = `http://localhost:4000/file/${item._id}?action=download`;
     } catch (err) {
       showError(err.message);
@@ -787,265 +789,255 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
+useEffect(()=> {
+  console.log('combined', combinedItems)
+},[combinedItems])
 
-  const handleSharedRoleUpdate = async (item, type, message) => {
-    setIsShareLoading(true);
 
-    try {
-      const result = await updateSharedAccess({
+ const handleSharedRoleUpdate = async (
+  item,
+  type,
+  message,
+) => {
+  setIsShareLoading(true);
+
+  try {
+  
+
+    const allPermissions =
+      item?.permissions ?? [];
+
+  
+
+    const mergedPermissions =
+      allPermissions.map((permission) => {
+   
+
+        const changedPermission =
+          peopleWithAccess.find(
+            (person) =>
+              String(person.id) ===
+              String(permission.id),
+          );
+
+        if (!changedPermission) {
+          return permission;
+        }
+
+        return {
+          ...permission,
+
+          role: changedPermission.role,
+        };
+      });
+
+   
+
+ 
+
+    const editablePermissions =
+      mergedPermissions.filter(
+        (permission) =>
+          permission?.type !== "anyone" &&
+          permission?.type !== "superuser" &&
+          permission?.role !== "owner",
+      );
+
+ 
+    const previousEditablePermissions =
+      (item?.permissions ?? []).filter(
+        (permission) =>
+          permission?.type !== "anyone" &&
+          permission?.type !== "superuser" &&
+          permission?.role !== "owner",
+      );
+
+    const equal =
+      previousEditablePermissions.length ===
+        editablePermissions.length &&
+      previousEditablePermissions.every(
+        (previousPermission) => {
+          const currentPermission =
+            editablePermissions.find(
+              (permission) =>
+                String(permission.id) ===
+                String(previousPermission.id),
+            );
+
+          return (
+            currentPermission &&
+            currentPermission.role ===
+              previousPermission.role
+          );
+        },
+      );
+
+    if (equal) {
+      setShareItem(null);
+      return;
+    }
+
+
+    const result =
+      await updateSharedAccess({
         item,
         type,
-        peopleWithAccess,
-        prevPermissions,
+
+      
+        peopleWithAccess:
+          editablePermissions,
+
+     
+        prevPermissions:
+          previousEditablePermissions,
+
         message,
+
         grantAccessById,
+
         revokeFileAccess,
       });
 
-      if (!result.changed) {
-        setShareItem(null);
-        return;
-      }
+    if (!result?.changed) {
+      setShareItem(null);
+      return;
+    }
 
-      const updatedPermissions = result.permissions ?? [];
+ 
+    const backendPermissions =
+      result?.permissions ?? [];
 
-      const currentUserId = String(user?.id ?? user?._id);
-
-      // =========================================================
-      // FIND CURRENT USER IN OLD PERMISSIONS
-      // =========================================================
-
-      const previousCurrentUserPermission = (
-        item?.permissions ??
-        prevPermissions ??
-        []
-      ).find(
-        (permission) =>
-          permission?.type === "user" &&
-          String(permission?.id) === currentUserId,
+    const backendPermissionMap =
+      new Map(
+        backendPermissions.map(
+          (permission) => [
+            String(permission.id),
+            permission,
+          ],
+        ),
       );
 
-      // =========================================================
-      // FIND CURRENT USER IN NEW PERMISSIONS
-      // =========================================================
-
-      const currentUserPermission = updatedPermissions.find(
-        (permission) =>
-          permission?.type === "user" &&
-          String(permission?.id) === currentUserId,
-      );
-
-      const previousRole =
-        previousCurrentUserPermission?.role ?? item?.currentUser?.role ?? null;
-
-      const newRole = currentUserPermission?.role ?? previousRole;
-
-      const currentUserRoleChanged = previousRole !== newRole;
-
-      // =========================================================
-      // KEEP EXISTING CURRENT USER CAPABILITIES
-      //
-      // If owner changes somebody else's permission:
-      //
-      //     owner capabilities MUST stay exactly the same.
-      // =========================================================
-
-      let newCapabilities = item?.capabilities ?? {};
-
-      let newCurrentUser = item?.currentUser;
-
-      // =========================================================
-      // ONLY REBUILD CAPABILITIES IF MY ROLE CHANGED
-      // =========================================================
-
-      if (currentUserRoleChanged) {
-        const isOwner = newRole === "owner";
-
-        const isWriter = newRole === "writer" || isOwner;
-
-        const isReader =
-          newRole === "reader" || newRole === "writer" || isOwner;
-
-        let canChangeRole = isOwner || isWriter;
-
-        // Root-level FILE:
-        // only owner can change permissions.
-        if (
-          type === "file" &&
-          item?.capabilities?.isRootLevelItem === true &&
-          !isOwner
-        ) {
-          canChangeRole = false;
-        }
-
-        newCapabilities = {
-          ...item?.capabilities,
-
-          canRead: isReader,
-
-          canWrite: isWriter,
-
-          canShare: isOwner || isWriter,
-
-          canChangeRole,
-
-          canRename: isOwner || isWriter,
-
-          canDownload: isReader,
-
-          canCopy: isReader,
-
-          canMove: isOwner || isWriter,
-
-          canTrash: isOwner,
-
-          canDelete: isOwner,
-        };
-
-        if (type === "folder") {
-          newCapabilities.canAddChildren = isOwner || isWriter;
-
-          newCapabilities.canRemoveChildren = isOwner || isWriter;
-        }
-
-        newCurrentUser = {
-          ...(item?.currentUser ?? {}),
-
-          role: newRole,
-
-          directRole: currentUserPermission?.directRole ?? null,
-
-          inheritedRole: currentUserPermission?.inheritedRole ?? null,
-
-          inherited: currentUserPermission?.inherited ?? false,
-
-          inheritedFrom: currentUserPermission?.inheritedFrom ?? null,
-
-          capabilities: newCapabilities,
-
-          canChangeRole,
-        };
-      }
-
-      // =========================================================
-      // PRESERVE PERMISSION UI DATA
-      //
-      // Backend may not return canChangeRole on every
-      // permission. Do not lose it.
-      // =========================================================
-
-      const oldPermissionMap = new Map(
-        (item?.permissions ?? prevPermissions ?? []).map((permission) => [
-          String(permission?.id),
-          permission,
-        ]),
-      );
-
-      const finalPermissions = updatedPermissions.map((permission) => {
-        const id = String(permission?.id);
-
-        const oldPermission = oldPermissionMap.get(id);
-
-        /*
-         * If backend supplied canChangeRole,
-         * use it.
-         *
-         * Otherwise preserve the old value.
-         */
-        const canChangeRole =
-          permission?.canChangeRole ?? oldPermission?.canChangeRole ?? false;
-
-        return {
-          ...oldPermission,
-          ...permission,
-
-          canChangeRole,
-        };
-      });
-
-      // =========================================================
-      // UPDATE RESOURCE
-      // =========================================================
-
-      const updateResource = (list) =>
-        list.map((resource) => {
-          const resourceId = String(resource?._id ?? resource?.id);
-
-          if (resourceId !== String(result.itemId)) {
-            return resource;
-          }
-
-          const nonUserPermissions = (resource?.permissions ?? []).filter(
-            (permission) => permission?.type !== "user",
+    const finalPermissions =
+      allPermissions.map((permission) => {
+        const updatedPermission =
+          backendPermissionMap.get(
+            String(permission.id),
           );
 
-          /*
-           * VERY IMPORTANT:
-           *
-           * If I changed another user's role,
-           * preserve the resource's existing capabilities.
-           *
-           * Do NOT replace them with undefined.
-           */
+     
+        if (!updatedPermission) {
+          return permission;
+        }
 
-          const finalCapabilities = currentUserRoleChanged
-            ? newCapabilities
-            : (resource?.capabilities ?? item?.capabilities ?? {});
-
-          const finalCurrentUser = currentUserRoleChanged
-            ? newCurrentUser
-            : (resource?.currentUser ?? item?.currentUser);
-
-          return {
-            ...resource,
-
-            // Keep all non-user permissions.
-            permissions: [...nonUserPermissions, ...finalPermissions],
-
-            // ===================================================
-            // CURRENT USER CAPABILITIES
-            // ===================================================
-
-            capabilities: finalCapabilities,
-
-            // ===================================================
-            // CURRENT USER
-            // ===================================================
-
-            currentUser: finalCurrentUser,
-          };
-        });
-
-      // =========================================================
-      // UPDATE LISTS
-      // =========================================================
-
-      setFilesList(updateResource);
-      setDirectoriesList(updateResource);
-
-      // =========================================================
-      // SHARE MODAL STATE
-      // =========================================================
-
-      setPeopleWithAccess(finalPermissions);
-
-      setPrevPermissions(finalPermissions);
-
-      setShareItem(null);
-
-      toast({
-        message: "Access updated",
-        type: "success",
+        return {
+          ...permission,
+          ...updatedPermission,
+        };
       });
-    } catch (error) {
-      toast({
-        message: error?.message || "Something went wrong!",
-        type: "error",
-      });
-    } finally {
-      setIsShareLoading(false);
+
+      for (const permission of backendPermissions) {
+      const alreadyExists =
+        finalPermissions.some(
+          (existingPermission) =>
+            String(existingPermission.id) ===
+            String(permission.id),
+        );
+
+      if (!alreadyExists) {
+        finalPermissions.push(permission);
+      }
     }
-  };
+
+  
+      setFilesList((prev) =>
+      prev.map((resource) => {
+        const resourceId = String(
+          resource?._id ??
+            resource?.id,
+        );
+
+        if (
+          resourceId !==
+          String(result.itemId)
+        ) {
+          return resource;
+        }
+
+        return {
+          ...resource,
+
+          permissions:
+            finalPermissions,
+        };
+      }),
+    );
+
+  
+    setDirectoriesList((prev) =>
+      prev.map((resource) => {
+        const resourceId = String(
+          resource?._id ??
+            resource?.id,
+        );
+
+        if (
+          resourceId !==
+          String(result.itemId)
+        ) {
+          return resource;
+        }
+
+        return {
+          ...resource,
+
+          permissions:
+            finalPermissions,
+        };
+      }),
+    );
+
+   
+    const updatedEditablePermissions =
+      finalPermissions.filter(
+        (permission) =>
+          permission?.type !== "anyone" &&
+          permission?.type !== "superuser" &&
+          permission?.role !== "owner",
+      );
+
+    setPeopleWithAccess(
+      updatedEditablePermissions,
+    );
+
+    setPrevPermissions(
+      updatedEditablePermissions,
+    );
+
+  
+    setShareItem(null);
+
+    toast({
+      message: "Access updated",
+      type: "success",
+    });
+  } catch (error) {
+    console.error(
+      "handleSharedRoleUpdate:",
+      error,
+    );
+
+    toast({
+      message:
+        error?.message ||
+        "Something went wrong!",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+};
+
+
 
   async function handleDeleteSelected() {
     for (const id of selectedItems) {

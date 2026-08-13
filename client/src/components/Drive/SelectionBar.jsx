@@ -8,7 +8,7 @@ import {
   IconLink,
   IconTrash,
 } from "../../Components/Icons/Icons";
-import { useToast } from "../../Contexts";
+import { useAuth, useToast } from "../../Contexts";
 
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
@@ -35,6 +35,7 @@ export default function SelectionBar({
   }
 
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // ============================================================
   // SELECTED ITEM
@@ -81,11 +82,11 @@ export default function SelectionBar({
   // component doesn't care where the item came from.
   // ============================================================
 
-  const capabilities = item.capabilities || {};
+  const capabilities = item.permissions?.find((p)=> p.id === user.id)?.capabilities || {};
 
   const canRead = capabilities.canRead === true;
 
-  const canShare = capabilities.canShare === true;
+  const canShare = true;
 
   const canDownload = capabilities.canDownload === true;
 

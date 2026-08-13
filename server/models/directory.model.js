@@ -33,24 +33,7 @@ const directorySchema = new Schema(
       type: Boolean,
       default: false,
     },
-    transfer: {
-      fromUser: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-      toUser: {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-      },
-      status: {
-        type: String,
-        enum: ["pending", "accepted", "rejected", "cancelled"],
-        default: "pending",
-      },
-      expiresAt: {
-        type: Date,
-      },
-    },
+
     viewedByMeTime: {
       type: Date,
       default: Date.now,

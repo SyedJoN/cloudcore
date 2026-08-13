@@ -71,7 +71,7 @@ const MouseTooltip = ({ children, message, disabled = false }) => {
               transformOrigin: "top center",
               transform: "translateX(-50%)",
 
-              maxWidth: "280px",
+              maxWidth: "260px",
               padding: "8px 12px",
 
               background: "var(--text-primary)",
@@ -81,7 +81,9 @@ const MouseTooltip = ({ children, message, disabled = false }) => {
               fontSize: "13px",
               lineHeight: "18px",
 
-
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              display: "-webkit-box",
               whiteSpace: "normal",
               overflowWrap: "break-word",
 
@@ -93,7 +95,7 @@ const MouseTooltip = ({ children, message, disabled = false }) => {
           >
             {message}
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );
