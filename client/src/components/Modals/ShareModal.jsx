@@ -381,7 +381,7 @@ export default function ShareModal({
     setIsShareLoading(true);
 
     try {
-      const message = await sendOwnershipMail({
+      const result = await sendOwnershipMail({
         newOwner: person,
         itemId: item._id ?? item.id,
         type,
@@ -394,16 +394,7 @@ export default function ShareModal({
 
           return {
             ...resource,
-
-            permissions: resource.permissions.map((permission) =>
-              String(permission?.id ?? permission?._id) ===
-              String(person?.id ?? person?._id)
-                ? {
-                    ...permission,
-                    pendingOwner: true,
-                  }
-                : permission,
-            ),
+            permissions: result.permissions
           };
         };
 
@@ -446,7 +437,7 @@ export default function ShareModal({
 
       update();
       setOpenDropdown(null);
-      toast({ message, type: "success" });
+      toast({ message: result.message, type: "success" });
     } catch (error) {
       toast({ message: error.message, type: "error" });
     } finally {
@@ -954,8 +945,9 @@ export default function ShareModal({
                       {ROLE_LABEL[inviteRole] || inviteRole}{" "}
                       <IconChevronDown size={14} />
                     </button>
-                    {openDropdown === "invite" && (
+                  
                       <RoleDropdown
+                      open={openDropdown === "invite"}
                         containerRef={shareModalOverlayRef}
                         anchorRef={inviteRoleRef}
                         current={inviteRole}
@@ -971,7 +963,7 @@ export default function ShareModal({
                         }}
                         onClose={() => setOpenDropdown(null)}
                       />
-                    )}
+                   
                   </div>
                 </div>
 
@@ -1178,8 +1170,9 @@ export default function ShareModal({
                                   )}
                                 </button>
                               </MouseTooltip>
-                              {openDropdown === idx && (
+                            
                                 <RoleDropdown
+                                open={openDropdown === idx}
                                   isChanged={isChanged}
                                   isOwnerPending={person.pendingOwner}
                                   onTransfer={() =>
@@ -1197,7 +1190,7 @@ export default function ShareModal({
                                   showRemove={true}
                                   isOwner={isOwner}
                                 />
-                              )}
+                           
                             </div>
                           </div>
                         </div>
@@ -1290,8 +1283,9 @@ export default function ShareModal({
                           >
                             {ROLE_LABEL[linkRole]} <IconChevronDown size={14} />
                           </button>
-                          {openDropdown === "link" && (
+                     
                             <RoleDropdown
+                            open={openDropdown === "link"}
                               anchorRef={linkRoleRef}
                               containerRef={shareModalOverlayRef}
                               current={ROLE_LABEL[linkRole]}
@@ -1302,7 +1296,7 @@ export default function ShareModal({
                               }}
                               onClose={() => setOpenDropdown(null)}
                             />
-                          )}
+                    
                         </div>
                       )}
                     </div>

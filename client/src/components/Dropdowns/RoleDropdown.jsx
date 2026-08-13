@@ -1,21 +1,15 @@
-import {
-  useLayoutEffect,
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import {
-  ROLE_LABEL,
-  ROLE_DESC,
-  DRIVE_ROLES,
-} from "../../../Utils/displayUtils";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+
+import { ROLE_LABEL, DRIVE_ROLES } from "../../../Utils/displayUtils";
+
 import { CheckIcon } from "@heroicons/react/24/solid";
 import MouseTooltip from "../Tooltip/Tooltip";
+import { Portal, useTransitionClass } from "../../hooks/useFloatingMenu";
 
 const ROLES = ["viewer", "editor"];
 
-export default function RoleDropdown({
+function RoleDropdownContent({
+  open,
   anchorRef,
   current,
   isOwnerPending,
@@ -27,37 +21,60 @@ export default function RoleDropdown({
   showRemove = false,
   isChanged = false,
 }) {
-  const dropdownRef = useRef(null);
+  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open);
 
   const [position, setPosition] = useState(null);
 
-  const dropdownWidth = 180;
+  const dropdownWidth = 220;
 
   const updatePosition = useCallback(() => {
     const anchor = anchorRef?.current;
-    if (!anchor) return;
+
+    if (!anchor) {
+      return;
+    }
 
     const rect = anchor.getBoundingClientRect();
+
     let left = rect.right - dropdownWidth;
+
+    // Don't go outside left side
     if (left < 8) {
-      left = rect.right;
+      left = 8;
     }
+
+    // Don't go outside right side
     if (left + dropdownWidth > window.innerWidth - 8) {
       left = window.innerWidth - dropdownWidth - 8;
     }
-    setPosition({ top: rect.bottom + 4, left });
+
+    setPosition({
+      top: rect.bottom + 4,
+      left,
+    });
   }, [anchorRef]);
 
+  /*
+   * Calculate position before paint.
+   */
   useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+
     updatePosition();
+  }, [open, updatePosition]);
 
-    const handleResize = () => {
-      updatePosition();
-    };
+  /*
+   * Keep dropdown positioned while scrolling/resizing.
+   */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
 
-    const handleScroll = () => {
-      updatePosition();
-    };
+    const handleResize = () => updatePosition();
+    const handleScroll = () => updatePosition();
 
     window.addEventListener("resize", handleResize);
     window.addEventListener("scroll", handleScroll, true);
@@ -66,67 +83,76 @@ export default function RoleDropdown({
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("scroll", handleScroll, true);
     };
-  }, [updatePosition]);
+  }, [open, updatePosition]);
 
+  // Escape closes dropdown.
   useEffect(() => {
-    const onKey = (e) => {
+    if (!open) {
+      return;
+    }
+
+    const handleKeyDown = (e) => {
       if (e.key === "Escape") {
-        onClose();
+        onClose?.();
       }
     };
 
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [open, onClose]);
 
   return (
-    <>
-      <div
-        ref={dropdownRef}
-        className="gd-role-dropdown"
-        style={{
-          position: "fixed",
-          top: position?.top ?? 0,
-          left: position?.left ?? 0,
-          zIndex: 9999,
-          minWidth: dropdownWidth,
-          visibility: position ? "visible" : "hidden",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {ROLES.map((r) => {
-          const isSelected = String(current).toLowerCase() === r;
+    <div
+      ref={nodeRef}
+      className={`gd-role-dropdown ${animate ? "open" : ""}`}
+      onTransitionEnd={onTransitionEnd}
+      style={{
+        position: "fixed",
+        top: position?.top ?? 0,
+        left: position?.left ?? 0,
+        zIndex: 9999,
+        width: dropdownWidth,
+        visibility: position ? "visible" : "hidden",
+        pointerEvents: animate ? "auto" : "none",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {ROLES.map((r) => {
+        const isSelected = String(current ?? "").toLowerCase() === r;
 
-          return (
-            <button
-              key={r}
-              type="button"
-              className="gd-role-option"
-              onClick={() => onChange(r)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              <span className="absolute left-3 top-2.75">
-                {isSelected && (
-                  <CheckIcon className="w-5 h-5 min-w-5 text-(--accent-blue)" />
-                )}
-              </span>
+        return (
+          <button
+            key={r}
+            type="button"
+            className="gd-role-option"
+            onClick={() => onChange?.(r)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            <span className="absolute left-3 top-2.75">
+              {isSelected && (
+                <CheckIcon className="w-5 h-5 min-w-5 text-(--accent-blue)" />
+              )}
+            </span>
 
-              <span className="gd-role-option-label">
-                <span>{ROLE_LABEL[r] || r}</span>
-              </span>
-            </button>
-          );
-        })}
-        {isOwner && (
-          <>
-            <div className="gd-context-divider" />
+            <span className="gd-role-option-label">
+              <span>{ROLE_LABEL[r] || r}</span>
+            </span>
+          </button>
+        );
+      })}
+
+      {isOwner && (
+        <>
+          <div className="gd-context-divider" />
+
           <MouseTooltip
             disabled={isChanged}
             message="Disabled because other changes are pending"
@@ -135,29 +161,32 @@ export default function RoleDropdown({
               disabled={isChanged}
               type="button"
               className="gd-role-option remove"
-              onClick={() => (isOwnerPending ? onCancel() : onTransfer())}
+              onClick={() => (isOwnerPending ? onCancel?.() : onTransfer?.())}
             >
-              {isOwnerPending
-                ? "Cancel ownership transfer"
-                : "Transfer ownership"}
+              {isOwnerPending ? "Cancel ownership transfer" : "Transfer ownership"}
             </button>
           </MouseTooltip>
-          </>
+        </>
+      )}
 
-        )}
-        {showRemove && (
-          <button
-            type="button"
-            className="gd-role-option remove"
-            style={{
-              color: "#d93025",
-            }}
-            onClick={() => onChange("remove")}
-          >
-            Remove access
-          </button>
-        )}
-      </div>
-    </>
+      {showRemove && (
+        <button
+          type="button"
+          className="gd-role-option remove"
+          style={{ color: "#d93025" }}
+          onClick={() => onChange?.("remove")}
+        >
+          Remove access
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function RoleDropdown({ open, anchorRef, containerRef, ...rest }) {
+  return (
+    <Portal>
+      <RoleDropdownContent open={open} anchorRef={anchorRef} {...rest} />
+    </Portal>
   );
 }

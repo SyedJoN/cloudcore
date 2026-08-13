@@ -23,7 +23,6 @@ export function useDirectoryData({
   const [directoriesList, setDirectoriesList] = useState([]);
   const [filesList, setFilesList] = useState([]);
   const [crumbs, setCrumbs] = useState([]);
-  const [isDeleted, setIsDeleted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [needsAccess, setNeedsAccess] = useState(false);
 
@@ -180,7 +179,6 @@ export function useDirectoryData({
     setDirectoriesList,
     crumbs,
     setCrumbs,
-    isDeleted,
     isLoading,
     needsAccess,
     getDirectoryItems,

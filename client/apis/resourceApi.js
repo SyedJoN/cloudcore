@@ -10,7 +10,7 @@ export async function sendOwnershipMail({ newOwner, itemId, type }) {
     },
   );
 
-  return data.message;
+  return data;
 }
 
 export async function cancelPendingOwnership({ newOwner, itemId }) {

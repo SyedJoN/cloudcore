@@ -5,13 +5,16 @@ const ToastContext = createContext(null);
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const toast = useCallback(({ message, type = "info", duration = 3000 }) => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((prev) => [{ id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, duration);
-  }, []);
+  const toast = useCallback(
+    ({ message, type = "info", undoAction = null, duration = 5000 }) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setToasts((prev) => [{ id, message, type, undoAction }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, duration);
+    },
+    [],
+  );
 
   const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -27,7 +30,7 @@ export function ToastProvider({ children }) {
 
 export function useToast() {
   const context = useContext(ToastContext);
-    if (!context) {
+  if (!context) {
     throw new Error("useToast must be used inside ToastProvider");
   }
   return context;
@@ -40,6 +43,30 @@ function ToastContainer({ toasts, onRemove }) {
       {toasts.map((t) => (
         <div key={t.id} style={{ ...styles.toast, ...styles[t.type] }}>
           <span>{t.message}</span>
+
+          {typeof t.undoAction?.onUndo === "function" && (
+            <button
+              type="button"
+              style={{
+                background: "none",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer",
+                textDecoration: "underline",
+                fontWeight: 600,
+              }}
+              onClick={async () => {
+                try {
+                  await t.undoAction.onUndo();
+                  onRemove(t.id);
+                } catch (error) {
+                  console.error("Undo failed:", error);
+                }
+              }}
+            >
+              Undo
+            </button>
+          )}
           <button style={styles.close} onClick={() => onRemove(t.id)}>
             ✕
           </button>
@@ -53,7 +80,7 @@ const styles = {
   container: {
     position: "fixed",
     bottom: 24,
-    left: 24, 
+    left: 24,
     display: "flex",
     flexDirection: "column",
     gap: 8,

@@ -48,8 +48,9 @@ export const updateSharedAccess = async ({
   /*
    * Apply grants / role changes.
    */
+  let response;
   if (personsToGrant.length) {
-    await grantAccessById(
+   response = await grantAccessById(
       type,
       itemId,
       personsToGrant,
@@ -61,7 +62,7 @@ export const updateSharedAccess = async ({
    * Apply removals.
    */
   if (personsToRemove.length) {
-    await Promise.all(
+   response = await Promise.all(
       personsToRemove.map((person) =>
         revokeFileAccess(
           type,
@@ -73,51 +74,10 @@ export const updateSharedAccess = async ({
     );
   }
 
-  /*
-   * IMPORTANT:
-   *
-   * Start with ALL existing permissions.
-   * Then replace only the users that were submitted.
-   */
-  const updatedPermissionMap = new Map(
-    previousPermissions.map((permission) => [
-      String(permission?.id),
-      permission,
-    ]),
-  );
-
-  /*
-   * Update / add granted users.
-   */
-  for (const person of personsToGrant) {
-    updatedPermissionMap.set(
-      String(person?.id),
-      person,
-    );
-  }
-
-  /*
-   * Remove users that were explicitly removed.
-   */
-  for (const person of personsToRemove) {
-    updatedPermissionMap.delete(
-      String(person?.id),
-    );
-  }
-
-  const finalPermissions = Array.from(
-    updatedPermissionMap.values(),
-  );
 
   return {
     changed: true,
     itemId,
-
-    // THIS IS NOW THE FULL PERMISSION ARRAY
-    permissions: finalPermissions,
-
-    granted: personsToGrant,
-
-    removed: personsToRemove,
+    finalPermissions: response.permissions
   };
 };

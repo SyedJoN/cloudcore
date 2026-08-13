@@ -31,6 +31,7 @@ import { getAncestorDirectories } from "../utils/permissions/getAncestorDirector
 import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
+import { resolve } from "dns";
 const roleMap = {
   viewer: "reader",
   editor: "writer",
@@ -211,13 +212,12 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
   const ownership = await Ownership.findOne({
     itemId: item?._id,
-  }).lean();
+  }).sort({createdAt: -1})
+  .lean();
 
   const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
-
   const updatedPermissions = permissionsWithCapabilities.map((permission) => {
     const permissionId = getIdString(permission.id);
-
     if (ownership?.status === "pending" && permissionId === ownerId) {
       return {
         ...permission,
@@ -1039,6 +1039,7 @@ export const giveAccessById = async (req, res, next) => {
     const Model = type === "folder" ? Directory : File;
 
     const item = await Model.findById(id)
+      .populate("parentDirId")
       .populate("userId", "name email")
       .lean();
 
@@ -1277,9 +1278,10 @@ export const giveAccessById = async (req, res, next) => {
         });
       }),
     );
-
+    const finalResult = await resolveRole(item, type, item?.userId, item.parentDirId)
     return res.status(200).json({
       message: `${type} access updated successfully`,
+      permissions: finalResult.permissions
     });
   } catch (error) {
     console.error("giveAccessById error:", error);

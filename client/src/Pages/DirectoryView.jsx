@@ -116,8 +116,6 @@ export default function DirectoryView({ route }) {
   const [allUsers, setAllUsers] = useState([]);
   const [downloadQueue, setDownloadQueue] = useState([]);
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
-  const downloadControllers = useRef({});
-
   const dirContext =
     location.state?.dirContext ||
     (isTrashRoute
@@ -135,6 +133,25 @@ export default function DirectoryView({ route }) {
                 : "root");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
+  const downloadControllers = useRef({});
+
+  const handleUndo = async (undoAction) => {
+    if (!undoAction) return;
+
+    if (undoAction.type === "trash") {
+      await handleRestoreItem(undoAction.item);
+      refreshCurrentDirectory();
+    }
+    if (undoAction.type === "restore") {
+      await handleMoveToTrash(undoAction.item);
+      refreshCurrentDirectory()
+    }
+    if (undoAction.type === "star") {
+      await handleToggleStar(undoAction.item);
+      isStarredRoute && getDirectoryItems("starred");
+    }
+    toast({ message: "Action undone", type: "success" });
+  };
 
   function showError(message, autoClear = false) {
     setError(message);
@@ -176,7 +193,6 @@ export default function DirectoryView({ route }) {
   }, [dirId]);
   const {
     directoryName,
-    isDeleted,
     isLoading,
     needsAccess,
     crumbs,
@@ -205,7 +221,13 @@ export default function DirectoryView({ route }) {
 
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
-      type === "google" ? "google-drive" : isSharedRoute ? "shared" : "root",
+      type === "google"
+        ? "google-drive"
+        : isSharedRoute
+          ? "shared"
+          : isStarredRoute
+            ? "starred" : isTrashRoute ? "trash"
+            : "root",
     );
 
   const {
@@ -273,7 +295,9 @@ export default function DirectoryView({ route }) {
     handleMainMouseMove,
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef });
-
+  useEffect(() => {
+    console.log("route", route);
+  }, [route]);
   useEffect(() => {
     if (!isStarredRoute) return;
     setIsStarred((prev) => {
@@ -439,6 +463,24 @@ export default function DirectoryView({ route }) {
         : `/file/soft-delete/${item._id}`;
       await softDeleteFile(url);
       await refreshUser();
+
+      toast({
+        message: "Item moved to trash",
+        type: "success",
+        duration: 5000,
+
+        undoAction: {
+          type: "trash",
+          itemId: item._id,
+          onUndo: async () => {
+            await handleUndo({
+              type: "trash",
+              itemId: item._id,
+              item,
+            });
+          },
+        },
+      });
       refreshCurrentDirectory();
       clearSelection();
     } catch (err) {
@@ -456,6 +498,22 @@ export default function DirectoryView({ route }) {
       const type = item.isDirectory ? "directory" : "file";
       await restoreFile(`/${type}/${item._id}/restore`);
       await refreshUser();
+      toast({
+        message: `${item.name} restored`,
+        type: "success",
+
+        undoAction: {
+          type: "restore",
+          itemId: item._id,
+          onUndo: async () => {
+            await handleUndo({
+              type: "restore",
+              itemId: item._id,
+              item,
+            });
+          },
+        },
+      });
       getTrashItems(showError);
       clearSelection();
     } catch (err) {
@@ -550,15 +608,33 @@ export default function DirectoryView({ route }) {
 
       const newStarredValue = !item.isStarred;
 
-      if (!newStarredValue) {
+      if (!newStarredValue && isStarredRoute) {
         if (item.isDirectory) {
           setDirectoriesList((prev) => prev.filter((d) => d._id !== item._id));
         } else {
           setFilesList((prev) => prev.filter((f) => f._id !== item._id));
         }
       }
+      setIsStarred((prev) => ({
+        ...prev,
+        [item._id]: !prev[item._id],
+      }));
+      toast({
+        message,
+        type: "success",
 
-      toast({ message, type: "success" });
+        undoAction: {
+          type: "star",
+          itemId: item._id,
+          onUndo: async () => {
+            await handleUndo({
+              type: "star",
+              itemId: item._id,
+              item,
+            });
+          },
+        },
+      });
     } catch (error) {
       setError(error.message);
     }
@@ -789,36 +865,20 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
-useEffect(()=> {
-  console.log('combined', combinedItems)
-},[combinedItems])
+  useEffect(() => {
+    console.log("combined", combinedItems);
+  }, [combinedItems]);
 
+  const handleSharedRoleUpdate = async (item, type, message) => {
+    setIsShareLoading(true);
 
- const handleSharedRoleUpdate = async (
-  item,
-  type,
-  message,
-) => {
-  setIsShareLoading(true);
+    try {
+      const allPermissions = item?.permissions ?? [];
 
-  try {
-  
-
-    const allPermissions =
-      item?.permissions ?? [];
-
-  
-
-    const mergedPermissions =
-      allPermissions.map((permission) => {
-   
-
-        const changedPermission =
-          peopleWithAccess.find(
-            (person) =>
-              String(person.id) ===
-              String(permission.id),
-          );
+      const mergedPermissions = allPermissions.map((permission) => {
+        const changedPermission = peopleWithAccess.find(
+          (person) => String(person.id) === String(permission.id),
+        );
 
         if (!changedPermission) {
           return permission;
@@ -826,70 +886,27 @@ useEffect(()=> {
 
         return {
           ...permission,
-
           role: changedPermission.role,
         };
       });
 
-   
-
- 
-
-    const editablePermissions =
-      mergedPermissions.filter(
+      const newPermissions = mergedPermissions.filter(
         (permission) =>
-          permission?.type !== "anyone" &&
-          permission?.type !== "superuser" &&
-          permission?.role !== "owner",
+          permission?.type !== "anyone" && permission?.role !== "owner",
       );
 
- 
-    const previousEditablePermissions =
-      (item?.permissions ?? []).filter(
+      const previousEditablePermissions = (item?.permissions ?? []).filter(
         (permission) =>
-          permission?.type !== "anyone" &&
-          permission?.type !== "superuser" &&
-          permission?.role !== "owner",
+          permission?.type !== "anyone" && permission?.role !== "owner",
       );
 
-    const equal =
-      previousEditablePermissions.length ===
-        editablePermissions.length &&
-      previousEditablePermissions.every(
-        (previousPermission) => {
-          const currentPermission =
-            editablePermissions.find(
-              (permission) =>
-                String(permission.id) ===
-                String(previousPermission.id),
-            );
-
-          return (
-            currentPermission &&
-            currentPermission.role ===
-              previousPermission.role
-          );
-        },
-      );
-
-    if (equal) {
-      setShareItem(null);
-      return;
-    }
-
-
-    const result =
-      await updateSharedAccess({
+      const result = await updateSharedAccess({
         item,
         type,
 
-      
-        peopleWithAccess:
-          editablePermissions,
+        peopleWithAccess: newPermissions,
 
-     
-        prevPermissions:
-          previousEditablePermissions,
+        prevPermissions: previousEditablePermissions,
 
         message,
 
@@ -898,146 +915,64 @@ useEffect(()=> {
         revokeFileAccess,
       });
 
-    if (!result?.changed) {
-      setShareItem(null);
-      return;
-    }
-
- 
-    const backendPermissions =
-      result?.permissions ?? [];
-
-    const backendPermissionMap =
-      new Map(
-        backendPermissions.map(
-          (permission) => [
-            String(permission.id),
-            permission,
-          ],
-        ),
-      );
-
-    const finalPermissions =
-      allPermissions.map((permission) => {
-        const updatedPermission =
-          backendPermissionMap.get(
-            String(permission.id),
-          );
-
-     
-        if (!updatedPermission) {
-          return permission;
-        }
-
-        return {
-          ...permission,
-          ...updatedPermission,
-        };
-      });
-
-      for (const permission of backendPermissions) {
-      const alreadyExists =
-        finalPermissions.some(
-          (existingPermission) =>
-            String(existingPermission.id) ===
-            String(permission.id),
-        );
-
-      if (!alreadyExists) {
-        finalPermissions.push(permission);
+      if (!result?.changed) {
+        setShareItem(null);
+        return;
       }
-    }
 
-  
       setFilesList((prev) =>
-      prev.map((resource) => {
-        const resourceId = String(
-          resource?._id ??
-            resource?.id,
-        );
+        prev.map((resource) => {
+          const resourceId = String(resource?._id ?? resource?.id);
 
-        if (
-          resourceId !==
-          String(result.itemId)
-        ) {
-          return resource;
-        }
+          if (resourceId !== String(result.itemId)) {
+            return resource;
+          }
 
-        return {
-          ...resource,
+          return {
+            ...resource,
 
-          permissions:
-            finalPermissions,
-        };
-      }),
-    );
-
-  
-    setDirectoriesList((prev) =>
-      prev.map((resource) => {
-        const resourceId = String(
-          resource?._id ??
-            resource?.id,
-        );
-
-        if (
-          resourceId !==
-          String(result.itemId)
-        ) {
-          return resource;
-        }
-
-        return {
-          ...resource,
-
-          permissions:
-            finalPermissions,
-        };
-      }),
-    );
-
-   
-    const updatedEditablePermissions =
-      finalPermissions.filter(
-        (permission) =>
-          permission?.type !== "anyone" &&
-          permission?.type !== "superuser" &&
-          permission?.role !== "owner",
+            permissions: result.finalPermissions,
+          };
+        }),
       );
 
-    setPeopleWithAccess(
-      updatedEditablePermissions,
-    );
+      setDirectoriesList((prev) =>
+        prev.map((resource) => {
+          const resourceId = String(resource?._id ?? resource?.id);
 
-    setPrevPermissions(
-      updatedEditablePermissions,
-    );
+          if (resourceId !== String(result.itemId)) {
+            return resource;
+          }
 
-  
-    setShareItem(null);
+          return {
+            ...resource,
 
-    toast({
-      message: "Access updated",
-      type: "success",
-    });
-  } catch (error) {
-    console.error(
-      "handleSharedRoleUpdate:",
-      error,
-    );
+            permissions: result.finalPermissions,
+          };
+        }),
+      );
 
-    toast({
-      message:
-        error?.message ||
-        "Something went wrong!",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-};
+      setPeopleWithAccess(result.finalPermissions);
 
+      setPrevPermissions(result.finalPermissions);
 
+      setShareItem(null);
+
+      toast({
+        message: "Access updated",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("handleSharedRoleUpdate:", error);
+
+      toast({
+        message: error?.message || "Something went wrong!",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
 
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
@@ -1243,7 +1178,6 @@ useEffect(()=> {
         hasFileSelected={hasFileSelected}
         isStarred={isStarred}
         setIsStarred={setIsStarred}
-        isDeleted={isDeleted}
         route={route}
         onClear={() => {
           clearSelection();
@@ -1311,7 +1245,6 @@ useEffect(()=> {
         isGoogleDriveRoute={isGoogleDriveRoute}
         isTrashRoute={isTrashRoute}
         dirId={dirId}
-        isDeleted={isDeleted}
         viewMode={viewMode}
         onClose={() => {
           setOpen(false);
@@ -1331,7 +1264,6 @@ useEffect(()=> {
         <FileViewer
           key={viewItem._id}
           item={viewItem}
-          isDeleted={isDeleted}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}

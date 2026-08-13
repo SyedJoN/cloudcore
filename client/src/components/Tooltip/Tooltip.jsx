@@ -86,7 +86,7 @@ const MouseTooltip = ({ children, message, disabled = false }) => {
               display: "-webkit-box",
               whiteSpace: "normal",
               overflowWrap: "break-word",
-
+              overflow: "hidden",
               pointerEvents: "none",
               zIndex: 999999,
 

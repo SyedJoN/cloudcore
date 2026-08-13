@@ -183,7 +183,11 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   // Public / anyone permission
 
   if (isPublic) {
-    const publicCapabilities = getCapabilities(publicRole, type, isRootLevelFile);
+    const publicCapabilities = getCapabilities(
+      publicRole,
+      type,
+      isRootLevelFile,
+    );
 
     publicCapabilities.canChangeRole = false;
 
@@ -206,9 +210,11 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
   const ownership = await Ownership.findOne({
     itemId: item?._id,
-  }).lean();
+  }).sort({createdAt: -1})
+  .lean();
 
   const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
+
 
   const updatedPermissions = permissionsWithCapabilities.map((permission) => {
     const permissionId = getIdString(permission.id);
@@ -312,11 +318,16 @@ export const getDirectory = async (req, res, next) => {
         ),
         Promise.all(
           directories.map(async (d) => {
-            const permissions = await resolveRole(d, "folder", userId, parentDir);
+            const permissions = await resolveRole(
+              d,
+              "folder",
+              userId,
+              parentDir,
+            );
             return {
               ...d,
               owners: roles.owners,
-              ...permissions
+              ...permissions,
             };
           }),
         ),
@@ -329,7 +340,7 @@ export const getDirectory = async (req, res, next) => {
       );
       const parentDirWithRole = {
         ...parentDirData,
-        ...permissions
+        ...permissions,
       };
       return res.status(200).json({
         ...parentDirWithRole,
@@ -389,7 +400,7 @@ export const getDirectory = async (req, res, next) => {
         const permissions = await resolveRole(file, "file", userId, parentDir);
         return {
           ...file,
-          ...permissions
+          ...permissions,
         };
       }),
     );
@@ -399,7 +410,7 @@ export const getDirectory = async (req, res, next) => {
         const permissions = await resolveRole(dir, "folder", userId, parentDir);
         return {
           ...dir,
-          ...permissions
+          ...permissions,
         };
       }),
     );
@@ -468,20 +479,30 @@ export const getTrashItems = async (req, res, next) => {
 
     const topLevelFilesWithResolvedRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const permissions = await resolveRole(file, "file", userId, file.parentDirId);
+        const permissions = await resolveRole(
+          file,
+          "file",
+          userId,
+          file.parentDirId,
+        );
         return {
           ...file,
-          ...permissions
+          ...permissions,
         };
       }),
     );
 
     const topLevelDirsWithResolvedRoles = await Promise.all(
       topLevelDirs.map(async (dir) => {
-        const permissions = await resolveRole(dir, "folder", userId, dir.parentDirId);
+        const permissions = await resolveRole(
+          dir,
+          "folder",
+          userId,
+          dir.parentDirId,
+        );
         return {
           ...dir,
-          ...permissions
+          ...permissions,
         };
       }),
     );
@@ -592,7 +613,7 @@ export const getSharedWithMe = async (req, res, next) => {
 
         return {
           ...file,
-          ...permissions
+          ...permissions,
         };
       }),
     );
@@ -621,7 +642,7 @@ export const getSharedWithMe = async (req, res, next) => {
 
         return {
           ...directory,
-          ...permissions
+          ...permissions,
         };
       }),
     );
@@ -708,13 +729,8 @@ export const getStarredItems = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const roles = await resolveRole(
-          file,
-          "file",
-          userId,
-          file.parentDirId,
-        );
-         return {
+        const roles = await resolveRole(file, "file", userId, file.parentDirId);
+        return {
           ...file,
           ...permissions,
         };
@@ -1209,7 +1225,7 @@ export const sendOwnershipMail = async (req, res, next) => {
     const resource = await Model.findOne({
       _id: itemId,
       userId: currentOwnerId,
-    });
+    }).populate("parentDirId");
 
     if (!resource) {
       return res.status(404).json({
@@ -1225,17 +1241,24 @@ export const sendOwnershipMail = async (req, res, next) => {
       status: "pending",
     });
 
-    await sendOwnershipTransferEmail({
-      to: newOwner.emailAddress,
-      toName: newOwner.displayName,
-      fromName: currentOwnerName,
-      itemName: resource.name,
-      transferId: transfer._id,
-      expiresAt: transfer.expiresAt,
-    });
-
+    // await sendOwnershipTransferEmail({
+    //   to: newOwner.emailAddress,
+    //   toName: newOwner.displayName,
+    //   fromName: currentOwnerName,
+    //   itemName: resource.name,
+    //   transferId: transfer._id,
+    //   expiresAt: transfer.expiresAt,
+    // });
+  
+    const finalResponse = await resolveRole(
+      resource,
+      type,
+      newOwner.id,
+      resource.parentDirId,
+    );
     return res.status(200).json({
       message: "Ownership mail sent successfully!",
+      permissions: finalResponse.permissions,
     });
   } catch (error) {
     console.error("OWNERSHIP MAIL ERROR:", error);
@@ -1259,7 +1282,9 @@ export const cancelOwnershipMail = async (req, res, next) => {
         message: "newOwner and itemId are required",
       });
     }
-    const ownership = await Ownership.findOne({ toUser: newOwnerId });
+    const ownership = await Ownership.findOne({ toUser: newOwnerId }).sort({createdAt: -1}).populate(
+      "itemId",
+    );
 
     if (!ownership) {
       return res
@@ -1268,9 +1293,23 @@ export const cancelOwnershipMail = async (req, res, next) => {
     }
     ownership.status = "cancelled";
     await ownership.save();
-    return res
-      .status(200)
-      .json({ message: "Ownership mail cancelled successfully!" });
+    const type = ownership.itemType === "Directory" ? "folder" : "file";
+    console.log({
+      itemId:ownership.itemId,
+      type,
+      newOwnerId,
+      parentDirId:ownership.itemId.parentDirId,
+    })
+    const finalResponse = await resolveRole(
+      ownership.itemId,
+      type,
+      newOwnerId,
+      ownership.itemId.parentDirId,
+    );
+    return res.status(200).json({
+      message: "Ownership mail cancelled successfully!",
+      permissions: finalResponse.permissions,
+    });
   } catch (error) {
     return next(error);
   }
@@ -1423,7 +1462,6 @@ export const downloadFolder = async (req, res, next) => {
   let cancelled = false;
 
   try {
-   
     const userId = req.user?._id;
 
     if (!userId) {
@@ -1439,7 +1477,6 @@ export const downloadFolder = async (req, res, next) => {
         message: "Missing folder id",
       });
     }
-
 
     const folder = await Directory.findOne({
       _id: id,

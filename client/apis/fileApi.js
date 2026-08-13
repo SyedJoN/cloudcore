@@ -13,7 +13,7 @@ export async function notifyBackend(fileId) {
 export async function uploadDriveFileToS3(fileId, driveFileId) {
   const response = await axiosWithCreds.post(`/file/uploads/google/complete`, {
     fileId,
-    driveFileId
+    driveFileId,
   });
   return response;
 }
@@ -45,7 +45,7 @@ export async function toggleFilePublic(itemId, role, access, type) {
 export async function toggleDriveFilePermission(fileId, role) {
   const response = await axiosWithCreds.patch(
     `/file/google-drive/permissions/update`,
-    {fileId, role}
+    { fileId, role },
   );
 
   return response;
@@ -56,24 +56,15 @@ export async function grantAccessById(type, fileId, usersArray, message) {
     message,
     type,
   });
-
-  return data.message;
+  return data;
 }
 
-export async function revokeFileAccess(
-  type,
-  fileId,
-  targetId,
-  relation
-) {
-  const { data } = await axiosWithCreds.post(
-    `/file/revoke-access/${fileId}`,
-    {
-      targetId,
-      relation,
-      type,
-    }
-  );
+export async function revokeFileAccess(type, fileId, targetId, relation) {
+  const { data } = await axiosWithCreds.post(`/file/revoke-access/${fileId}`, {
+    targetId,
+    relation,
+    type,
+  });
 
   return data.message;
 }

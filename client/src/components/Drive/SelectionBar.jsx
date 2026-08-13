@@ -135,14 +135,7 @@ export default function SelectionBar({
   // Stars are local-only.
   // ============================================================
 
-  const handleStar = () => {
-    setIsStarred((prev) => ({
-      ...prev,
-      [item._id]: !prev[item._id],
-    }));
 
-    onStar();
-  };
 
   // ============================================================
   // NORMAL ACTIONS
@@ -214,7 +207,7 @@ export default function SelectionBar({
               <button
                 className="gd-sel-action-btn"
                 title="Star"
-                onClick={handleStar}
+                onClick={onStar}
               >
                 {isStarred[item._id] ? (
                   <StarIconSolid className="w-5 h-5" />
