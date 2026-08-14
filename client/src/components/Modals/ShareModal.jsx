@@ -98,8 +98,8 @@ export default function ShareModal({
       : "file";
 
   const isOwner = item.owners?.[0].me === true;
-  const capabilities =
-    item.permissions?.find((p) => p.id === user.id)?.capabilities || {};
+    const capabilities = item.capabilities || {};
+
 
   const canChangeRole = capabilities?.canChangeRole ?? true;
   const canShare = capabilities.canShare === true;

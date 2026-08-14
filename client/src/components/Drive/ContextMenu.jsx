@@ -14,7 +14,11 @@ import {
 } from "../Icons/Icons";
 
 import { useToast } from "../../Contexts/ToastContext";
-import { Portal, useTransitionClass, useSelfMountedTransition } from "../../hooks/useFloatingMenu";
+import {
+  Portal,
+  useTransitionClass,
+  useSelfMountedTransition,
+} from "../../hooks/useFloatingMenu";
 import { useAuth } from "../../Contexts";
 
 /*
@@ -22,7 +26,8 @@ import { useAuth } from "../../Contexts";
 */
 
 function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
-  const { mounted, animate, nodeRef, onTransitionEnd } = useSelfMountedTransition(open);
+  const { mounted, animate, nodeRef, onTransitionEnd } =
+    useSelfMountedTransition(open);
 
   if (!mounted) {
     return null;
@@ -109,8 +114,11 @@ function ContextMenuContent({
   onDownload,
   onPreview,
 }) {
-  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open, onExited);
-const {user} = useAuth();
+  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(
+    open,
+    onExited,
+  );
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [showOpenWith, setShowOpenWith] = useState(false);
@@ -121,7 +129,10 @@ const {user} = useAuth();
 
   useEffect(() => {
     function handleClick(e) {
-      if (!e.target.closest(".gd-context-menu") && !e.target.closest(".gd-context-submenu")) {
+      if (
+        !e.target.closest(".gd-context-menu") &&
+        !e.target.closest(".gd-context-submenu")
+      ) {
         onClose();
       }
     }
@@ -147,7 +158,7 @@ const {user} = useAuth();
      CAPABILITIES
  */
 
-   const capabilities = item.permissions?.find((p)=> p.id === user.id)?.capabilities || {};
+  const capabilities = item.capabilities || {};
 
   const canRead = capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
@@ -234,7 +245,10 @@ const {user} = useAuth();
       {showDeleteActions ? (
         <>
           {canDelete && (
-            <button className="gd-context-item" onClick={close(() => onRestore(item))}>
+            <button
+              className="gd-context-item"
+              onClick={close(() => onRestore(item))}
+            >
               <IconRestore size={18} />
               Restore
             </button>
@@ -246,7 +260,9 @@ const {user} = useAuth();
 
               <button
                 className="gd-context-item danger"
-                onClick={close(() => onDelete(item, isGoogle ? "google" : "local"))}
+                onClick={close(() =>
+                  onDelete(item, isGoogle ? "google" : "local"),
+                )}
               >
                 <IconTrash size={18} />
                 Delete forever
@@ -276,12 +292,18 @@ const {user} = useAuth();
                 onMouseEnter={openWithHover.onMouseEnter}
                 onMouseLeave={openWithHover.onMouseLeave}
               >
-                <button className="gd-context-item" onClick={close(() => onPreview(item))}>
+                <button
+                  className="gd-context-item"
+                  onClick={close(() => onPreview(item))}
+                >
                   <IconPreview size={18} />
                   Preview
                 </button>
 
-                <button className="gd-context-item" onClick={handleOpenInNewTab}>
+                <button
+                  className="gd-context-item"
+                  onClick={handleOpenInNewTab}
+                >
                   <IconNewTab size={18} />
                   Open in new tab
                 </button>
@@ -309,7 +331,10 @@ const {user} = useAuth();
                 onMouseEnter={shareHover.onMouseEnter}
                 onMouseLeave={shareHover.onMouseLeave}
               >
-                <button className="gd-context-item" onClick={close(() => onShare(item))}>
+                <button
+                  className="gd-context-item"
+                  onClick={close(() => onShare(item))}
+                >
                   <IconShare size={18} />
                   Share
                 </button>
@@ -336,7 +361,10 @@ const {user} = useAuth();
           {/* DOWNLOAD */}
 
           {showFileActions && !isDeleted && canDownload && (
-            <button className="gd-context-item" onClick={close(() => onDownload(item))}>
+            <button
+              className="gd-context-item"
+              onClick={close(() => onDownload(item))}
+            >
               <IconDownload size={18} />
               Download
             </button>
@@ -346,7 +374,10 @@ const {user} = useAuth();
 
           {!isDeleted && canRename && (
             <>
-              <button className="gd-context-item" onClick={close(() => onRename(item))}>
+              <button
+                className="gd-context-item"
+                onClick={close(() => onRename(item))}
+              >
                 <IconRename size={18} />
                 Rename
               </button>
@@ -358,7 +389,10 @@ const {user} = useAuth();
           {/* MOVE TO TRASH */}
 
           {!isDeleted && canTrash && (
-            <button className="gd-context-item danger" onClick={close(() => onSoftDelete(item))}>
+            <button
+              className="gd-context-item danger"
+              onClick={close(() => onSoftDelete(item))}
+            >
               <IconTrash size={18} />
               Move to trash
             </button>

@@ -4,8 +4,8 @@ import {
   deleteFile,
   generateSignedUploadUrl,
   giveAccessById,
+  revokeAccessById,
   restoreFile,
-  revokeFileAccess,
   softDeleteFile,
   toggleFilePublic,
   updateFile,
@@ -36,7 +36,7 @@ router.patch("/:id/activity/view", checkAuth, updateFileViewTime);
 
 // Shareble file
 router.post("/grant-access/:id", checkAuth, giveAccessById);
-router.post("/revoke-access/:id", checkAuth, revokeFileAccess);
+router.post("/revoke-access/:id", checkAuth, revokeAccessById);
 router.patch("/google-drive/permissions/update", updateGoogleDrivePermission);
 
 

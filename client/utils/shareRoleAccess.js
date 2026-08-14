@@ -23,6 +23,7 @@ export const updateSharedAccess = async ({
     (person) => person?.role === "remove",
   );
 
+
   /*
    * Nothing changed.
    */
@@ -48,7 +49,9 @@ export const updateSharedAccess = async ({
   /*
    * Apply grants / role changes.
    */
+
   let response;
+  let access;
   if (personsToGrant.length) {
    response = await grantAccessById(
       type,
@@ -62,6 +65,7 @@ export const updateSharedAccess = async ({
    * Apply removals.
    */
   if (personsToRemove.length) {
+    access = "remove"
    response = await Promise.all(
       personsToRemove.map((person) =>
         revokeFileAccess(
@@ -78,6 +82,7 @@ export const updateSharedAccess = async ({
   return {
     changed: true,
     itemId,
-    finalPermissions: response.permissions
+    access,
+    finalPermissions: type.startsWith('google') ? response : response.permissions
   };
 };

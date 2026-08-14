@@ -82,7 +82,7 @@ export default function SelectionBar({
   // component doesn't care where the item came from.
   // ============================================================
 
-  const capabilities = item.permissions?.find((p)=> p.id === user.id)?.capabilities || {};
+  const capabilities = item.capabilities || {};
 
   const canRead = capabilities.canRead === true;
 
@@ -90,8 +90,7 @@ export default function SelectionBar({
 
   const canDownload = capabilities.canDownload === true;
 
-  const canRename =
-    capabilities.canRename === true
+  const canRename = capabilities.canRename === true;
 
   const canMove = capabilities.canMove === true;
 
@@ -134,8 +133,6 @@ export default function SelectionBar({
   //
   // Stars are local-only.
   // ============================================================
-
-
 
   // ============================================================
   // NORMAL ACTIONS
@@ -266,15 +263,19 @@ export default function SelectionBar({
               permissions.find(...)
           ==================================================== */}
 
-        {!isGoogle && !isDeleted && !isSharedRoute && !canTrash && canDelete && (
-          <button
-            className="gd-sel-action-btn gd-sel-action-danger"
-            title="Remove"
-            onClick={onDeleteForever}
-          >
-            <IconTrash size={18} />
-          </button>
-        )}
+        {!isGoogle &&
+          !isDeleted &&
+          !isSharedRoute &&
+          !canTrash &&
+          canDelete && (
+            <button
+              className="gd-sel-action-btn gd-sel-action-danger"
+              title="Remove"
+              onClick={onDeleteForever}
+            >
+              <IconTrash size={18} />
+            </button>
+          )}
 
         {/* ====================================================
             DELETED ITEMS

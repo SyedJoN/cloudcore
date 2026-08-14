@@ -144,7 +144,7 @@ export default function DirectoryView({ route }) {
     }
     if (undoAction.type === "restore") {
       await handleMoveToTrash(undoAction.item);
-      refreshCurrentDirectory()
+      refreshCurrentDirectory();
     }
     if (undoAction.type === "star") {
       await handleToggleStar(undoAction.item);
@@ -226,8 +226,10 @@ export default function DirectoryView({ route }) {
         : isSharedRoute
           ? "shared"
           : isStarredRoute
-            ? "starred" : isTrashRoute ? "trash"
-            : "root",
+            ? "starred"
+            : isTrashRoute
+              ? "trash"
+              : "root",
     );
 
   const {
@@ -919,42 +921,52 @@ export default function DirectoryView({ route }) {
         setShareItem(null);
         return;
       }
+      let update;
+      let finalPermissions;
+      if (type.startsWith("google") && result?.access === "remove") {
+        finalPermissions = mergedPermissions.filter((p) => p.role !== "remove");
+        update = (list) =>
+          list.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
+            if (resourceId !== String(result.itemId)) {
+              return resource;
+            }
+            return {
+              ...resource,
+              permissions: finalPermissions
+            };
+          });
+      } else {
+        finalPermissions = type.startsWith("google")
+          ? mergedPermissions
+          : result.finalPermissions;
+        update = (list) =>
+          list.map((resource) => {
+            const resourceId = String(resource?._id ?? resource?.id);
 
-      setFilesList((prev) =>
-        prev.map((resource) => {
-          const resourceId = String(resource?._id ?? resource?.id);
+            if (resourceId !== String(result.itemId)) {
+              return resource;
+            }
+            if (type.startsWith("google")) {
+              return {
+                ...resource,
+                permissions: mergedPermissions,
+              };
+            }
+            return {
+              ...resource,
+              permissions: result.finalPermissions,
+            };
+          });
+      }
 
-          if (resourceId !== String(result.itemId)) {
-            return resource;
-          }
+      setFilesList(update);
 
-          return {
-            ...resource,
+      setDirectoriesList(update);
+      console.log("finalPermissions", finalPermissions);
+      setPeopleWithAccess(finalPermissions);
 
-            permissions: result.finalPermissions,
-          };
-        }),
-      );
-
-      setDirectoriesList((prev) =>
-        prev.map((resource) => {
-          const resourceId = String(resource?._id ?? resource?.id);
-
-          if (resourceId !== String(result.itemId)) {
-            return resource;
-          }
-
-          return {
-            ...resource,
-
-            permissions: result.finalPermissions,
-          };
-        }),
-      );
-
-      setPeopleWithAccess(result.finalPermissions);
-
-      setPrevPermissions(result.finalPermissions);
+      setPrevPermissions(finalPermissions);
 
       setShareItem(null);
 

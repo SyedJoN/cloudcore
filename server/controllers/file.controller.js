@@ -38,6 +38,8 @@ const roleMap = {
   commenter: "commenter",
 };
 
+const getObject = (resourceType, resourceId) => `${resourceType}:${resourceId}`;
+
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const objectType = type === "folder" ? "folder" : "file";
 
@@ -164,23 +166,22 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
   let canChangeRole = isOwner || isWriter;
 
-  // Root-level file:
-  // only owner can change role
-  if (isRootLevelFile && !isOwner) {
-    canChangeRole = false;
-  }
-
-  // Public-only user cannot change role
-  if (isPublicEffective && !isOwner && !directRole && !inheritedRole) {
-    canChangeRole = false;
-  }
-
   // Add capabilities to each user
-
-  const permissionsWithCapabilities = permissions.map((permission) => ({
-    ...permission,
-    capabilities: getCapabilities(permission.role, type, isRootLevelFile),
-  }));
+  let currentUserCapabilities;
+  const permissionsWithCapabilities = permissions.map((permission) => {
+    console.log("permission", permission);
+    const permissionId = permission.id;
+    if (permissionId.toString() === userId) {
+      currentUserCapabilities = getCapabilities(
+        permission.role,
+        type,
+        isRootLevelFile,
+      );
+    }
+    return {
+      ...permission,
+    };
+  });
 
   // Public / anyone permission
 
@@ -212,16 +213,19 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
   const ownership = await Ownership.findOne({
     itemId: item?._id,
-  }).sort({createdAt: -1})
-  .lean();
+  })
+    .sort({ createdAt: -1 })
+    .lean();
 
   const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
+
   const updatedPermissions = permissionsWithCapabilities.map((permission) => {
     const permissionId = getIdString(permission.id);
+
     if (ownership?.status === "pending" && permissionId === ownerId) {
       return {
         ...permission,
-        pendingOwner: ownership.status === "pending",
+        pendingOwner: true,
       };
     }
 
@@ -231,6 +235,8 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   // Final response
 
   return {
+
+    capabilities: currentUserCapabilities,
     permissions: updatedPermissions,
 
     owners,
@@ -513,11 +519,12 @@ export const getFileMetaById = async (req, res, next) => {
       .lean();
 
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
-    const permissions = await resolveRole(file, "file", userId, parentDir);
+    const {capabilities, permissions} = await resolveRole(file, "file", userId, parentDir);
 
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
+        ...capabilities,
         ...permissions,
       });
     }
@@ -552,6 +559,7 @@ export const getFileMetaById = async (req, res, next) => {
 
       return res.status(200).json({
         ...file,
+        ...capabilities,
         ...permissions,
       });
     }
@@ -573,6 +581,7 @@ export const getFileMetaById = async (req, res, next) => {
       if (canRead.checked || canWrite.checked) {
         return res.status(200).json({
           ...file,
+          ...capabilities,
           ...permissions,
         });
       }
@@ -619,7 +628,7 @@ export const getRecentFiles = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       sharedFiles.map(async (file) => {
-        const permissions = await resolveRole(
+        const {capabilities,permissions} = await resolveRole(
           file,
           "file",
           userId,
@@ -627,6 +636,7 @@ export const getRecentFiles = async (req, res, next) => {
         );
         return {
           ...file,
+          ...capabilities,
           ...permissions,
         };
       }),
@@ -634,9 +644,10 @@ export const getRecentFiles = async (req, res, next) => {
 
     const ownFilesWithRoles = await Promise.all(
       ownFiles.map(async (file) => {
-        const permissions = await resolveRole(file, "file", userId);
+        const {capabilities, permissions} = await resolveRole(file, "file", userId);
         return {
           ...file,
+          ...capabilities,
           ...permissions,
         };
       }),
@@ -1001,14 +1012,14 @@ export const giveAccessById = async (req, res, next) => {
 
       try {
         const drive = getDriveClient(drive_access_token);
-
+        let response;
         await Promise.all(
           usersArray.map(async (user) => {
             if (!user.role) {
               throw new Error(`Invalid role: ${user.role}`);
             }
 
-            await drive.permissions.create({
+            response = await drive.permissions.create({
               fileId: id,
               requestBody: {
                 type: "user",
@@ -1016,12 +1027,14 @@ export const giveAccessById = async (req, res, next) => {
                 emailAddress: user.emailAddress || user.email,
               },
               sendNotificationEmail: true,
+              fields: "id,type,role,emailAddress,displayName",
             });
           }),
         );
 
         return res.status(200).json({
           message: "Permissions granted successfully!",
+          response: response.data,
         });
       } catch (err) {
         console.error("Google Drive Error:", err.response?.data || err.message);
@@ -1063,21 +1076,6 @@ export const giveAccessById = async (req, res, next) => {
         });
       }
     }
-
-    const getParentId = (resource) => {
-      if (!resource) return null;
-
-      return (
-        resource.parentDirId ||
-        resource.parentDirectoryId ||
-        resource.directoryId ||
-        resource.folderId ||
-        null
-      );
-    };
-
-    const getObject = (resourceType, resourceId) =>
-      `${resourceType}:${resourceId}`;
 
     const removeDirectRole = async (object, userId) => {
       await Promise.allSettled(
@@ -1131,7 +1129,7 @@ export const giveAccessById = async (req, res, next) => {
       return tuple?.key || null;
     };
 
-    const findPermissionSource = async ({
+    const findexistingPermissionSource = async ({
       resourceType,
       resourceId,
       userId,
@@ -1146,7 +1144,6 @@ export const giveAccessById = async (req, res, next) => {
           currentObject,
           userId,
         );
-
         if (directPermission) {
           return {
             object: currentObject,
@@ -1168,7 +1165,7 @@ export const giveAccessById = async (req, res, next) => {
           break;
         }
 
-        const parentId = getParentId(currentResource);
+        const parentId = currentResource.parentDirId;
 
         if (!parentId) {
           break;
@@ -1193,7 +1190,7 @@ export const giveAccessById = async (req, res, next) => {
 
         const userId = user.id;
 
-        const permissionSource = await findPermissionSource({
+        const existingPermissionSource = await findexistingPermissionSource({
           resourceType: type,
           resourceId: id,
           userId,
@@ -1203,16 +1200,16 @@ export const giveAccessById = async (req, res, next) => {
         let previousRole = null;
         let inherited = false;
 
-        if (permissionSource) {
-          targetObject = permissionSource.object;
-          previousRole = permissionSource.role;
-          inherited = !permissionSource.isCurrentObject;
+        if (existingPermissionSource) {
+          targetObject = existingPermissionSource.object;
+          previousRole = existingPermissionSource.role;
+          inherited = !existingPermissionSource.isCurrentObject;
         } else {
           targetObject = getObject(type, id);
         }
 
         if (inherited) {
-          const sourceId = permissionSource.id;
+          const sourceId = existingPermissionSource.id;
 
           const rootOwner = await User.findOne({
             parentDirId: sourceId,
@@ -1246,7 +1243,7 @@ export const giveAccessById = async (req, res, next) => {
 
         await writeRole(targetObject, userId, user.role);
 
-        if (!permissionSource) {
+        if (!existingPermissionSource) {
           const userData = await User.findById(userId)
             .select("name email avatar")
             .lean();
@@ -1267,21 +1264,17 @@ export const giveAccessById = async (req, res, next) => {
             });
           }
         }
-
-        console.log("Permission changed:", {
-          userId,
-          requestedObject: getObject(type, id),
-          targetObject,
-          previousRole,
-          newRole: user.role,
-          inherited,
-        });
       }),
     );
-    const finalResult = await resolveRole(item, type, item?.userId, item.parentDirId)
+    const finalResult = await resolveRole(
+      item,
+      type,
+      item?.userId,
+      item.parentDirId,
+    );
     return res.status(200).json({
       message: `${type} access updated successfully`,
-      permissions: finalResult.permissions
+      permissions: finalResult.permissions,
     });
   } catch (error) {
     console.error("giveAccessById error:", error);
@@ -1289,12 +1282,14 @@ export const giveAccessById = async (req, res, next) => {
   }
 };
 
-export const revokeFileAccess = async (req, res, next) => {
+export const revokeAccessById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { targetId: userId, type, relation } = req.body;
+    const { targetId: permissionId, type, relation } = req.body;
 
-    if (type !== "google" && !userId) {
+    
+
+    if (type !== "google" && !permissionId) {
       return res.status(400).json({
         message: "Target user is required",
       });
@@ -1312,34 +1307,52 @@ export const revokeFileAccess = async (req, res, next) => {
       try {
         const drive = getDriveClient(drive_access_token);
 
-        const permissions = await drive.permissions.list({
-          fileId: id,
-          fields: "permissions(id,type)",
-        });
+     const permissions = await drive.permissions.list({
+  fileId: id,
+  fields: "permissions(id,type,role)",
+});
 
-        const publicPermission = permissions.data.permissions.find(
-          (permission) => permission.type === "anyone",
-        );
+const userPermission = permissions.data.permissions.find(
+  (permission) =>
+    permission.type === "user" &&
+    permission.id === permissionId
+);
 
-        if (!publicPermission) {
-          return res.status(200).json({
-            message: "Permission already revoked",
-          });
-        }
+if (!userPermission) {
+  return res.status(200).json({
+    message: "User access already revoked",
+  });
+}
 
-        await drive.permissions.delete({
-          fileId: id,
-          permissionId: publicPermission.id,
-        });
+await drive.permissions.delete({
+  fileId: id,
+  permissionId: userPermission.id,
+});
 
-        return res.status(200).json({
-          message: "Permission revoked successfully",
-        });
+return res.status(200).json({
+  message: "User access revoked successfully",
+});
+
+
+        // if (!publicPermission) {
+        //   return res.status(200).json({
+        //     message: "Permission already revoked",
+        //   });
+        // }
+
+        // await drive.permissions.delete({
+        //   fileId: id,
+        //   permissionId: publicPermission.id,
+        // });
+
+        // return res.status(200).json({
+        //   message: "Permission revoked successfully",
+        // });
       } catch (error) {
         return next(error);
       }
     }
-
+   const userId = permissionId;
     const objectType = type === "folder" ? "folder" : "file";
     const object = `${objectType}:${id}`;
 

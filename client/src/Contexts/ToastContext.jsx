@@ -47,14 +47,7 @@ function ToastContainer({ toasts, onRemove }) {
           {typeof t.undoAction?.onUndo === "function" && (
             <button
               type="button"
-              style={{
-                background: "none",
-                border: "none",
-                color: "inherit",
-                cursor: "pointer",
-                textDecoration: "underline",
-                fontWeight: 600,
-              }}
+              style={styles.undo}
               onClick={async () => {
                 try {
                   await t.undoAction.onUndo();
@@ -113,5 +106,13 @@ const styles = {
     opacity: 0.7,
     fontSize: 14,
     padding: 0,
+  },
+  undo: {
+    background: "none",
+    border: "none",
+    color: "inherit",
+    cursor: "pointer",
+    textDecoration: "underline",
+    fontWeight: 600,
   },
 };
