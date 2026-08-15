@@ -148,10 +148,10 @@ function RoleDropdownContent({
           </button>
         );
       })}
+          {isOwner || showRemove && <div className="gd-context-divider" />}
 
       {isOwner && (
         <>
-          <div className="gd-context-divider" />
 
           <MouseTooltip
             disabled={isChanged}

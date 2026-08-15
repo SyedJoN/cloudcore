@@ -106,18 +106,30 @@ export default function ShareModal({
   const canRename = capabilities.canRename === true;
   const { toast } = useToast();
 
-  useEffect(() => {
-    const authorizedUsers = item.permissions
-      ?.filter(
-        (person) =>
-          person.type !== "anyone" &&
-          person.type !== "superuser" &&
-          person.role !== "owner",
-      )
-      .map((p) => p);
-    setPeopleWithAccess(authorizedUsers);
-    setPrevPermissions(authorizedUsers);
-  }, [item]);
+useEffect(() => {
+  const permissions = item?.permissions ?? [];
+
+  const authorizedUsers = permissions.filter(
+    (person) =>
+      person.type !== "anyone" &&
+      person.type !== "superuser" &&
+      person.role !== "owner"
+  );
+
+  const linkPermission = permissions.find(
+    (person) => person.type === "anyone"
+  );
+
+  setPeopleWithAccess(authorizedUsers);
+  setPrevPermissions(authorizedUsers);
+
+  // Whatever state you're using for link sharing:
+  setLinkAccess(linkPermission ? "anyone" : "restricted");
+
+  if (linkPermission) {
+    setLinkRole(linkPermission.role);
+  }
+}, [item]);
 
   useEffect(() => {
     const previous = prevPermissions ?? [];

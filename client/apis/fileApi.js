@@ -40,7 +40,7 @@ export async function toggleFilePublic(itemId, role, access, type) {
     `/file/${itemId}/public/${role}?access=${access}&type=${type}`,
   );
 
-  return data.message;
+  return data;
 }
 export async function toggleDriveFilePermission(fileId, role) {
   const response = await axiosWithCreds.patch(

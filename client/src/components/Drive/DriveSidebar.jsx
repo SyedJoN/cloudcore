@@ -155,7 +155,7 @@ function NewMenu({
           className="gd-context-item"
           onClick={close(() => onCreateFolder())}
         >
-          <FolderPlusIcon className="text-black w-5 h-5" />
+          <FolderPlusIcon className="text-(--border-inverse) w-5 h-5" />
           New folder
         </button>
 
@@ -166,7 +166,7 @@ function NewMenu({
           onClick={close(() => onUploadFiles())}
           disabled={disabled}
         >
-          <ArrowUpOnSquareIcon className="text-black w-5 h-5" />
+          <ArrowUpOnSquareIcon className="text-(--border-inverse) w-5 h-5" />
           File upload
         </button>
       <button
@@ -174,7 +174,7 @@ function NewMenu({
           onClick={close(() => onUploadFolders())}
           disabled={disabled}
         >
-          <ArrowUpOnSquareStackIcon className="text-black w-5 h-5" />
+          <ArrowUpOnSquareStackIcon className="text-(--border-inverse) w-5 h-5" />
           Folder upload
         </button>
         <button

@@ -11,13 +11,14 @@
 }
 
 .gd-filter-btn {
+  height: 2rem;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
+  padding: 0 18px;
   border-radius: 8px;
   border: 1px solid var(--border-inverse);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
   cursor: pointer;

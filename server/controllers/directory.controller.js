@@ -45,6 +45,7 @@ import { getAncestorDirectories } from "../utils/permissions/getAncestorDirector
 import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
+import copyS3File from "../services/s3/copy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -175,16 +176,12 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   let canChangeRole = isOwner || isWriter;
 
   // Add capabilities to each user
-  let currentUserCapabilities;
+  let capabilities;
   const permissionsWithCapabilities = permissions.map((permission) => {
     console.log("permission", permission);
     const permissionId = permission.id;
     if (permissionId.toString() === userId) {
-      currentUserCapabilities = getCapabilities(
-        permission.role,
-        type,
-        isRootLevelFile,
-      );
+      capabilities = getCapabilities(permission.role, type, isRootLevelFile);
     }
     return {
       ...permission,
@@ -243,8 +240,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   // Final response
 
   return {
-
-    capabilities: currentUserCapabilities,
+    capabilities: capabilities,
     permissions: updatedPermissions,
 
     owners,
@@ -322,17 +318,23 @@ export const getDirectory = async (req, res, next) => {
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
           files.map(async (f) => {
-            const {permissions, capabilities} = await resolveRole(f, "file", userId, parentDir);
+            const { owners, capabilities, permissions } = await resolveRole(
+              f,
+              "file",
+              userId,
+              parentDir,
+            );
             return {
               ...f,
-              ...capabilities,
-              ...permissions,
+              owners,
+              capabilities,
+              permissions,
             };
           }),
         ),
         Promise.all(
           directories.map(async (d) => {
-            const {capabilities, permissions} = await resolveRole(
+            const { owners, capabilities, permissions } = await resolveRole(
               d,
               "folder",
               userId,
@@ -340,8 +342,9 @@ export const getDirectory = async (req, res, next) => {
             );
             return {
               ...d,
-              ...capabilities,
-              ...permissions,
+              owners,
+              capabilities,
+              permissions,
             };
           }),
         ),
@@ -411,22 +414,34 @@ export const getDirectory = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const {capabilities,permissions} = await resolveRole(file, "file", userId, parentDir);
+        const { owners, capabilities, permissions } = await resolveRole(
+          file,
+          "file",
+          userId,
+          parentDir,
+        );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
 
     const directoriesWithRoles = await Promise.all(
       directories.map(async (dir) => {
-        const {capabilities, permissions} = await resolveRole(dir, "folder", userId, parentDir);
+        const { owners, capabilities, permissions } = await resolveRole(
+          dir,
+          "folder",
+          userId,
+          parentDir,
+        );
         return {
           ...dir,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -490,7 +505,7 @@ export const getTrashItems = async (req, res, next) => {
 
     const topLevelFilesWithResolvedRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const {capabilities, permissions} = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           file,
           "file",
           userId,
@@ -498,15 +513,16 @@ export const getTrashItems = async (req, res, next) => {
         );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
 
     const topLevelDirsWithResolvedRoles = await Promise.all(
       topLevelDirs.map(async (dir) => {
-        const {capabilities, permissions} = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           dir,
           "folder",
           userId,
@@ -514,8 +530,9 @@ export const getTrashItems = async (req, res, next) => {
         );
         return {
           ...dir,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -616,7 +633,7 @@ export const getSharedWithMe = async (req, res, next) => {
 
     const filesWithRoles = await Promise.all(
       topLevelFiles.map(async (file) => {
-        const {capabilities, permissions} = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           file,
           "file",
           userId,
@@ -626,8 +643,9 @@ export const getSharedWithMe = async (req, res, next) => {
 
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -646,7 +664,7 @@ export const getSharedWithMe = async (req, res, next) => {
           }
         }
 
-        const {capabilities, permissions} = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           directory,
           "folder",
           userId,
@@ -656,8 +674,9 @@ export const getSharedWithMe = async (req, res, next) => {
 
         return {
           ...directory,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -724,44 +743,65 @@ export const getStarredItems = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       topLevelSharedFiles.map(async (file) => {
-        const {capabilities, permissions} = await resolveRole(file, "file", userId);
+        const { owners, capabilities, permissions } = await resolveRole(
+          file,
+          "file",
+          userId,
+        );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
 
     const sharedDirectoriesWithRoles = await Promise.all(
       topLevelSharedDirs.map(async (dir) => {
-        const {capabilities, permissions} = await resolveRole(dir, "folder", userId);
+        const { owners, capabilities, permissions } = await resolveRole(
+          dir,
+          "folder",
+          userId,
+        );
         return {
           ...dir,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const {capabilities, permissions} = await resolveRole(file, "file", userId, file.parentDirId);
+        const { owners, capabilities, permissions } = await resolveRole(
+          file,
+          "file",
+          userId,
+          file.parentDirId,
+        );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
 
     const directoriesWithRoles = await Promise.all(
       directories.map(async (dir) => {
-        const {capabilities, permissions} = await resolveRole(dir, "folder", userId);
+        const { owners, capabilities, permissions } = await resolveRole(
+          dir,
+          "folder",
+          userId,
+        );
         return {
           ...dir,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -2270,5 +2310,82 @@ export const completeFolderUpload = async (req, res, next) => {
     });
   } catch (error) {
     return next(error);
+  }
+};
+
+export const copyItem = async (req, res, next) => {
+  try {
+    const { id, type } = req.body;
+    const userId = req.user?._id;
+
+    const allowedTypes = ["file", "folder"];
+
+    if (!id || !type) {
+      return res.status(400).json({
+        message: "Item id and type are required",
+      });
+    }
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({
+        message: "Invalid item type",
+      });
+    }
+
+    const Model = type === "folder" ? Directory : File;
+
+    const item = await Model.findById(id).lean();
+
+    if (!item) {
+      return res.status(404).json({
+        message: "Item not found",
+      });
+    }
+
+    const copiedItem = new Model({
+      name: "Copy of " + item.name,
+      size: item.size,
+      parentDirId: item.parentDirId,
+      path: item.path,
+      userId: item.userId,
+      isPublic: item.isPublic,
+      publicRole: item.publicRole,
+    });
+
+    if (type === "file") {
+      copiedItem.extension = item.extension;
+      copiedItem.isUploading = true;
+
+      const newS3Key = `${copiedItem._id.toString()}${copiedItem.extension}`;
+      const oldS3Key = `${item._id.toString()}${item.extension}`;
+
+      await copyS3File(oldS3Key, newS3Key);
+      copiedItem.isUploading = false;
+    }
+
+
+    await copiedItem.save();
+
+    await fgaClient.write({
+      writes: [
+        {
+          user: `user:${userId.toString()}`,
+          relation: "owner",
+          object: `${type}:${copiedItem._id.toString()}`,
+        },
+        {
+          user: `folder:${copiedItem.parentDirId.toString()}`,
+          relation: "parent",
+          object: `${type}:${copiedItem._id.toString()}`,
+        },
+      ],
+    });
+
+    return res.status(201).json({
+      message: `${type} copied successfully!`,
+      itemId: copiedItem._id,
+    });
+  } catch (error) {
+    next(error);
   }
 };

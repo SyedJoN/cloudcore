@@ -10,7 +10,7 @@ import {
 } from "../../Components/Icons/Icons";
 import { useAuth, useToast } from "../../Contexts";
 
-import { StarIcon } from "@heroicons/react/24/outline";
+import { DocumentDuplicateIcon, StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 export default function SelectionBar({
@@ -24,6 +24,7 @@ export default function SelectionBar({
   onStar,
   onClear,
   onDownload,
+  onCopy,
   onRename,
   onShare,
   onRestore,
@@ -89,6 +90,8 @@ export default function SelectionBar({
   const canShare = true;
 
   const canDownload = capabilities.canDownload === true;
+
+  const canCopy = capabilities.canCopy === true;
 
   const canRename = capabilities.canRename === true;
 
@@ -181,6 +184,7 @@ export default function SelectionBar({
               </button>
             )}
 
+       
             {/* ------------------------------------------------
                 SHARE
             ------------------------------------------------ */}

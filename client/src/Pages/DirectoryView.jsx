@@ -52,7 +52,7 @@ import {
   applyRecentFilters,
   DEFAULT_RECENT_FILTERS,
 } from "../Components/Drive/Recent/ApplyRecentFilters";
-import { toggleItemStar } from "../../apis/resourceApi";
+import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import DownloadTray from "../Components/Drive/DownloadTray";
@@ -810,9 +810,9 @@ export default function DirectoryView({ route }) {
 
       let permission = null;
 
-      if (isGoogleDrive) {
+      if (isGoogleDriveRoute) {
         if (restricted) {
-          await revokeFileAccess("google", itemId);
+          await revokeFileAccess("google", itemId, "anyoneWithLink");
         } else {
           const { data } = await toggleDriveFilePermission(itemId, userRole);
 
@@ -843,6 +843,8 @@ export default function DirectoryView({ route }) {
 
           return {
             ...resource,
+            isPublic: restricted ? false : true,
+            publicRole: restricted ? null : userRole,
             permissions: updatedPermissions,
           };
         });
@@ -924,6 +926,7 @@ export default function DirectoryView({ route }) {
       let update;
       let finalPermissions;
       if (type.startsWith("google") && result?.access === "remove") {
+        console.log("yayy");
         finalPermissions = mergedPermissions.filter((p) => p.role !== "remove");
         update = (list) =>
           list.map((resource) => {
@@ -933,13 +936,10 @@ export default function DirectoryView({ route }) {
             }
             return {
               ...resource,
-              permissions: finalPermissions
+              permissions: finalPermissions,
             };
           });
       } else {
-        finalPermissions = type.startsWith("google")
-          ? mergedPermissions
-          : result.finalPermissions;
         update = (list) =>
           list.map((resource) => {
             const resourceId = String(resource?._id ?? resource?.id);
@@ -947,26 +947,66 @@ export default function DirectoryView({ route }) {
             if (resourceId !== String(result.itemId)) {
               return resource;
             }
-            if (type.startsWith("google")) {
+
+            if (!type.startsWith("google")) {
               return {
                 ...resource,
-                permissions: mergedPermissions,
+                permissions: result.finalPermissions,
               };
             }
+
+            let permissions = finalPermissions;
+
+            if (linkAccess === "restricted") {
+              // Remove existing public/link permission.
+              permissions = finalPermissions.filter((p) => p.type !== "anyone");
+            } else if (linkAccess === "anyone") {
+              const hasPublicPermission = finalPermissions.some(
+                (p) => p.type === "anyone",
+              );
+
+              if (hasPublicPermission) {
+                // Only update the existing public permission.
+                permissions = finalPermissions.map((p) =>
+                  p.type === "anyone"
+                    ? {
+                        ...p,
+                        role: linkRole,
+                      }
+                    : p,
+                );
+              } else {
+                // Add a public permission without modifying users/groups.
+                permissions = [
+                  ...finalPermissions,
+                  {
+                    id: "anyoneWithLink",
+                    type: "anyone",
+                    role: linkRole,
+                    allowFileDiscovery: false,
+                  },
+                ];
+              }
+            }
+
             return {
               ...resource,
-              permissions: result.finalPermissions,
+              permissions,
             };
           });
       }
+      finalPermissions = type.startsWith("google")
+        ? mergedPermissions
+        : result.finalPermissions;
+      setFilesList((prev) => update(prev));
+      setDirectoriesList((prev) => update(prev));
 
-      setFilesList(update);
-
-      setDirectoriesList(update);
       console.log("finalPermissions", finalPermissions);
       setPeopleWithAccess(finalPermissions);
 
       setPrevPermissions(finalPermissions);
+      //  setLinkAccess(restricted ? "restricted" : "anyone");
+      // setLinkRole(restricted ? "reader" : userRole);
 
       setShareItem(null);
 
@@ -985,7 +1025,18 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
-
+  async function handleCopyItem(item) {
+    const type = getResourceType(item);
+    try {
+      const { message } = await copyItem({ id: item.id ?? item._id, type });
+      toast({ message, type: "success" });
+      setTimeout(() => {
+        refreshCurrentDirectory();
+      }, 1000);
+    } catch (error) {
+      showError(error);
+    }
+  }
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1212,6 +1263,15 @@ export default function DirectoryView({ route }) {
           });
           clearSelection();
         }}
+        onCopy={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item) {
+              handleCopyItem(item);
+            }
+          });
+          clearSelection();
+        }}
         onRename={() => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1269,6 +1329,7 @@ export default function DirectoryView({ route }) {
         onDelete={(item, type) => handleDelete(item, type)}
         onRestore={(item) => handleRestoreItem(item)}
         onDownload={(item) => handleDownload(item)}
+        onCopy={(item) => handleCopyItem(item)}
         onPreview={(item) => setViewItem(item)}
       />
 

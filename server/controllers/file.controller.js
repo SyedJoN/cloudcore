@@ -31,7 +31,6 @@ import { getAncestorDirectories } from "../utils/permissions/getAncestorDirector
 import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
-import { resolve } from "dns";
 const roleMap = {
   viewer: "reader",
   editor: "writer",
@@ -235,7 +234,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   // Final response
 
   return {
-
     capabilities: currentUserCapabilities,
     permissions: updatedPermissions,
 
@@ -519,7 +517,12 @@ export const getFileMetaById = async (req, res, next) => {
       .lean();
 
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
-    const {capabilities, permissions} = await resolveRole(file, "file", userId, parentDir);
+    const { capabilities, permissions } = await resolveRole(
+      file,
+      "file",
+      userId,
+      parentDir,
+    );
 
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
@@ -628,7 +631,7 @@ export const getRecentFiles = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       sharedFiles.map(async (file) => {
-        const {capabilities,permissions} = await resolveRole(
+        const { capabilities, permissions } = await resolveRole(
           file,
           "file",
           userId,
@@ -644,7 +647,11 @@ export const getRecentFiles = async (req, res, next) => {
 
     const ownFilesWithRoles = await Promise.all(
       ownFiles.map(async (file) => {
-        const {capabilities, permissions} = await resolveRole(file, "file", userId);
+        const { capabilities, permissions } = await resolveRole(
+          file,
+          "file",
+          userId,
+        );
         return {
           ...file,
           ...capabilities,
@@ -981,9 +988,15 @@ export const toggleFilePublic = async (req, res, next) => {
     }
 
     await item.save();
-
+    const { permissions } = await resolveRole(
+      item,
+      type,
+      userId,
+      item.parentDirId,
+    );
     return res.status(201).json({
       message: `${type === "file" ? "File" : "Directory"} made ${item.isPublic ? "public" : "private"} successfully`,
+      permissions: permissions,
     });
   } catch (error) {
     next(error);
@@ -991,57 +1004,83 @@ export const toggleFilePublic = async (req, res, next) => {
 };
 
 export const giveAccessById = async (req, res, next) => {
-  try {
-    const { usersArray, message, type } = req.body;
-    const id = req.params.id;
+ try {
+  const { usersArray, message, type } = req.body;
+  const id = req.params.id;
 
-    if (!Array.isArray(usersArray) || usersArray.length === 0) {
-      return res.status(400).json({
-        message: "No users provided",
+  if (!Array.isArray(usersArray) || usersArray.length === 0) {
+    return res.status(400).json({
+      message: "No users provided",
+    });
+  }
+
+  if (type !== "google") {
+    return res.status(400).json({
+      message: "Unsupported type",
+    });
+  }
+
+  const { drive_access_token } = req.signedCookies;
+
+  if (!drive_access_token) {
+    return res.status(401).json({
+      message: "Missing token",
+    });
+  }
+
+  const drive = getDriveClient(drive_access_token);
+
+  // Get existing permissions
+  const { data } = await drive.permissions.list({
+    fileId: id,
+    fields: "permissions(id,type,role,emailAddress,displayName)",
+  });
+
+  const existingPermissions = data.permissions || [];
+
+  const responses = await Promise.all(
+    usersArray.map(async (user) => {
+      const email = user.emailAddress || user.email;
+
+      const existing = existingPermissions.find(
+        (p) =>
+          p.type === "user" &&
+          p.emailAddress?.toLowerCase() === email?.toLowerCase()
+      );
+
+  
+      if (existing) {
+        const response = await drive.permissions.update({
+          fileId: id,
+          permissionId: existing.id,
+          requestBody: {
+            role: user.role,
+          },
+          fields: "id,type,role,emailAddress,displayName",
+        });
+
+        return response.data;
+      }
+
+      const response = await drive.permissions.create({
+        fileId: id,
+        requestBody: {
+          type: "user",
+          role: user.role,
+          emailAddress: email,
+        },
+        sendNotificationEmail: true,
+        fields: "id,type,role,emailAddress,displayName",
       });
-    }
 
-    if (type === "google") {
-      const { drive_access_token } = req.signedCookies;
+      return response.data;
+    })
+  );
 
-      if (!drive_access_token) {
-        return res.status(401).json({
-          message: "Missing token",
-        });
-      }
-
-      try {
-        const drive = getDriveClient(drive_access_token);
-        let response;
-        await Promise.all(
-          usersArray.map(async (user) => {
-            if (!user.role) {
-              throw new Error(`Invalid role: ${user.role}`);
-            }
-
-            response = await drive.permissions.create({
-              fileId: id,
-              requestBody: {
-                type: "user",
-                role: user.role,
-                emailAddress: user.emailAddress || user.email,
-              },
-              sendNotificationEmail: true,
-              fields: "id,type,role,emailAddress,displayName",
-            });
-          }),
-        );
-
-        return res.status(200).json({
-          message: "Permissions granted successfully!",
-          response: response.data,
-        });
-      } catch (err) {
-        console.error("Google Drive Error:", err.response?.data || err.message);
-
-        return next(err);
-      }
-    }
+  return res.status(200).json({
+    message: message || "Permissions updated successfully!",
+    permissions: responses,
+  });
 
     if (!["file", "folder"].includes(type)) {
       return res.status(400).json({
@@ -1283,76 +1322,38 @@ export const giveAccessById = async (req, res, next) => {
 };
 
 export const revokeAccessById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { targetId: permissionId, type, relation } = req.body;
+try {
+  const { id } = req.params;
+  const { targetId: permissionId, type } = req.body;
 
-    
+  if (!permissionId) {
+    return res.status(400).json({
+      message: "Target permission is required",
+    });
+  }
 
-    if (type !== "google" && !permissionId) {
-      return res.status(400).json({
-        message: "Target user is required",
+  if (type === "google") {
+    const { drive_access_token } = req.signedCookies;
+
+    if (!drive_access_token) {
+      return res.status(401).json({
+        message: "Missing token",
       });
     }
 
-    if (type === "google") {
-      const { drive_access_token } = req.signedCookies;
+    const drive = getDriveClient(drive_access_token);
 
-      if (!drive_access_token) {
-        return res.status(401).json({
-          message: "Missing token",
-        });
-      }
+    await drive.permissions.delete({
+      fileId: id,
+      permissionId,
+    });
 
-      try {
-        const drive = getDriveClient(drive_access_token);
+    return res.status(200).json({
+      message: "Permission revoked successfully",
+    });
+  }
 
-     const permissions = await drive.permissions.list({
-  fileId: id,
-  fields: "permissions(id,type,role)",
-});
-
-const userPermission = permissions.data.permissions.find(
-  (permission) =>
-    permission.type === "user" &&
-    permission.id === permissionId
-);
-
-if (!userPermission) {
-  return res.status(200).json({
-    message: "User access already revoked",
-  });
-}
-
-await drive.permissions.delete({
-  fileId: id,
-  permissionId: userPermission.id,
-});
-
-return res.status(200).json({
-  message: "User access revoked successfully",
-});
-
-
-        // if (!publicPermission) {
-        //   return res.status(200).json({
-        //     message: "Permission already revoked",
-        //   });
-        // }
-
-        // await drive.permissions.delete({
-        //   fileId: id,
-        //   permissionId: publicPermission.id,
-        // });
-
-        // return res.status(200).json({
-        //   message: "Permission revoked successfully",
-        // });
-      } catch (error) {
-        return next(error);
-      }
-    }
-   const userId = permissionId;
+    const userId = permissionId;
     const objectType = type === "folder" ? "folder" : "file";
     const object = `${objectType}:${id}`;
 

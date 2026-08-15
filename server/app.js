@@ -27,6 +27,7 @@ import {
   sendOwnershipMail,
   cancelOwnershipMail,
   ownershipAction,
+  copyItem,
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
@@ -121,6 +122,7 @@ app.post("/item/send-link", checkAuth, sendLink);
 app.post("/item/sendMail/transfer-ownership", checkAuth, sendOwnershipMail);
 app.post("/item/cancel-pending-ownership", checkAuth, cancelOwnershipMail);
 app.get("/item/ownership-transfer/:transferId/:action", checkAuth, ownershipAction);
+app.post("/item/copy", checkAuth, copyItem);
 
 app.use((err, req, res, next) => {
   console.log(err);

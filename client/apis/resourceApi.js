@@ -52,3 +52,12 @@ export async function toggleItemStar(id, type) {
   );
   return response;
 }
+
+export async function copyItem({ id, type }) {
+  const { data } = await axiosWithCreds.post(`/item/copy`, {
+    id,
+    type,
+  });
+
+  return data;
+}

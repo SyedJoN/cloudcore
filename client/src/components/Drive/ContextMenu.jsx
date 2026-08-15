@@ -20,6 +20,7 @@ import {
   useSelfMountedTransition,
 } from "../../hooks/useFloatingMenu";
 import { useAuth } from "../../Contexts";
+import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 
 /*
    SUB MENU
@@ -112,6 +113,7 @@ function ContextMenuContent({
   onDelete,
   onRestore,
   onDownload,
+  onCopy,
   onPreview,
 }) {
   const { animate, nodeRef, onTransitionEnd } = useTransitionClass(
@@ -162,6 +164,7 @@ function ContextMenuContent({
 
   const canRead = capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
+  const canCopy = capabilities.canCopy === true;
   const canShare = capabilities.canShare === true;
   const canRename = capabilities.canRename === true;
   const canTrash = capabilities.canTrash === true;
@@ -369,7 +372,20 @@ function ContextMenuContent({
               Download
             </button>
           )}
+        {/* ------------------------------------------------
+                COPY
+            ------------------------------------------------ */}
 
+            {canCopy && (
+              <button
+                className="gd-context-item"
+                title="Copy"
+                onClick={close(() => onCopy(item))}
+              >
+                <DocumentDuplicateIcon className="w-5 h-5" />
+                Make a Copy
+              </button>
+            )}
           {/* RENAME */}
 
           {!isDeleted && canRename && (

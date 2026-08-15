@@ -59,7 +59,7 @@ const fileSchema = new Schema(
     },
     isUploading: {
       type: Boolean,
-      required: true,
+      default: true
     },
     viewedByMeTime: {
       type: Date,
