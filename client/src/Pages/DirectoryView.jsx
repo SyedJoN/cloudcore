@@ -413,7 +413,7 @@ export default function DirectoryView({ route }) {
       if (usersLoadedRef.current) return;
       usersLoadedRef.current = true;
       try {
-        const data = await searchUsers(user.id);
+        const data = await searchUsers();
         setAllUsers(
           data.users.map((u) => ({
             id: u._id,
@@ -950,13 +950,10 @@ export default function DirectoryView({ route }) {
 
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
-
-      // console.log("finalPermissions", finalPermissions);
+      
       setPeopleWithAccess(updatedPeopleWithAccess);
 
       setPrevPermissions(updatedPeopleWithAccess);
-      //  setLinkAccess(restricted ? "restricted" : "anyone");
-      // setLinkRole(restricted ? "reader" : userRole);
 
       setShareItem(null);
 

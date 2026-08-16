@@ -174,6 +174,9 @@ export default function ShareModal({
       : allUsers
   )?.filter((u) => !selectedUsers.find((s) => s.id === u.id));
 
+  useEffect(() => {
+    console.log("selectedUsers", selectedUsers);
+  }, [selectedUsers]);
   function handleSelectUser(e, user) {
     e.stopPropagation();
     setSelectedUsers([{ ...user, role: DRIVE_ROLES[inviteRole] }]);
@@ -201,6 +204,10 @@ export default function ShareModal({
     }
   }
 
+  useEffect(() => {
+    console.log("suggestions", suggestions);
+  }, [suggestions]);
+
   async function handleSend(e) {
     e.preventDefault();
 
@@ -211,21 +218,39 @@ export default function ShareModal({
     try {
       const itemId = String(item?._id ?? item?.id);
 
-      await grantAccessById(type, itemId, selectedUsers, message);
+      const response = await grantAccessById(
+        type,
+        itemId,
+        selectedUsers,
+        message,
+      );
+      let updatedUsers;
 
-      const updatedUsers = selectedUsers.map((user) => ({
-        id: user.id,
-        photoLink: user.avatar,
-        displayName: user.name,
-        type: "user",
-        emailAddress: user.emailAddress ?? user.email,
-        role: DRIVE_ROLES[user.role] ?? user.role,
-      }));
+      if (!isGoogleDriveRoute) {
+        updatedUsers = selectedUsers.map((user) => ({
+          id: user.id,
+          photoLink: user.avatar,
+          displayName: user.name,
+          type: "user",
+          emailAddress: user.email,
+          role: DRIVE_ROLES[user.role] ?? user.role,
+        }));
+      } else {
+        updatedUsers = response?.permissions?.map((user) => ({
+          id: user.id,
+          photoLink: user.avatar,
+          displayName: user.displayName,
+          type: "user",
+          emailAddress: user.emailAddress,
+          role: DRIVE_ROLES[user.role] ?? user.role,
+        }));
+      }
 
       const currentPermissions = item?.permissions ?? [];
 
+      console.log("updatedUser", updatedUsers);
       const updatedPermissions = currentPermissions.map((permission) => {
-        const updatedUser = updatedUsers.find(
+        const updatedUser = updatedUsers?.find(
           (user) => String(user.id) === String(permission.id),
         );
 
@@ -242,12 +267,11 @@ export default function ShareModal({
           ...updatedUser,
         };
       });
-
       const existingIds = new Set(
         currentPermissions.map((permission) => String(permission.id)),
       );
 
-      const newPermissions = updatedUsers.filter(
+      const newPermissions = updatedUsers?.filter(
         (user) => !existingIds.has(String(user.id)),
       );
 
@@ -309,52 +333,65 @@ export default function ShareModal({
   }
 
   async function handleSendLink(e) {
-    e.preventDefault();
-    setSelectedUsers((prev) => [
-      ...prev,
-      {
-        email: inviteInput,
-        message: message,
-      },
-    ]);
-    if (isShareLoading) return;
-    if (!selectedUsers.length) return;
-    const type = getResourceType(item);
-    const { email } = selectedUsers[0];
-    const url = item.webViewLink
-      ? item.webViewLink
-      : item
-        ? `${window.location.origin}/${item.isDirectory ? "directory" : "file"}/${item._id}?usp=drive_link`
-        : window.location.href;
-    try {
-      setIsShareLoading(true);
-      await sendLink({
-        toEmail: email,
-        message,
-        type,
-        id: item._id ?? item.id,
-        name: item.name,
-        url,
-        isPublic:
-          item.isPublic || item.permissions?.some((p) => p.type === "anyone"),
-        publicRole:
-          item.publicRole ||
-          item.permissions?.find((p) => p.type === "anyone")?.role,
-      });
+  e.preventDefault();
 
-      toast({ message: "Link sent successfully", type: "success" });
-      setShareItem(null);
-    } catch (error) {
-      console.log(error);
-      toast({
-        message: error.message || "Something went wrong",
-        type: "error",
-      });
-      setShareItem(null);
-    } finally {
-      setIsShareLoading(false);
-    }
+  if (isShareLoading) return;
+
+  if (!selectedUsers.length) {
+    toast({
+      message: "Please select a person",
+      type: "error",
+    });
+    return;
   }
+
+  const type = getResourceType(item);
+
+  const { email } = selectedUsers[0];
+
+  const url = item.webViewLink
+    ? item.webViewLink
+    : item
+      ? `${window.location.origin}/${
+          item.isDirectory ? "directory" : "file"
+        }/${item._id}?usp=drive_link`
+      : window.location.href;
+
+  try {
+    setIsShareLoading(true);
+
+    await sendLink({
+      toEmail: email,
+      message,
+      type,
+      id: item._id ?? item.id,
+      name: item.name,
+      url,
+      isPublic:
+        item.isPublic ||
+        item.permissions?.some((p) => p.type === "anyone"),
+      publicRole:
+        item.publicRole ||
+        item.permissions?.find((p) => p.type === "anyone")?.role,
+    });
+
+    toast({
+      message: "Link sent successfully",
+      type: "success",
+    });
+setSelectedUsers([]);
+    setShareItem(null);
+  } catch (error) {
+    console.log(error);
+
+    toast({
+      message: error.message || "Something went wrong",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+}
   function handleCancel() {
     setShowInvitePanel(false);
     setSelectedUsers([]);
@@ -380,7 +417,6 @@ export default function ShareModal({
             id: "anyoneWithLink",
             type: "anyone",
             role: linkRole,
-            allowFileDiscovery: false,
           };
         }
 
@@ -419,7 +455,7 @@ export default function ShareModal({
 
   async function sendOwnershipTransferMail(person) {
     setIsShareLoading(true);
-
+const type = item.isDirectory ? "folder" : "file"
     try {
       const result = await sendOwnershipMail({
         newOwner: person,
@@ -627,7 +663,7 @@ export default function ShareModal({
               </p>
 
               {/* Email input */}
-              <form onSubmit={handleSend}>
+              <form onSubmit={handleSendLink}>
                 <div
                   className="gd-share-input-wrap gd-invite-chip-wrap"
                   ref={inviteSuggestionsRef}
@@ -638,11 +674,11 @@ export default function ShareModal({
                   }}
                 >
                   {selectedUsers.map((u) => (
-                    <div key={u._id} className="gd-invite-chip">
-                      {u.avatar ? (
+                    <div key={u._id ?? u.id} className="gd-invite-chip">
+                      {u.avatar || u.photoLink ? (
                         <img
-                          src={u.avatar}
-                          alt={u.name}
+                          src={u.avatar || u.photoLink}
+                          alt={u.name || u.displayName}
                           style={{
                             width: 20,
                             height: 20,
@@ -663,7 +699,7 @@ export default function ShareModal({
                           {u.name?.charAt(0)?.toUpperCase()}
                         </span>
                       )}
-                      <span>{u.email || u.name}</span>
+                      <span>{(u.email ?? u.emailAddress) || (u.displayName ?? u.name)}</span>
                       <button
                         type="button"
                         className="gd-invite-chip-remove"
@@ -691,13 +727,14 @@ export default function ShareModal({
                   >
                     {!selectedUsers.length &&
                       suggestions
+                        .filter((user) => user?.email)
                         .filter((user) => {
-                          const owners = item.owners?.map(
-                            (o) => o.permissionId.toString() || [],
-                          );
+                          const owners =
+                            item.owners?.map((o) => o.emailAddress) || [];
 
-                          return owners?.includes(user.id.toString());
+                          return owners.includes(user.email);
                         })
+
                         .map((user) => (
                           <div
                             key={user.id}
@@ -712,15 +749,15 @@ export default function ShareModal({
                               }}
                             >
                               <UseAvatar
-                                name={user.name}
-                                avatar={user.avatar}
+                                name={user.name || user.displayName}
+                                avatar={user.avatar || user.photolink}
                                 size={36}
                               />
 
                               <div className="people-details">
-                                <span className="people-name">{user.name}</span>
+                                <span className="people-name">{user.name || user.displayName}</span>
                                 <span className="people-email">
-                                  {user.email}
+                                  {user.email || user.emailAddress}
                                 </span>
                               </div>
                             </div>
@@ -808,13 +845,14 @@ export default function ShareModal({
                   </button>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
+                      type="button"
                       className="gd-btn gd-btn-text"
                       onClick={() => setShareItem(null)}
                     >
                       Cancel
                     </button>
                     <button
-                      onClick={handleSendLink}
+                      type="submit"
                       className="gd-btn gd-btn-primary"
                       disabled={isShareLoading}
                       style={{
@@ -939,7 +977,16 @@ export default function ShareModal({
 
                     {showInviteSuggestions && inviteSuggestions.length > 0 && (
                       <div className="people-card-container transition-grow">
-                        {inviteSuggestions.map((user) => (
+                        {inviteSuggestions
+                        .filter((user) => user?.email)
+                        .filter((user) => {
+                          const owners =
+                            item.owners?.map((o) => o.emailAddress) || [];
+
+                          return !owners.includes(user.email);
+                        })
+
+                        .map((user) => (
                           <div
                             key={user.id}
                             className="people-row"
@@ -1066,31 +1113,41 @@ export default function ShareModal({
                     ref={suggestionsRef}
                     className={`people-card-container ${showSuggestions ? "transition-grow" : ""}`}
                   >
-                    {suggestions.map((user) => (
-                      <div
-                        key={user.id}
-                        className="people-row"
-                        onClick={(e) => handleSelectUser(e, user)}
-                      >
+                    {suggestions
+                      .filter((user) => {
+                        const addedPeople = peopleWithAccess.some(
+                          (p) => p.emailAddress === user.email,
+                        );
+                        if (addedPeople) {
+                          return false;
+                        }
+                        return true;
+                      })
+                      .map((user) => (
                         <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                          }}
+                          key={user.id}
+                          className="people-row"
+                          onClick={(e) => handleSelectUser(e, user)}
                         >
-                          <UseAvatar
-                            name={user.name}
-                            avatar={user.avatar}
-                            size={36}
-                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            <UseAvatar
+                              name={user.name}
+                              avatar={user.avatar}
+                              size={36}
+                            />
 
-                          <div className="people-details">
-                            <span className="people-name">{user.name}</span>
-                            <span className="people-email">{user.email}</span>
+                            <div className="people-details">
+                              <span className="people-name">{user.name}</span>
+                              <span className="people-email">{user.email}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </div>
 
@@ -1157,8 +1214,8 @@ export default function ShareModal({
                           >
                             <div className="gd-share-person-row">
                               <UseAvatar
-                                name={person?.displayName}
-                                avatar={person?.photoLink}
+                                name={person?.displayName || person?.name}
+                                avatar={person?.photoLink || person?.avatar}
                               />
                               <div className="gd-share-person-info">
                                 <div

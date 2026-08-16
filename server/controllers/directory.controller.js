@@ -1300,14 +1300,6 @@ export const sendOwnershipMail = async (req, res, next) => {
       status: "pending",
     });
 
-    // await sendOwnershipTransferEmail({
-    //   to: newOwner.emailAddress,
-    //   toName: newOwner.displayName,
-    //   fromName: currentOwnerName,
-    //   itemName: resource.name,
-    //   transferId: transfer._id,
-    //   expiresAt: transfer.expiresAt,
-    // });
 
     const finalResponse = await resolveRole(
       resource,
