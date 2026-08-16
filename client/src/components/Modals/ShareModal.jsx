@@ -96,40 +96,31 @@ export default function ShareModal({
     : item.isDirectory
       ? "folder"
       : "file";
-
-  const isOwner = item.owners?.[0].me === true;
-    const capabilities = item.capabilities || {};
-
+  const isOwner = item.owners?.[0]?.me === true;
+  const capabilities = item.capabilities || {};
 
   const canChangeRole = capabilities?.canChangeRole ?? true;
   const canShare = capabilities.canShare === true;
   const canRename = capabilities.canRename === true;
   const { toast } = useToast();
 
-useEffect(() => {
-  const permissions = item?.permissions ?? [];
+  useEffect(() => {
+    const permissions = item?.permissions ?? [];
 
-  const authorizedUsers = permissions.filter(
-    (person) =>
-      person.type !== "anyone" &&
-      person.type !== "superuser" &&
-      person.role !== "owner"
-  );
+    const linkPermission = permissions.find(
+      (person) => person?.type === "anyone",
+    );
 
-  const linkPermission = permissions.find(
-    (person) => person.type === "anyone"
-  );
+    setPeopleWithAccess(permissions);
+    setPrevPermissions(permissions);
 
-  setPeopleWithAccess(authorizedUsers);
-  setPrevPermissions(authorizedUsers);
+    // Whatever state you're using for link sharing:
+    setLinkAccess(linkPermission ? "anyone" : "restricted");
 
-  // Whatever state you're using for link sharing:
-  setLinkAccess(linkPermission ? "anyone" : "restricted");
-
-  if (linkPermission) {
-    setLinkRole(linkPermission.role);
-  }
-}, [item]);
+    if (linkPermission) {
+      setLinkRole(linkPermission?.role);
+    }
+  }, [item]);
 
   useEffect(() => {
     const previous = prevPermissions ?? [];
@@ -157,7 +148,7 @@ useEffect(() => {
         : "restricted",
     );
     setLinkRole(
-      item.permissions?.find((p) => p.type === "anyone")?.role || "reader",
+      item.permissions?.find((p) => p?.type === "anyone")?.role || "reader",
     );
   }, [item]);
 
@@ -373,13 +364,50 @@ useEffect(() => {
 
   async function updatePersonRole(person, idx, role) {
     const userId = person.id;
-    setPeopleWithAccess((prev) =>
-      prev.map((p) =>
-        p.id === person.id
-          ? { ...p, role: role !== "remove" ? DRIVE_ROLES[role] : role }
-          : p,
-      ),
-    );
+    setPeopleWithAccess((prev) => {
+      const hasPublicAccess = prev.some((p) => p.type === "anyone");
+
+      let updated = prev.map((p) => {
+        const isPublicAccess = p.type === "anyone";
+
+        if (isPublicAccess && linkAccess === "restricted") {
+          return null;
+        }
+
+        if (isPublicAccess && linkAccess === "anyone") {
+          return {
+            ...p,
+            id: "anyoneWithLink",
+            type: "anyone",
+            role: linkRole,
+            allowFileDiscovery: false,
+          };
+        }
+
+        const isPersonMatched = p.id === person.id;
+
+        if (isPersonMatched) {
+          return {
+            ...p,
+            role: role !== "remove" ? DRIVE_ROLES[role] : role,
+          };
+        }
+
+        return p;
+      });
+
+      updated = updated.filter(Boolean);
+      if (linkAccess === "anyone" && !hasPublicAccess) {
+        updated.push({
+          id: "anyoneWithLink",
+          type: "anyone",
+          role: linkRole,
+          allowFileDiscovery: false,
+        });
+      }
+
+      return updated;
+    });
 
     if (prevRoleRef.current === role) {
       setOpenDropdown(null);
@@ -406,7 +434,7 @@ useEffect(() => {
 
           return {
             ...resource,
-            permissions: result.permissions
+            permissions: result.permissions,
           };
         };
 
@@ -957,25 +985,24 @@ useEffect(() => {
                       {ROLE_LABEL[inviteRole] || inviteRole}{" "}
                       <IconChevronDown size={14} />
                     </button>
-                  
-                      <RoleDropdown
+
+                    <RoleDropdown
                       open={openDropdown === "invite"}
-                        containerRef={shareModalOverlayRef}
-                        anchorRef={inviteRoleRef}
-                        current={inviteRole}
-                        onChange={(r) => {
-                          setInviteRole(r);
-                          setSelectedUsers((prev) =>
-                            prev.map((u) => ({
-                              ...u,
-                              role: DRIVE_ROLES[r],
-                            })),
-                          );
-                          setOpenDropdown(null);
-                        }}
-                        onClose={() => setOpenDropdown(null)}
-                      />
-                   
+                      containerRef={shareModalOverlayRef}
+                      anchorRef={inviteRoleRef}
+                      current={inviteRole}
+                      onChange={(r) => {
+                        setInviteRole(r);
+                        setSelectedUsers((prev) =>
+                          prev.map((u) => ({
+                            ...u,
+                            role: DRIVE_ROLES[r],
+                          })),
+                        );
+                        setOpenDropdown(null);
+                      }}
+                      onClose={() => setOpenDropdown(null)}
+                    />
                   </div>
                 </div>
 
@@ -1111,82 +1138,85 @@ useEffect(() => {
 
                 {item.permissions?.length > 0 && (
                   <div className="gd-share-people-list">
-                    {peopleWithAccess?.map((person, idx) => {
-                      if (
-                        person.type === "superuser" ||
-                        person.role === "owner"
-                      )
-                        return;
-                      if (!personRefs.current[idx])
-                        personRefs.current[idx] = { current: null };
-                      return (
-                        <div
-                          key={person.email || person.emailAddress}
-                          onClick={() =>
-                            setActivePerson(activePerson === idx ? null : idx)
-                          }
-                          className={`gd-share-person ${activePerson === idx ? "gd-active" : ""}`}
-                        >
-                          <div className="gd-share-person-row">
-                            <UseAvatar
-                              name={person.displayName}
-                              avatar={person.photoLink}
-                            />
-                            <div className="gd-share-person-info">
-                              <div
-                                className={`gd-share-person-name ${person.role === "remove" ? "line-through" : ""}`}
-                              >
-                                {person.displayName}{" "}
-                                {person.emailAddress === user.email
-                                  ? "(you)"
-                                  : ""}
-                              </div>
-                              <div className="gd-share-person-email">
-                                {person.emailAddress}
-                              </div>
-                              <div className="gd-share-person-pending-owner">
-                                {person.pendingOwner && "Pending owner"}
-                              </div>
-                            </div>
-                            <div className="gd-share-role-select">
-                              <MouseTooltip
-                                disabled={!canChangeRole}
-                                message="Can't reduce permission because it's set on a parent folder"
-                              >
-                                <button
-                                  ref={(el) =>
-                                    (personRefs.current[idx] = { current: el })
-                                  }
-                                  className="gd-share-person-role-btn"
-                                  aria-disabled={!canChangeRole}
-                                  onClick={(e) => {
-                                    if (!canChangeRole) return;
-                                    e.stopPropagation();
-                                    setOpenDropdown(
-                                      openDropdown === idx ? null : idx,
-                                    );
-                                  }}
-                                  style={{
-                                    opacity: !canChangeRole ? 0.5 : 1,
-                                    cursor: !canChangeRole
-                                      ? "not-allowed"
-                                      : "pointer",
-                                    pointerEvents: !canChangeRole
-                                      ? "none"
-                                      : "auto",
-                                  }}
+                    {peopleWithAccess
+                      ?.map((person, idx) => {
+                        if (
+                          person?.type === "anyone" ||
+                          person?.role === "owner"
+                        )
+                          return null;
+                        if (!personRefs.current[idx])
+                          personRefs.current[idx] = { current: null };
+                        return (
+                          <div
+                            key={person?.email || person?.emailAddress}
+                            onClick={() =>
+                              setActivePerson(activePerson === idx ? null : idx)
+                            }
+                            className={`gd-share-person ${activePerson === idx ? "gd-active" : ""}`}
+                          >
+                            <div className="gd-share-person-row">
+                              <UseAvatar
+                                name={person?.displayName}
+                                avatar={person?.photoLink}
+                              />
+                              <div className="gd-share-person-info">
+                                <div
+                                  className={`gd-share-person-name ${person?.role === "remove" ? "line-through" : ""}`}
                                 >
-                                  {ROLE_LABEL[person.role]}{" "}
-                                  {canChangeRole && (
-                                    <IconChevronDown size={12} />
-                                  )}
-                                </button>
-                              </MouseTooltip>
-                            
+                                  {person?.displayName}{" "}
+                                  {person?.emailAddress === user.email
+                                    ? "(you)"
+                                    : ""}
+                                </div>
+                                <div className="gd-share-person-email">
+                                  {person?.emailAddress}
+                                </div>
+                                <div className="gd-share-person-pending-owner">
+                                  {person?.pendingOwner && "Pending owner"}
+                                </div>
+                              </div>
+                              <div className="gd-share-role-select">
+                                <MouseTooltip
+                                  disabled={!canChangeRole}
+                                  message="Can't reduce permission because it's set on a parent folder"
+                                >
+                                  <button
+                                    ref={(el) =>
+                                      (personRefs.current[idx] = {
+                                        current: el,
+                                      })
+                                    }
+                                    className="gd-share-person-role-btn"
+                                    aria-disabled={!canChangeRole}
+                                    onClick={(e) => {
+                                      if (!canChangeRole) return;
+                                      e.stopPropagation();
+                                      setOpenDropdown(
+                                        openDropdown === idx ? null : idx,
+                                      );
+                                    }}
+                                    style={{
+                                      opacity: !canChangeRole ? 0.5 : 1,
+                                      cursor: !canChangeRole
+                                        ? "not-allowed"
+                                        : "pointer",
+                                      pointerEvents: !canChangeRole
+                                        ? "none"
+                                        : "auto",
+                                    }}
+                                  >
+                                    {ROLE_LABEL[person?.role]}{" "}
+                                    {canChangeRole && (
+                                      <IconChevronDown size={12} />
+                                    )}
+                                  </button>
+                                </MouseTooltip>
+
                                 <RoleDropdown
-                                open={openDropdown === idx}
+                                  open={openDropdown === idx}
                                   isChanged={isChanged}
-                                  isOwnerPending={person.pendingOwner}
+                                  isOwnerPending={person?.pendingOwner}
                                   onTransfer={() =>
                                     sendOwnershipTransferMail(person)
                                   }
@@ -1194,7 +1224,7 @@ useEffect(() => {
                                     cancelOwnershipTransferMail(person)
                                   }
                                   anchorRef={personRefs.current[idx]}
-                                  current={ROLE_LABEL[person.role]}
+                                  current={ROLE_LABEL[person?.role]}
                                   onChange={(r) =>
                                     updatePersonRole(person, idx, r)
                                   }
@@ -1202,12 +1232,12 @@ useEffect(() => {
                                   showRemove={true}
                                   isOwner={isOwner}
                                 />
-                           
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                      .filter(Boolean)}
                   </div>
                 )}
 
@@ -1295,20 +1325,19 @@ useEffect(() => {
                           >
                             {ROLE_LABEL[linkRole]} <IconChevronDown size={14} />
                           </button>
-                     
-                            <RoleDropdown
+
+                          <RoleDropdown
                             open={openDropdown === "link"}
-                              anchorRef={linkRoleRef}
-                              containerRef={shareModalOverlayRef}
-                              current={ROLE_LABEL[linkRole]}
-                              onChange={(r) => {
-                                setLinkRole(r);
-                                setOpenDropdown(null);
-                                onClose(item, r, linkAccess);
-                              }}
-                              onClose={() => setOpenDropdown(null)}
-                            />
-                    
+                            anchorRef={linkRoleRef}
+                            containerRef={shareModalOverlayRef}
+                            current={ROLE_LABEL[linkRole]}
+                            onChange={(r) => {
+                              setLinkRole(r);
+                              setOpenDropdown(null);
+                              onClose(item, r, linkAccess);
+                            }}
+                            onClose={() => setOpenDropdown(null)}
+                          />
                         </div>
                       )}
                     </div>

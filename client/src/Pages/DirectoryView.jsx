@@ -872,7 +872,9 @@ export default function DirectoryView({ route }) {
   useEffect(() => {
     console.log("combined", combinedItems);
   }, [combinedItems]);
-
+  useEffect(() => {
+    console.log("peopleWithAccess", peopleWithAccess);
+  }, [peopleWithAccess]);
   const handleSharedRoleUpdate = async (item, type, message) => {
     setIsShareLoading(true);
 
@@ -923,88 +925,36 @@ export default function DirectoryView({ route }) {
         setShareItem(null);
         return;
       }
-      let update;
-      let finalPermissions;
-      if (type.startsWith("google") && result?.access === "remove") {
-        console.log("yayy");
-        finalPermissions = mergedPermissions.filter((p) => p.role !== "remove");
-        update = (list) =>
-          list.map((resource) => {
-            const resourceId = String(resource?._id ?? resource?.id);
-            if (resourceId !== String(result.itemId)) {
-              return resource;
-            }
-            return {
-              ...resource,
-              permissions: finalPermissions,
-            };
-          });
-      } else {
-        update = (list) =>
-          list.map((resource) => {
-            const resourceId = String(resource?._id ?? resource?.id);
 
-            if (resourceId !== String(result.itemId)) {
-              return resource;
-            }
+      const updatedPeopleWithAccess = peopleWithAccess
+        .map((p) => {
+          const isRemoved = p.role === "remove";
+          if (isRemoved) {
+            return null;
+          }
+          return p;
+        })
+        .filter(Boolean);
 
-            if (!type.startsWith("google")) {
-              return {
-                ...resource,
-                permissions: result.finalPermissions,
-              };
-            }
+      const update = (list) =>
+        list.map((resource) => {
+          const resourceId = String(resource?._id ?? resource?.id);
+          if (resourceId !== String(result.itemId)) {
+            return resource;
+          }
+          return {
+            ...resource,
+            permissions: updatedPeopleWithAccess,
+          };
+        });
 
-            let permissions = finalPermissions;
-
-            if (linkAccess === "restricted") {
-              // Remove existing public/link permission.
-              permissions = finalPermissions.filter((p) => p.type !== "anyone");
-            } else if (linkAccess === "anyone") {
-              const hasPublicPermission = finalPermissions.some(
-                (p) => p.type === "anyone",
-              );
-
-              if (hasPublicPermission) {
-                // Only update the existing public permission.
-                permissions = finalPermissions.map((p) =>
-                  p.type === "anyone"
-                    ? {
-                        ...p,
-                        role: linkRole,
-                      }
-                    : p,
-                );
-              } else {
-                // Add a public permission without modifying users/groups.
-                permissions = [
-                  ...finalPermissions,
-                  {
-                    id: "anyoneWithLink",
-                    type: "anyone",
-                    role: linkRole,
-                    allowFileDiscovery: false,
-                  },
-                ];
-              }
-            }
-
-            return {
-              ...resource,
-              permissions,
-            };
-          });
-      }
-      finalPermissions = type.startsWith("google")
-        ? mergedPermissions
-        : result.finalPermissions;
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
 
-      console.log("finalPermissions", finalPermissions);
-      setPeopleWithAccess(finalPermissions);
+      // console.log("finalPermissions", finalPermissions);
+      setPeopleWithAccess(updatedPeopleWithAccess);
 
-      setPrevPermissions(finalPermissions);
+      setPrevPermissions(updatedPeopleWithAccess);
       //  setLinkAccess(restricted ? "restricted" : "anyone");
       // setLinkRole(restricted ? "reader" : userRole);
 

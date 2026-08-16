@@ -1014,13 +1014,8 @@ export const giveAccessById = async (req, res, next) => {
     });
   }
 
-  if (type !== "google") {
-    return res.status(400).json({
-      message: "Unsupported type",
-    });
-  }
-
-  const { drive_access_token } = req.signedCookies;
+  if (type === "google") {
+   const { drive_access_token } = req.signedCookies;
 
   if (!drive_access_token) {
     return res.status(401).json({
@@ -1082,6 +1077,9 @@ export const giveAccessById = async (req, res, next) => {
     permissions: responses,
   });
 
+  }
+
+ 
     if (!["file", "folder"].includes(type)) {
       return res.status(400).json({
         message: "Invalid resource type",
@@ -1324,7 +1322,7 @@ export const giveAccessById = async (req, res, next) => {
 export const revokeAccessById = async (req, res, next) => {
 try {
   const { id } = req.params;
-  const { targetId: permissionId, type } = req.body;
+  const { targetId: permissionId, type, relation } = req.body;
 
   if (!permissionId) {
     return res.status(400).json({
