@@ -40,51 +40,34 @@
   animation: modal-appear 0.15s ease;
 }
 .gd-share-modal-loader {
-  position: absolute;
+  position: absolute;   /* back to absolute, pinned to modal */
   top: 0;
   left: 0;
   width: 100%;
-  height: 3px;
+  height: 4px;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   overflow: hidden;
-  background-color: transparent;
+  background-color: var(--accent-blue-light);
 }
 
 .gd-share-modal-loader::before {
   content: "";
   position: absolute;
   top: 0;
-  left: -50%;
-  width: 50%;
+  left: 0;
   height: 100%;
+  width: 100%;
   background-color: var(--accent-blue);
-  animation: gd-loader-slide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: left center;
+  animation: gd-loader-bar 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-.gd-share-modal-loader::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -80%;
-  width: 30%;
-  height: 100%;
-  background-color: var(--accent-blue);
-  animation: gd-loader-slide 1.4s cubic-bezier(0.4, 0, 0.2, 1) 0.5s infinite;
-  opacity: 0.6;
-}
-
-@keyframes gd-loader-slide {
+@keyframes gd-loader-bar {
   0% {
-    left: -50%;
-    width: 50%;
-  }
-  50% {
-    left: 30%;
-    width: 60%;
+    transform: translateX(-5%) scaleX(0.05);
   }
   100% {
-    left: 110%;
-    width: 50%;
+    transform: translateX(100%) scaleX(1);
   }
 }
 .gd-share-header {

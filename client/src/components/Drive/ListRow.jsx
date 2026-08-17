@@ -25,7 +25,7 @@ export default function ListRow({
     : isGoogleDrive && isGoogleDriveRoute
       ? "google-file"
       : "file";
-  const iconType = item.isDirectory ? null : getFileType(item.name);
+  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
   const itemId = item.id ?? item._id;
   const lastModified = formatDate(item.modifiedTime || item.updatedAt);
   const size = formatSize(item.size);

@@ -28,7 +28,7 @@ export default function SelectionBar({
   onRename,
   onShare,
   onRestore,
-  onSoftDelete,
+  onTrash,
   onDeleteForever,
 }) {
   if (selectedItems.size === 0) {
@@ -87,7 +87,7 @@ export default function SelectionBar({
 
   const canRead = capabilities.canRead === true;
 
-  const canShare = capabilities.canShare === true;
+  const canShare = true;
 
   const canDownload = capabilities.canDownload === true;
 
@@ -252,7 +252,7 @@ export default function SelectionBar({
           <button
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Move to trash"
-            onClick={onSoftDelete}
+            onClick={onTrash}
           >
             <IconTrash size={18} />
           </button>

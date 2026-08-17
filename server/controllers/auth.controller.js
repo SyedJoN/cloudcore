@@ -441,7 +441,6 @@ export const googleAuth = async (req, res, next) => {
     let fgaTuple = null;
     await session.withTransaction(async () => {
       user = await User.findOne({ email }).session(session);
-
       if (user && user.isDeleted) {
         return res.status(403).json({
           message: "Account deleted. To recover, contact owner.",
@@ -919,5 +918,90 @@ export const downloadGoogleDriveFiles = async (req, res, next) => {
     response.data.pipe(res);
   } catch (error) {
     next(error);
+  }
+};
+
+export const createGoogleDriveUploadSession = async (req, res) => {
+  try {
+    const accessToken =
+      req.signedCookies.drive_access_token;
+
+    if (!accessToken) {
+      return res.status(401).json({
+        message: "Google Drive is not connected",
+      });
+    }
+
+    const {
+      name,
+      size,
+      contentType,
+      parentDirId,
+    } = req.body;
+
+    const metadata = {
+      name,
+    };
+
+    // If you want the file inside a specific
+    // Google Drive folder, parentDirId must be
+    // the GOOGLE folder ID, not your local Mongo ID.
+    if (parentDirId) {
+      metadata.parents = [parentDirId];
+    }
+
+    const response = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json; charset=UTF-8",
+          "X-Upload-Content-Type":
+            contentType || "application/octet-stream",
+          "X-Upload-Content-Length": String(size),
+        },
+        body: JSON.stringify(metadata),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      console.error(
+        "Google Drive session error:",
+        errorText,
+      );
+
+      return res.status(response.status).json({
+        message: "Failed to create Google Drive upload session",
+        error: errorText,
+      });
+    }
+
+    const uploadUrl =
+      response.headers.get("location");
+
+    if (!uploadUrl) {
+      return res.status(500).json({
+        message:
+          "Google Drive did not return an upload URL",
+      });
+    }
+
+    return res.status(200).json({
+      uploadUrl,
+    });
+  } catch (error) {
+    console.error(
+      "createGoogleDriveUploadSession:",
+      error,
+    );
+
+    return res.status(500).json({
+      message:
+        error.message ||
+        "Failed to create Google Drive upload session",
+    });
   }
 };

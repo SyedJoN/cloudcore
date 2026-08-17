@@ -38,7 +38,7 @@ export default function GridItem({
       ? "google-file"
       : "file";
 
-  const iconType = item.isDirectory ? null : getFileType(item.name);
+  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
   const itemId = item.id ?? item._id;
 
   const avatarEl =

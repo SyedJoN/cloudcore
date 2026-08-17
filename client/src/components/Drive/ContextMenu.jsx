@@ -109,8 +109,8 @@ function ContextMenuContent({
   onClose,
   onShare,
   onRename,
-  onSoftDelete,
-  onDelete,
+  onTrash,
+  onDeleteForever,
   onRestore,
   onDownload,
   onCopy,
@@ -264,7 +264,7 @@ function ContextMenuContent({
               <button
                 className="gd-context-item danger"
                 onClick={close(() =>
-                  onDelete(item, isGoogle ? "google" : "local"),
+                  onDeleteForever(isGoogle ? "google" : "local"),
                 )}
               >
                 <IconTrash size={18} />
@@ -407,7 +407,7 @@ function ContextMenuContent({
           {!isDeleted && canTrash && (
             <button
               className="gd-context-item danger"
-              onClick={close(() => onSoftDelete(item))}
+              onClick={close(() => onTrash(item))}
             >
               <IconTrash size={18} />
               Move to trash
@@ -417,7 +417,7 @@ function ContextMenuContent({
           {isGoogleDriveRoute && !isDeleted && canDelete && (
             <button
               className="gd-context-item danger"
-              onClick={close(() => onDelete(item, "google"))}
+              onClick={close(() => onDeleteForever("google"))}
             >
               <IconTrash size={18} />
               Delete forever

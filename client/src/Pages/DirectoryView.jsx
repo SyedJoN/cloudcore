@@ -57,6 +57,8 @@ import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import DownloadTray from "../Components/Drive/DownloadTray";
 import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
+import { addDirectory } from "../../apis/directoryApi";
+import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -136,21 +138,42 @@ export default function DirectoryView({ route }) {
   const downloadControllers = useRef({});
 
   const handleUndo = async (undoAction) => {
-    if (!undoAction) return;
+    try {
+      if (!undoAction) return;
+      const items = undoAction?.items;
 
-    if (undoAction.type === "trash") {
-      await handleRestoreItem(undoAction.item);
-      refreshCurrentDirectory();
+      if (undoAction.type === "trash") {
+        await handleRestoreItem(items);
+
+        const folders = items.filter((item) => item.isDirectory);
+        const files = items.filter((item) => !item.isDirectory);
+        setDirectoriesList((prev) => [...prev, ...folders]);
+
+        setFilesList((prev) => [...prev, ...files]);
+      }
+      if (undoAction.type === "restore") {
+        await handleMoveToTrash(items);
+        const folders = items.filter((item) => item.isDirectory);
+        const files = items.filter((item) => !item.isDirectory);
+
+        setDirectoriesList((prev) => [...prev, ...folders]);
+        setFilesList((prev) => [...prev, ...files]);
+      }
+      if (undoAction.type === "star") {
+        await handleToggleStar(items);
+
+        if (isStarredRoute) {
+          const folders = items.filter((item) => item.isDirectory);
+          const files = items.filter((item) => !item.isDirectory);
+
+          setDirectoriesList((prev) => [...prev, ...folders]);
+          setFilesList((prev) => [...prev, ...files]);
+        }
+      }
+      toast({ message: "Action undone", type: "success" });
+    } catch (error) {
+      console.log("error", error);
     }
-    if (undoAction.type === "restore") {
-      await handleMoveToTrash(undoAction.item);
-      refreshCurrentDirectory();
-    }
-    if (undoAction.type === "star") {
-      await handleToggleStar(undoAction.item);
-      isStarredRoute && getDirectoryItems("starred");
-    }
-    toast({ message: "Action undone", type: "success" });
   };
 
   function showError(message, autoClear = false) {
@@ -385,6 +408,9 @@ export default function DirectoryView({ route }) {
   }, [setFilesList]);
 
   useEffect(() => {
+    setError("");
+  }, []);
+  useEffect(() => {
     if (grantUserId && grantRole && dirId && !grantExecutedRef.current) {
       grantExecutedRef.current = true;
       axiosWithCreds
@@ -457,33 +483,48 @@ export default function DirectoryView({ route }) {
     }
   };
 
-  // Item actions
-  async function handleMoveToTrash(item) {
+  async function handleMoveToTrash(items) {
     try {
-      const url = item.isDirectory
-        ? `/directory/soft-delete/${item._id}`
-        : `/file/soft-delete/${item._id}`;
-      await softDeleteFile(url);
+      showError("");
+      await Promise.all(
+        items.map((item) => {
+          const url = item.isDirectory
+            ? `/directory/soft-delete/${item._id}`
+            : `/file/soft-delete/${item._id}`;
+          return softDeleteFile(url);
+        }),
+      );
       await refreshUser();
+      const areAllFiles = items.every((item) => !item.isDirectory);
+      const areAllFolders = items.every((item) => item.isDirectory);
+      const count = items.length;
+      const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
 
       toast({
-        message: "Item moved to trash",
+        message: `${count} ${noun}${count === 1 ? "" : "s"} moved to trash`,
         type: "success",
         duration: 5000,
 
         undoAction: {
           type: "trash",
-          itemId: item._id,
+          items: items,
           onUndo: async () => {
             await handleUndo({
               type: "trash",
-              itemId: item._id,
-              item,
+              items,
             });
           },
         },
       });
-      refreshCurrentDirectory();
+
+      const deletedIds = new Set(items.map((item) => item._id));
+
+      setDirectoriesList((prev) =>
+        prev.filter((item) => !deletedIds.has(item._id)),
+      );
+
+      setFilesList((prev) => prev.filter((item) => !deletedIds.has(item._id)));
+
       clearSelection();
     } catch (err) {
       const status = err.response?.status;
@@ -495,28 +536,41 @@ export default function DirectoryView({ route }) {
     }
   }
 
-  async function handleRestoreItem(item) {
+  async function handleRestoreItem(items) {
+    showError("");
+
     try {
-      const type = item.isDirectory ? "directory" : "file";
-      await restoreFile(`/${type}/${item._id}/restore`);
+      await Promise.all(
+        items.map((item) => {
+          const type = item.isDirectory ? "directory" : "file";
+
+          return restoreFile(`/${type}/${item._id}/restore`);
+        }),
+      );
       await refreshUser();
       toast({
-        message: `${item.name} restored`,
+        message: `${items.length} items restored`,
         type: "success",
 
         undoAction: {
           type: "restore",
-          itemId: item._id,
+          items: items,
           onUndo: async () => {
             await handleUndo({
               type: "restore",
-              itemId: item._id,
-              item,
+              items,
             });
           },
         },
       });
-      getTrashItems(showError);
+      const restoredIds = new Set(items.map((item) => item.id ?? item._id));
+
+      setDirectoriesList((prev) =>
+        prev.filter((item) => !restoredIds.has(item.id ?? item._id)),
+      );
+      setFilesList((prev) =>
+        prev.filter((item) => !restoredIds.has(item.id ?? item._id)),
+      );
       clearSelection();
     } catch (err) {
       const status = err.response?.status;
@@ -532,18 +586,36 @@ export default function DirectoryView({ route }) {
     }
   }
 
-  async function handleDelete(item, type = "local") {
+  async function handleDelete(items, type) {
     try {
-      const url =
-        item?.isDirectory && type === "local"
-          ? `/directory/${item._id}`
-          : `/file/${item._id ?? item.id}?type=${type}`;
-      const { data } = await deleteFile(url);
-      type === "google"
-        ? refreshCurrentDirectory("google")
-        : getTrashItems(showError);
+      await Promise.all(
+        items.map((item) => {
+          const url =
+            item?.isDirectory && type === "local"
+              ? `/directory/${item._id ?? item.id}`
+              : `/file/${item._id ?? item.id}?type=${type}`;
+          return deleteFile(url);
+        }),
+      );
+
       clearSelection();
-      toast({ message: data.message, type: "success" });
+      const areAllFiles = items.every((item) => !item.isDirectory);
+      const areAllFolders = items.every((item) => item.isDirectory);
+      const count = items.length;
+      const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
+
+      toast({
+        message: `${count} ${noun}${count === 1 ? "" : "s"} deleted permanently`,
+        type: "success",
+      });
+
+      const deletedIds = new Set(items.map((item) => item.id ?? item._id));
+      setDirectoriesList((prev) =>
+        prev.filter((item) => !deletedIds.has(item.id ?? item._id)),
+      );
+      setFilesList((prev) =>
+        prev.filter((item) => !deletedIds.has(item.id ?? item._id)),
+      );
     } catch (err) {
       showError(err.message);
     }
@@ -552,15 +624,13 @@ export default function DirectoryView({ route }) {
   async function handleCreateDirectory(e) {
     e.preventDefault();
     showError("");
+
+    const type = isGoogleDriveRoute ? "google" : "local";
     try {
-      await axiosWithCreds.post(
-        `/directory/${dirId || ""}`,
-        {},
-        { headers: { dirname: newDirname } },
-      );
-      setNewDirname("New Folder");
+      const response = await addDirectory(dirId, newDirname, type);
       setShowCreateDir(false);
-      refreshCurrentDirectory();
+      setNewDirname("New Folder");
+      setDirectoriesList((prev) => [...prev, response.data].reverse());
     } catch (err) {
       showError(err.message);
     }
@@ -592,52 +662,76 @@ export default function DirectoryView({ route }) {
 
       const { data } = await axiosWithCreds.patch(url, body);
       setShowRename(false);
+
       toast({ message: data.message, type: "success" });
-      refreshCurrentDirectory(renameType);
+      setDirectoriesList((prev) =>
+        prev.map((item) =>
+          (item.id ?? item._id) === renameId
+            ? { ...item, name: renameValue }
+            : item,
+        ),
+      );
+      setFilesList((prev) =>
+        prev.map((item) =>
+          (item.id ?? item._id) === renameId
+            ? { ...item, name: renameValue }
+            : item,
+        ),
+      );
     } catch (err) {
       showError(err.message);
     } finally {
       setIsRenameLoading(false);
     }
   }
-  async function handleToggleStar(item) {
+  async function handleToggleStar(items) {
+    showError("");
     try {
-      const type = item.isDirectory ? "folder" : "file";
-
-      const {
-        data: { message },
-      } = await toggleItemStar(item._id, type);
-
-      const newStarredValue = !item.isStarred;
-
-      if (!newStarredValue && isStarredRoute) {
-        if (item.isDirectory) {
-          setDirectoriesList((prev) => prev.filter((d) => d._id !== item._id));
-        } else {
-          setFilesList((prev) => prev.filter((f) => f._id !== item._id));
-        }
+      await Promise.all(
+        items.map((item) => {
+          const type = item.isDirectory ? "folder" : "file";
+          setIsStarred((prev) => ({
+            ...prev,
+            [item._id]: !prev[item._id],
+          }));
+          return toggleItemStar(item._id, type);
+        }),
+      );
+      if (isStarredRoute) {
+        const starredIds = new Set(items.map((item) => item.id ?? item._id));
+        setDirectoriesList((prev) =>
+          prev.filter((item) => !starredIds.has(item.id ?? item._id)),
+        );
+        setFilesList((prev) =>
+          prev.filter((item) => !starredIds.has(item.id ?? item._id)),
+        );
       }
-      setIsStarred((prev) => ({
-        ...prev,
-        [item._id]: !prev[item._id],
-      }));
-      toast({
-        message,
-        type: "success",
+      const areAllFiles = items.every((item) => !item.isDirectory);
+      const areAllFolders = items.every((item) => item.isDirectory);
+      const areAllCurrentlyStarred = items.every((item) => isStarred[item._id]);
 
+      const count = items.length;
+
+      const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
+
+      const action = areAllCurrentlyStarred ? "removed from" : "added to";
+
+      toast({
+        message: `${count} ${noun}${count === 1 ? "" : "s"} ${action} starred`,
+        type: "success",
         undoAction: {
           type: "star",
-          itemId: item._id,
+          items,
           onUndo: async () => {
             await handleUndo({
               type: "star",
-              itemId: item._id,
-              item,
+              items,
             });
           },
         },
       });
     } catch (error) {
+      showError(error.message);
       setError(error.message);
     }
   }
@@ -972,79 +1066,54 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
-const insertBefore = (items, sourceItem, newItem) => {
-  const index = items.findIndex(
-    (item) => (item.id || item._id) === (sourceItem.id || sourceItem._id)
-  );
+  const insertBefore = (items, sourceItem, newItem) => {
+    const index = items.findIndex(
+      (item) => (item.id || item._id) === (sourceItem.id || sourceItem._id),
+    );
 
-  if (index === -1) return [...items, newItem];
+    if (index === -1) return [...items, newItem];
 
-  return [
-    ...items.slice(0, index),
-    newItem,
-    ...items.slice(index),
-  ];
-};
-async function handleCopyItem(item) {
-  const type = item.isDirectory ? "folder" : "file";
-  const providerType = item.webViewLink ? "google" : "local";
+    return [...items.slice(0, index), newItem, ...items.slice(index)];
+  };
+  async function handleCopyItem(item) {
+    const type = item.isDirectory ? "folder" : "file";
+    const providerType = item.webViewLink ? "google" : "local";
 
-  try {
-    const {
-      message,
-      data: {
-        copiedItem,
+    try {
+      const {
+        message,
+        data: { copiedItem, owners, capabilities, permissions },
+      } = await copyItem({
+        item,
+        type,
+        providerType,
+      });
+
+      toast({
+        message,
+        type: "success",
+      });
+
+      const newItem = {
+        ...copiedItem,
         owners,
         capabilities,
         permissions,
-      },
-    } = await copyItem({
-      item,
-      type,
-      providerType,
-    });
+        isDirectory: type === "folder",
+      };
 
-    toast({
-      message,
-      type: "success",
-    });
-
-    const newItem = {
-      ...copiedItem,
-      owners,
-      capabilities,
-      permissions,
-      isDirectory: type === "folder",
-    };
-
-    if (type === "folder") {
-      setDirectoriesList((prev) =>
-        insertBefore(prev, item, newItem)
-      );
-    } else {
-      setFilesList((prev) =>
-        insertBefore(prev, item, newItem)
+      if (type === "folder") {
+        setDirectoriesList((prev) => insertBefore(prev, item, newItem));
+      } else {
+        setFilesList((prev) => insertBefore(prev, item, newItem));
+      }
+    } catch (error) {
+      showError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to copy item",
       );
     }
-  } catch (error) {
-    showError(
-      error?.response?.data?.message ||
-        error?.message ||
-        "Failed to copy item"
-    );
-  }
-}
-  async function handleDeleteSelected() {
-    for (const id of selectedItems) {
-      const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-      if (!item) continue;
-      const url = item.isDirectory
-        ? `${BASE_URL}/directory/${id}`
-        : `${BASE_URL}/file/${id}`;
-      await axiosWithCreds.delete(url).catch(() => {});
-    }
-    clearSelection();
-    refreshCurrentDirectory();
   }
 
   const listHeaderRow = (
@@ -1243,11 +1312,12 @@ async function handleCopyItem(item) {
           clearSelection();
           setContextItem(null);
         }}
-        onStar={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleToggleStar(item);
-          });
+        onStar={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleToggleStar(items);
         }}
         onDownload={() => {
           selectedItems.forEach((id) => {
@@ -1280,29 +1350,27 @@ async function handleCopyItem(item) {
           const item = combinedItems.find((i) => (i.id ?? i._id) === id);
           if (item) setShareItem(item);
         }}
-        onTrash={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleMoveToTrash(item);
-          });
+        onTrash={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+
+          if (!items.length) return;
+          await handleMoveToTrash(items);
         }}
-        onRestore={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleRestoreItem(item);
-          });
+        onRestore={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleRestoreItem(items);
         }}
-        onSoftDelete={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleMoveToTrash(item);
-          });
-        }}
-        onDeleteForever={(type) => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) handleDelete(item, type);
-          });
+        onDeleteForever={async (type) => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleDelete(items, type);
         }}
       />
 
@@ -1320,19 +1388,59 @@ async function handleCopyItem(item) {
           setContextItem(null);
           clearSelection();
         }}
-        onShare={(item) => setShareItem(item)}
-        onRename={(item) => openRename(item)}
-        onSoftDelete={(item) => handleMoveToTrash(item)}
-        onDelete={(item, type) => handleDelete(item, type)}
-        onRestore={(item) => handleRestoreItem(item)}
-        onDownload={(item) => {
-          if (item && item.isDirectory) {
-            handleDownloadFolder(item);
-          } else {
-            handleDownload(item);
-          }
+        onDownload={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item && item.isDirectory) {
+              handleDownloadFolder(item);
+            } else {
+              handleDownload(item);
+            }
+          });
+          clearSelection();
         }}
-        onCopy={(item) => handleCopyItem(item)}
+        onCopy={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item) {
+              handleCopyItem(item);
+            }
+          });
+          clearSelection();
+        }}
+        onRename={() => {
+          selectedItems.forEach((id) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+            if (item) openRename(item);
+          });
+        }}
+        onShare={() => {
+          const id = [...selectedItems][0];
+          const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+          if (item) setShareItem(item);
+        }}
+        onTrash={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+
+          if (!items.length) return;
+          await handleMoveToTrash(items);
+        }}
+        onRestore={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleRestoreItem(items);
+        }}
+        onDeleteForever={async (type) => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleDelete(items, type);
+        }}
         onPreview={(item) => setViewItem(item)}
       />
 

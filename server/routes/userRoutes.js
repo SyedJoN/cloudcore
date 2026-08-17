@@ -23,7 +23,7 @@ router.get("/current-user", getCurrentUser);
 // Get current user
 router.patch("/", validateAdmin, updateUser);
 router.get("/", validateManager, fetchUsers);
-router.patch("/search/:type", searchUsers);
+router.patch("/search", searchUsers);
 router.post("/:userId/revoke", validateManager, revokeUser);
 router.delete("/:userId/delete", validateAdmin, deleteUser);
 router.patch("/:userId/recover", validateManager, recoverUser);

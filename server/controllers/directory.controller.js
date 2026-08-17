@@ -179,7 +179,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   // Add capabilities to each user
   let capabilities;
   const permissionsWithCapabilities = permissions.map((permission) => {
-    console.log("permission", permission);
     const permissionId = permission.id;
     if (permissionId.toString() === userId) {
       capabilities = getCapabilities(permission.role, type, isRootLevelFile);
@@ -818,8 +817,30 @@ export const getStarredItems = async (req, res, next) => {
 export const addDirectory = async (req, res, next) => {
   const userId = req.user._id;
   const parentDirId = req.params.parentDirId || req.user.parentDirId;
-  const dirname = sanitizeText(req.headers.dirname) || "New folder";
+  const type = req.body.type;
+  const dirname = sanitizeText(req.body.dirName) || "New folder";
+  if (type === "google") {
+    const { drive_access_token } = req.signedCookies;
+    if (!drive_access_token) {
+      return res.status(401).json({
+        message: "Missing token",
+      });
+    }
+    const drive = getDriveClient(drive_access_token);
 
+    const response = await drive.files.create({
+      requestBody: {
+        name: dirname,
+        mimeType: "application/vnd.google-apps.folder",
+      },
+      fields:
+        "id,name,webViewLink,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,capabilities(canReadDrive, canEdit, canDelete, canShare, canCopy, canDownload, canRename, canAddChildren,canMoveItemWithinDrive),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner)",
+    });
+
+    return res
+      .status(201)
+      .json({ message: "Directory Created!", data: response.data });
+  }
   try {
     const parentDirectory = await Directory.findOne({
       _id: parentDirId,
@@ -864,8 +885,22 @@ export const addDirectory = async (req, res, next) => {
         },
       ],
     });
+    const { owners, capabilities, permissions } = await resolveRole(
+      addedDirectory,
+      "folder",
+      userId,
+      parentDirId,
+    );
+    const createdDirectory = {
+      ...addedDirectory.toObject(),
+      owners,
+      capabilities,
+      permissions,
+    };
 
-    return res.status(201).json({ message: "Directory Created!" });
+    return res
+      .status(201)
+      .json({ message: "Directory Created!", data: createdDirectory });
   } catch (error) {
     next(error);
   }
@@ -1159,7 +1194,7 @@ export const sendLink = async (req, res, next) => {
     const sender = await User.findById(userId).select("name email").lean();
     const cleanMessage = sanitizeText(message || "");
 
-    console.log("toEmail", cleanMessage);
+  
     if (isGoogleDriveLink) {
       await sendLinkEmail({
         toEmail,
@@ -1445,12 +1480,7 @@ export const cancelOwnershipMail = async (req, res, next) => {
     ownership.status = "cancelled";
     await ownership.save();
     const itemtype = ownership.itemType === "Directory" ? "folder" : "file";
-    console.log({
-      itemId: ownership.itemId,
-      itemtype,
-      newOwnerId,
-      parentDirId: ownership.itemId.parentDirId,
-    });
+
     const finalResponse = await resolveRole(
       ownership.itemId,
       itemtype,
@@ -2432,7 +2462,6 @@ export const copyItem = async (req, res, next) => {
       });
     }
 
-
     // GOOGLE
     if (providerType === "google") {
       const { drive_access_token } = req.signedCookies;
@@ -2504,16 +2533,8 @@ export const copyItem = async (req, res, next) => {
           });
 
           for (const file of response.data.files || []) {
-            if (
-              file.mimeType ===
-              "application/vnd.google-apps.folder"
-            ) {
-              await copyFolder(
-                drive,
-                file.id,
-                newFolderId,
-                file.name,
-              );
+            if (file.mimeType === "application/vnd.google-apps.folder") {
+              await copyFolder(drive, file.id, newFolderId, file.name);
             } else {
               await drive.files.copy({
                 fileId: file.id,
@@ -2544,13 +2565,11 @@ export const copyItem = async (req, res, next) => {
           fields: "id,name,mimeType,parents",
         });
 
-        const destinationParentId =
-          sourceFolder.data.parents?.[0];
+        const destinationParentId = sourceFolder.data.parents?.[0];
 
         if (!destinationParentId) {
           return res.status(400).json({
-            message:
-              "Could not determine destination parent folder",
+            message: "Could not determine destination parent folder",
           });
         }
 
@@ -2572,7 +2591,6 @@ export const copyItem = async (req, res, next) => {
         });
       }
     }
-
 
     // LOCAL
     const Model = type === "folder" ? Directory : File;
@@ -2599,11 +2617,9 @@ export const copyItem = async (req, res, next) => {
       copiedItem.extension = dbItem.extension;
       copiedItem.isUploading = true;
 
-      const newS3Key =
-        `${copiedItem._id.toString()}${copiedItem.extension}`;
+      const newS3Key = `${copiedItem._id.toString()}${copiedItem.extension}`;
 
-      const oldS3Key =
-        `${dbItem._id.toString()}${dbItem.extension}`;
+      const oldS3Key = `${dbItem._id.toString()}${dbItem.extension}`;
 
       await copyS3File(oldS3Key, newS3Key);
 
@@ -2627,11 +2643,7 @@ export const copyItem = async (req, res, next) => {
       ],
     });
 
-    const {
-      owners,
-      capabilities,
-      permissions,
-    } = await resolveRole(
+    const { owners, capabilities, permissions } = await resolveRole(
       copiedItem,
       type,
       userId,
@@ -2647,8 +2659,11 @@ export const copyItem = async (req, res, next) => {
         permissions,
       },
     });
-
   } catch (error) {
     next(error);
   }
 };
+
+
+
+
