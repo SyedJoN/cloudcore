@@ -164,7 +164,7 @@ function ContextMenuContent({
 
   const canRead = capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
-  const canCopy = capabilities.canCopy === true;
+  const canCopy = true;
   const canShare = capabilities.canShare === true;
   const canRename = capabilities.canRename === true;
   const canTrash = capabilities.canTrash === true;
@@ -363,7 +363,7 @@ function ContextMenuContent({
 
           {/* DOWNLOAD */}
 
-          {showFileActions && !isDeleted && canDownload && (
+          {!isDeleted && canDownload && (
             <button
               className="gd-context-item"
               onClick={close(() => onDownload(item))}

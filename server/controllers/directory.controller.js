@@ -46,6 +46,7 @@ import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 import copyS3File from "../services/s3/copy.js";
+import { getDriveClient } from "../services/googleDriveClient.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -1241,15 +1242,61 @@ export const sendOwnershipMail = async (req, res, next) => {
     const currentOwnerId = req.user?._id;
     const currentOwnerName = req.user?.name;
 
-    if (!currentOwnerId) {
-      return res.status(401).json({
-        message: "Authentication required",
+    if (!itemId || !type) {
+      return res.status(400).json({
+        message: "itemId and type are required",
       });
     }
+    if (type === "google") {
+      const { drive_access_token } = req.signedCookies;
 
-    if (!newOwner || !itemId || !type) {
-      return res.status(400).json({
-        message: "newOwner, itemId, and type are required",
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
+        });
+      }
+
+      const drive = getDriveClient(drive_access_token);
+      const permissions = await drive.permissions.list({
+        fileId: itemId,
+        fields: "permissions(id,type,emailAddress,role,pendingOwner)",
+      });
+
+      const existingPermission = permissions.data.permissions?.find(
+        (p) =>
+          p.type === "user" &&
+          p.emailAddress?.toLowerCase() === newOwner.emailAddress.toLowerCase(),
+      );
+
+      let result;
+
+      if (existingPermission) {
+        result = await drive.permissions.update({
+          fileId: itemId,
+          permissionId: existingPermission.id,
+          requestBody: {
+            role: "writer",
+            pendingOwner: true,
+          },
+          fields: "id,type,emailAddress,role,pendingOwner",
+        });
+      } else {
+        result = await drive.permissions.create({
+          fileId: itemId,
+          sendNotificationEmail: true,
+          requestBody: {
+            type: "user",
+            role: "writer",
+            emailAddress: newOwner.emailAddress,
+            pendingOwner: true,
+          },
+          fields: "id,type,emailAddress,role,pendingOwner",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Ownership transfer request sent",
+        permission: result.data,
       });
     }
 
@@ -1299,8 +1346,14 @@ export const sendOwnershipMail = async (req, res, next) => {
       toUser: newOwner.id,
       status: "pending",
     });
-
-
+    await sendOwnershipTransferEmail({
+      to: newOwner.emailAddress,
+      toName: newOwner.displayName,
+      fromName: currentOwnerName,
+      itemName: resource.name,
+      transferId: transfer._id,
+      expiresAt: transfer.expiresAt,
+    });
     const finalResponse = await resolveRole(
       resource,
       type,
@@ -1318,19 +1371,66 @@ export const sendOwnershipMail = async (req, res, next) => {
 };
 export const cancelOwnershipMail = async (req, res, next) => {
   try {
-    const { newOwner, itemId } = req.body;
+    const { newOwner, itemId, type } = req.body;
     const currentOwnerId = req.user?._id;
     const newOwnerId = newOwner?._id || newOwner?.id;
     const currentOwnerName = req.user?.name;
 
-    if (!currentOwnerId) {
-      return res.status(401).json({
-        message: "Authentication required",
-      });
-    }
     if (!newOwner || !itemId) {
       return res.status(400).json({
         message: "newOwner and itemId are required",
+      });
+    }
+    if (type === "google") {
+      const { drive_access_token } = req.signedCookies;
+
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
+        });
+      }
+
+      const drive = getDriveClient(drive_access_token);
+      const permissions = await drive.permissions.list({
+        fileId: itemId,
+        fields: "permissions(id,type,emailAddress,role,pendingOwner)",
+      });
+
+      const existingPermission = permissions.data.permissions?.find(
+        (p) =>
+          p.type === "user" &&
+          p.emailAddress?.toLowerCase() === newOwner.emailAddress.toLowerCase(),
+      );
+
+      let result;
+
+      if (existingPermission) {
+        result = await drive.permissions.update({
+          fileId: itemId,
+          permissionId: existingPermission.id,
+          requestBody: {
+            role: "writer",
+            pendingOwner: true,
+          },
+          fields: "id,type,emailAddress,role,pendingOwner",
+        });
+      } else {
+        result = await drive.permissions.create({
+          fileId: itemId,
+          sendNotificationEmail: true,
+          requestBody: {
+            type: "user",
+            role: "writer",
+            emailAddress: newOwner.emailAddress,
+            pendingOwner: true,
+          },
+          fields: "id,type,emailAddress,role,pendingOwner",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Ownership transfer request sent",
+        permission: result.data,
       });
     }
     const ownership = await Ownership.findOne({ toUser: newOwnerId })
@@ -1344,16 +1444,16 @@ export const cancelOwnershipMail = async (req, res, next) => {
     }
     ownership.status = "cancelled";
     await ownership.save();
-    const type = ownership.itemType === "Directory" ? "folder" : "file";
+    const itemtype = ownership.itemType === "Directory" ? "folder" : "file";
     console.log({
       itemId: ownership.itemId,
-      type,
+      itemtype,
       newOwnerId,
       parentDirId: ownership.itemId.parentDirId,
     });
     const finalResponse = await resolveRole(
       ownership.itemId,
-      type,
+      itemtype,
       newOwnerId,
       ownership.itemId.parentDirId,
     );
@@ -2307,14 +2407,22 @@ export const completeFolderUpload = async (req, res, next) => {
 
 export const copyItem = async (req, res, next) => {
   try {
-    const { id, type } = req.body;
+    const { item, type, providerType } = req.body;
     const userId = req.user?._id;
+    const itemId = item.id || item._id;
 
+    const allowedProviderTypes = ["local", "google"];
     const allowedTypes = ["file", "folder"];
 
-    if (!id || !type) {
+    if (!itemId || !type) {
       return res.status(400).json({
         message: "Item id and type are required",
+      });
+    }
+
+    if (!allowedProviderTypes.includes(providerType)) {
+      return res.status(400).json({
+        message: "Invalid provider type",
       });
     }
 
@@ -2324,37 +2432,183 @@ export const copyItem = async (req, res, next) => {
       });
     }
 
+
+    // GOOGLE
+    if (providerType === "google") {
+      const { drive_access_token } = req.signedCookies;
+
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
+        });
+      }
+
+      const drive = getDriveClient(drive_access_token);
+
+      if (type === "file") {
+        const copiedFile = await drive.files.copy({
+          fileId: itemId,
+          requestBody: {
+            name: `Copy of ${item.name}`,
+          },
+          fields:
+            "id,name,mimeType,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+        });
+
+        const permissions = await drive.permissions.list({
+          fileId: copiedFile.data.id,
+          fields:
+            "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
+        });
+
+        const copiedItem = {
+          ...copiedFile.data,
+          owners: copiedFile.data.owners || [],
+          capabilities: copiedFile.data.capabilities || {},
+          permissions: permissions.data.permissions || [],
+        };
+
+        return res.status(200).json({
+          message: "File copied successfully",
+          data: {
+            copiedItem,
+            owners: copiedItem.owners,
+            capabilities: copiedItem.capabilities,
+            permissions: copiedItem.permissions,
+          },
+        });
+      } else {
+        const newName = "Copy of " + item.name;
+
+        async function copyFolder(
+          drive,
+          sourceFolderId,
+          destinationParentId,
+          newName,
+        ) {
+          const folder = await drive.files.create({
+            requestBody: {
+              name: newName,
+              mimeType: "application/vnd.google-apps.folder",
+              parents: [destinationParentId],
+            },
+            fields:
+              "id,name,mimeType,parents,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+          });
+
+          const newFolderId = folder.data.id;
+
+          const response = await drive.files.list({
+            q: `'${sourceFolderId}' in parents and trashed = false`,
+            fields: "files(id,name,mimeType)",
+          });
+
+          for (const file of response.data.files || []) {
+            if (
+              file.mimeType ===
+              "application/vnd.google-apps.folder"
+            ) {
+              await copyFolder(
+                drive,
+                file.id,
+                newFolderId,
+                file.name,
+              );
+            } else {
+              await drive.files.copy({
+                fileId: file.id,
+                requestBody: {
+                  name: file.name,
+                  parents: [newFolderId],
+                },
+              });
+            }
+          }
+
+          const permissions = await drive.permissions.list({
+            fileId: newFolderId,
+            fields:
+              "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
+          });
+
+          return {
+            ...folder.data,
+            owners: folder.data.owners || [],
+            capabilities: folder.data.capabilities || {},
+            permissions: permissions.data.permissions || [],
+          };
+        }
+
+        const sourceFolder = await drive.files.get({
+          fileId: itemId,
+          fields: "id,name,mimeType,parents",
+        });
+
+        const destinationParentId =
+          sourceFolder.data.parents?.[0];
+
+        if (!destinationParentId) {
+          return res.status(400).json({
+            message:
+              "Could not determine destination parent folder",
+          });
+        }
+
+        const copiedFolderResult = await copyFolder(
+          drive,
+          itemId,
+          destinationParentId,
+          newName,
+        );
+
+        return res.status(200).json({
+          message: "Folder copied successfully",
+          data: {
+            copiedItem: copiedFolderResult,
+            owners: copiedFolderResult.owners,
+            capabilities: copiedFolderResult.capabilities,
+            permissions: copiedFolderResult.permissions,
+          },
+        });
+      }
+    }
+
+
+    // LOCAL
     const Model = type === "folder" ? Directory : File;
 
-    const item = await Model.findById(id).lean();
+    const dbItem = await Model.findById(itemId).lean();
 
-    if (!item) {
+    if (!dbItem) {
       return res.status(404).json({
         message: "Item not found",
       });
     }
 
     const copiedItem = new Model({
-      name: "Copy of " + item.name,
-      size: item.size,
-      parentDirId: item.parentDirId,
-      path: item.path,
-      userId: item.userId,
-      isPublic: item.isPublic,
-      publicRole: item.publicRole,
+      name: "Copy of " + dbItem.name,
+      size: dbItem.size,
+      parentDirId: dbItem.parentDirId,
+      path: dbItem.path,
+      userId: dbItem.userId,
+      isPublic: dbItem.isPublic,
+      publicRole: dbItem.publicRole,
     });
 
     if (type === "file") {
-      copiedItem.extension = item.extension;
+      copiedItem.extension = dbItem.extension;
       copiedItem.isUploading = true;
 
-      const newS3Key = `${copiedItem._id.toString()}${copiedItem.extension}`;
-      const oldS3Key = `${item._id.toString()}${item.extension}`;
+      const newS3Key =
+        `${copiedItem._id.toString()}${copiedItem.extension}`;
+
+      const oldS3Key =
+        `${dbItem._id.toString()}${dbItem.extension}`;
 
       await copyS3File(oldS3Key, newS3Key);
+
       copiedItem.isUploading = false;
     }
-
 
     await copiedItem.save();
 
@@ -2373,10 +2627,27 @@ export const copyItem = async (req, res, next) => {
       ],
     });
 
+    const {
+      owners,
+      capabilities,
+      permissions,
+    } = await resolveRole(
+      copiedItem,
+      type,
+      userId,
+      copiedItem.parentDirId,
+    );
+
     return res.status(201).json({
       message: `${type} copied successfully!`,
-      itemId: copiedItem._id,
+      data: {
+        copiedItem,
+        owners,
+        capabilities,
+        permissions,
+      },
     });
+
   } catch (error) {
     next(error);
   }

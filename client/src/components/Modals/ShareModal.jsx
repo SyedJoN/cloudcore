@@ -455,13 +455,13 @@ setSelectedUsers([]);
 
   async function sendOwnershipTransferMail(person) {
     setIsShareLoading(true);
-const type = item.isDirectory ? "folder" : "file"
     try {
       const result = await sendOwnershipMail({
         newOwner: person,
         itemId: item._id ?? item.id,
         type,
       });
+      const newPermission = result.permission;
       const update = () => {
         const updatePermissions = (resource) => {
           if (!resource?.permissions) {
@@ -470,7 +470,11 @@ const type = item.isDirectory ? "folder" : "file"
 
           return {
             ...resource,
-            permissions: result.permissions,
+            permissions: type === "google" ? 
+              resource.permissions.map((p)=> p.emailAddress === result.permission.emailAddress ? {...p,
+                 ...newPermission,
+              } : p)
+             : result.permissions,
           };
         };
 
@@ -524,9 +528,10 @@ const type = item.isDirectory ? "folder" : "file"
   async function cancelOwnershipTransferMail(person) {
     try {
       setIsShareLoading(true);
-      const message = await cancelPendingOwnership({
+      const {message} = await cancelPendingOwnership({
         newOwner: person,
         itemId: item._id ?? item.id,
+        type
       });
 
       const update = () => {

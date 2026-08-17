@@ -950,7 +950,7 @@ export default function DirectoryView({ route }) {
 
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
-      
+
       setPeopleWithAccess(updatedPeopleWithAccess);
 
       setPrevPermissions(updatedPeopleWithAccess);
@@ -972,18 +972,68 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
-  async function handleCopyItem(item) {
-    const type = getResourceType(item);
-    try {
-      const { message } = await copyItem({ id: item.id ?? item._id, type });
-      toast({ message, type: "success" });
-      setTimeout(() => {
-        refreshCurrentDirectory();
-      }, 1000);
-    } catch (error) {
-      showError(error);
+const insertBefore = (items, sourceItem, newItem) => {
+  const index = items.findIndex(
+    (item) => (item.id || item._id) === (sourceItem.id || sourceItem._id)
+  );
+
+  if (index === -1) return [...items, newItem];
+
+  return [
+    ...items.slice(0, index),
+    newItem,
+    ...items.slice(index),
+  ];
+};
+async function handleCopyItem(item) {
+  const type = item.isDirectory ? "folder" : "file";
+  const providerType = item.webViewLink ? "google" : "local";
+
+  try {
+    const {
+      message,
+      data: {
+        copiedItem,
+        owners,
+        capabilities,
+        permissions,
+      },
+    } = await copyItem({
+      item,
+      type,
+      providerType,
+    });
+
+    toast({
+      message,
+      type: "success",
+    });
+
+    const newItem = {
+      ...copiedItem,
+      owners,
+      capabilities,
+      permissions,
+      isDirectory: type === "folder",
+    };
+
+    if (type === "folder") {
+      setDirectoriesList((prev) =>
+        insertBefore(prev, item, newItem)
+      );
+    } else {
+      setFilesList((prev) =>
+        insertBefore(prev, item, newItem)
+      );
     }
+  } catch (error) {
+    showError(
+      error?.response?.data?.message ||
+        error?.message ||
+        "Failed to copy item"
+    );
   }
+}
   async function handleDeleteSelected() {
     for (const id of selectedItems) {
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1275,7 +1325,13 @@ export default function DirectoryView({ route }) {
         onSoftDelete={(item) => handleMoveToTrash(item)}
         onDelete={(item, type) => handleDelete(item, type)}
         onRestore={(item) => handleRestoreItem(item)}
-        onDownload={(item) => handleDownload(item)}
+        onDownload={(item) => {
+          if (item && item.isDirectory) {
+            handleDownloadFolder(item);
+          } else {
+            handleDownload(item);
+          }
+        }}
         onCopy={(item) => handleCopyItem(item)}
         onPreview={(item) => setViewItem(item)}
       />

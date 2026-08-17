@@ -13,13 +13,14 @@ export async function sendOwnershipMail({ newOwner, itemId, type }) {
   return data;
 }
 
-export async function cancelPendingOwnership({ newOwner, itemId }) {
+export async function cancelPendingOwnership({ newOwner, itemId, type }) {
   const { data } = await axiosWithCreds.post("/item/cancel-pending-ownership", {
     newOwner,
     itemId,
+    type
   });
 
-  return data.message;
+  return data;
 }
 
 export async function sendLink({
@@ -53,10 +54,11 @@ export async function toggleItemStar(id, type) {
   return response;
 }
 
-export async function copyItem({ id, type }) {
+export async function copyItem({ item, type, providerType }) {
   const { data } = await axiosWithCreds.post(`/item/copy`, {
-    id,
+    item,
     type,
+    providerType
   });
 
   return data;

@@ -87,7 +87,7 @@ export default function SelectionBar({
 
   const canRead = capabilities.canRead === true;
 
-  const canShare = true;
+  const canShare = capabilities.canShare === true;
 
   const canDownload = capabilities.canDownload === true;
 
