@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 
 const DefaultView = ({
   items,
+  combinedItems,
   viewMode,
   isGoogleDrive,
   isHomeRoute,
@@ -19,8 +20,15 @@ const DefaultView = ({
   onSelect,
   onRowClick,
   onDoubleClick,
+  onDownload,
+  onRename,
+  onShare,
   onContextMenu,
   listHeaderRow,
+  isStarred,
+  setIsStarred,
+  route,
+  onStar
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const navigate = useNavigate();
@@ -37,7 +45,6 @@ const DefaultView = ({
 
   const ItemComponent = viewMode === "grid" ? GridItem : ListRow;
 
-
   return (
     <>
       <div className="gd-drive">
@@ -46,7 +53,7 @@ const DefaultView = ({
           filters={filters}
           onChange={setFilters}
           user={user}
-          />
+        />
         {isGoogleDrive && !dirId && isHomeRoute && viewMode === "grid" && (
           <GoogleDriveCard onOpen={() => navigate("/google-drive")} />
         )}
@@ -62,7 +69,6 @@ const DefaultView = ({
             <div key={label} className="gd-drive-group">
               <div className="gd-section-label">{label}</div>
 
-
               <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
                 {groupItems.map((item) => (
                   <ItemComponent
@@ -70,13 +76,20 @@ const DefaultView = ({
                     item={item}
                     dirId={dirId}
                     avatar={item.userId?.avatar}
-                    owner={item.userId?.name}
+                    owner={item.userId?.name || item.owners?.[0].displayName}
                     selected={selectedItems.has(item.id ?? item._id)}
                     onSelect={onSelect}
+                    onDownload={onDownload}
+                    onRename={onRename}
                     selectionActive={selectedItems.size > 0}
                     onRowClick={onRowClick}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
+                    isStarred={isStarred}
+                    setIsStarred={setIsStarred}
+                    route={route}
+                    onShare={onShare}
+                    onStar={onStar}
                   />
                 ))}
               </div>

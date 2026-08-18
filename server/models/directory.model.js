@@ -1,20 +1,43 @@
 import mongoose, { Schema } from "mongoose";
 
+const sharedWithSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    sharedAt: {
+      type: Date,
+      default: Date.now,
+      required: true,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const directorySchema = new Schema(
   {
     name: {
       type: String,
       required: true,
     },
+
     size: {
       type: Number,
       default: 0,
       min: 0,
     },
+
     parentDirId: {
       type: Schema.Types.ObjectId,
+      ref: "Directory",
       default: null,
     },
+
     path: {
       type: [
         {
@@ -24,14 +47,29 @@ const directorySchema = new Schema(
       ],
       default: [],
     },
+
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
     isPublic: {
       type: Boolean,
       default: false,
+    },
+
+    publicRole: {
+      type: String,
+      enum: ["reader", "writer"],
+      required: function () {
+        return this.isPublic === true;
+      },
+    },
+
+    sharedWith: {
+      type: [sharedWithSchema],
+      default: [],
     },
 
     viewedByMeTime: {
@@ -39,22 +77,21 @@ const directorySchema = new Schema(
       default: Date.now,
       index: true,
     },
+
     modifiedTime: {
       type: Date,
       default: Date.now,
       index: true,
     },
-    publicRole: {
-      type: String,
-      enum: ["reader", "writer"],
-      required: function () {
-        return this.isPublic;
-      },
+    trashedTime: {
+      type: Date,
+      index: true,
     },
     isStarred: {
       type: Boolean,
       default: false,
     },
+
     isDeleted: {
       type: Boolean,
       default: false,
@@ -65,5 +102,7 @@ const directorySchema = new Schema(
     strict: "throw",
   },
 );
+
 const Directory = mongoose.model("Directory", directorySchema);
+
 export default Directory;

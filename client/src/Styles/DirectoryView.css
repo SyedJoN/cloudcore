@@ -18,6 +18,7 @@
   --text-tertiary: #80868b;
   --text-bright: #c4c7c5;
   --accent-blue: #1a73e8;
+  --accent-blue-hover-dark: #add1e9;
   --accent-blue-hover: #1765cc;
   --accent-blue-light: #c2e7ff;
   --accent-blue-light-hover: #cee6f6;
@@ -45,13 +46,14 @@
   --surface-white: #131314;
   --accent-blue: #c2e7ff;
   --accent-blue-light: #004a77;
+  --accent-blue-hover-dark: #023f65;
   --text-primary: #e3e3e3;
   --text-secondary: #c4c7c5;
   --surface-container-dark: #282a2c;
   --shadow-1: none;
   --shadow-dynamic:
     0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
-    --border-inverse: #cdc9c9;
+  --border-inverse: #cdc9c9;
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
   --btn-bg-medium: #37393b;
@@ -88,7 +90,7 @@ body {
   width: 0;
 }
 .disabled {
-  opacity: 0.6
+  opacity: 0.6;
 }
 /* ===================== APP SHELL ===================== */
 .directory-view {
@@ -505,7 +507,7 @@ body {
   color: #e3e3e3;
 }
 .gd-breadcrumb-item:hover {
-  background: rgba(32, 33, 36, 0.08);
+  background: var(--surface-container-dark);
 }
 
 .gd-breadcrumb-sep {
@@ -540,7 +542,7 @@ body {
 /* ===================== GRID VIEW ===================== */
 .gd-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));;
+  grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));
   gap: 20px;
   padding-bottom: 16px;
 }
@@ -620,7 +622,9 @@ body {
 
 .gd-list-header {
   display: grid;
-  grid-template-columns: 114fr 50fr 50fr 50fr 1fr;
+ grid-template-columns:
+    minmax(0, 5fr)
+    repeat(5, minmax(0, 1fr));
   align-items: center;
   padding: 5px;
   border-bottom: 1px solid var(--border);
@@ -632,23 +636,25 @@ body {
 
 .gd-list-row {
   display: grid;
-  grid-template-columns: 114fr 50fr 50fr 50fr 1fr;
+  grid-template-columns:
+    minmax(0, 5fr)
+    repeat(5, minmax(0, 1fr));
   align-items: center;
-  padding: 4px 8px;
+  padding: 5px;
   border-radius: var(--radius-sm);
-  cursor: pointer;
   transition: background var(--transition);
   gap: 8px;
   min-height: 48px;
   position: relative;
 }
-
-.gd-list-row:hover {
-  background: var(--accent-blue-light);
-}
-
 .gd-list-row.selected {
   background: var(--accent-blue-light);
+}
+.gd-list-row.selected:hover {
+  background: var(--accent-blue-hover-dark);
+}
+.gd-list-row:hover:not(.selected) {
+  background: var(--btn-hover-primary);
 }
 
 .gd-list-row-name {
@@ -668,10 +674,25 @@ body {
 
 .gd-list-row-cell {
   font-size: 13px;
+  align-items: center;
+  gap: 8px;
   color: var(--text-secondary);
   white-space: nowrap;
 }
-
+.gd-location-btn {
+  display: flex;
+  font-size: 13px;
+  color: var(--text-secondary);
+  align-items: center;
+  white-space: nowrap;
+  padding: 8px;
+  border-radius: 50px;
+  width: max-content;
+  cursor: pointer;
+}
+.gd-location-btn:hover {
+  background: var(--btn-hover-primary);
+}
 .gd-list-row-actions {
   display: flex;
   align-items: center;
@@ -764,7 +785,6 @@ body {
   min-width: 300px;
   padding: 8px 0;
   z-index: 1000;
-
 }
 .gd-context-menu {
   position: fixed;
@@ -833,7 +853,7 @@ body {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 500;
+  z-index: 501;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1275,7 +1295,6 @@ body.gd-overlay-open {
   border: none;
   border-radius: var(--radius-full);
   background: none;
-  cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font-main);
@@ -1289,6 +1308,17 @@ body.gd-overlay-open {
 .gd-sel-action-btn:hover {
   background: var(--surface-container-dark);
   color: var(--text-primary);
+}
+.gd-sel-action-btn-list-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 6px;
+  border-radius: 50px;
+  cursor: pointer;
+}
+.gd-sel-action-btn-list-row:hover {
+  background: var(--btn-hover-primary);
 }
 
 .gd-sel-action-btn svg {

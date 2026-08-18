@@ -100,14 +100,12 @@ app.use(
   "/directory",
   // rateLimitMiddleware(LIMITERS.readDirOps),
   checkAuth,
-  validateDeletedUser,
   readDirRoutes,
 );
 app.use(
   "/directory",
   // rateLimitMiddleware(LIMITERS.writeDirOps),
   checkAuth,
-  validateDeletedUser,
   writeDirRoutes,
 );
 

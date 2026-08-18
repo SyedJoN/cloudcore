@@ -38,10 +38,7 @@ export default function SelectionBar({
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // ============================================================
   // SELECTED ITEM
-  // ============================================================
-
   const item = combinedItems.find((item) =>
     selectedItems.has(item.id ?? item._id),
   );
@@ -50,9 +47,7 @@ export default function SelectionBar({
     return null;
   }
 
-  // ============================================================
   // ITEM TYPE
-  // ============================================================
 
   const isGoogle = Boolean(item.webViewLink);
 
@@ -68,20 +63,7 @@ export default function SelectionBar({
 
   const showFileActions = isFile;
 
-  // ============================================================
-  // CAPABILITIES
-  //
-  // Both Google Drive and local items now expose capabilities.
-  //
-  // Local:
-  //   canWrite
-  //
-  // Google:
-  //   canEdit
-  //
-  // Normalize that difference here so the rest of this
-  // component doesn't care where the item came from.
-  // ============================================================
+  // Capabilities
 
   const capabilities = item.capabilities || {};
 
@@ -103,9 +85,7 @@ export default function SelectionBar({
 
   const canChangeRole = capabilities.canChangeRole === true;
 
-  // ============================================================
   // COPY LINK
-  // ============================================================
 
   const handleCopyLink = async () => {
     const url =
@@ -131,27 +111,13 @@ export default function SelectionBar({
     }
   };
 
-  // ============================================================
-  // STAR
-  //
-  // Stars are local-only.
-  // ============================================================
-
-  // ============================================================
   // NORMAL ACTIONS
-  // ============================================================
-
   const showNormalActions = !isTrashRoute && !isDeleted;
 
-  // ============================================================
   // RENDER
-  // ============================================================
-
   return (
     <div className="gd-selection-bar">
-      {/* ======================================================
-          CLEAR SELECTION
-      ====================================================== */}
+      {/* CLEAR SELECTION*/}
 
       <button
         className="gd-icon-btn gd-sel-close"
@@ -164,15 +130,11 @@ export default function SelectionBar({
       <span className="gd-selection-count">{selectedItems.size} selected</span>
 
       <div className="gd-selection-actions">
-        {/* ====================================================
-            NORMAL ACTIONS
-        ==================================================== */}
+        {/* NORMAL ACTIONS */}
 
         {showNormalActions && (
           <>
-            {/* ------------------------------------------------
-                DOWNLOAD
-            ------------------------------------------------ */}
+            {/* DOWNLOAD */}
 
             {canDownload && (
               <button
@@ -184,10 +146,7 @@ export default function SelectionBar({
               </button>
             )}
 
-       
-            {/* ------------------------------------------------
-                SHARE
-            ------------------------------------------------ */}
+            {/* SHARE */}
 
             {canShare && (
               <button
@@ -199,10 +158,10 @@ export default function SelectionBar({
               </button>
             )}
 
-            {/* ------------------------------------------------
+            {/* 
                 STAR
                 Local only
-            ------------------------------------------------ */}
+           */}
 
             {!isGoogle && (
               <button
@@ -220,9 +179,7 @@ export default function SelectionBar({
           </>
         )}
 
-        {/* ====================================================
-            COPY LINK
-        ==================================================== */}
+        {/*COPY LINK */}
 
         {!isDeleted && canRead && (
           <button
@@ -234,9 +191,8 @@ export default function SelectionBar({
           </button>
         )}
 
-        {/* ====================================================
-            RENAME / EDIT
-        ==================================================== */}
+        {/*
+            RENAME / EDIT*/}
 
         {!isDeleted && canRename && (
           <button className="gd-sel-action-btn" title="Edit" onClick={onRename}>
@@ -244,9 +200,9 @@ export default function SelectionBar({
           </button>
         )}
 
-        {/* ====================================================
+        {/*
             TRASH / REMOVE FOR LOCAL ITEMS
-        ==================================================== */}
+      */}
 
         {!isGoogle && !isDeleted && !isSharedRoute && canTrash && (
           <button
@@ -258,14 +214,9 @@ export default function SelectionBar({
           </button>
         )}
 
-        {/* ====================================================
+        {/*
             REMOVE ACCESS
-            Local shared item where current user can write/share
-            but is not the owner.
-
-            This replaces the old manual role lookup:
-              permissions.find(...)
-          ==================================================== */}
+          */}
 
         {!isGoogle &&
           !isDeleted &&
@@ -281,15 +232,13 @@ export default function SelectionBar({
             </button>
           )}
 
-        {/* ====================================================
-            DELETED ITEMS
-        ==================================================== */}
+        {/* 
+            DELETED ITEMS*/}
 
         {isDeleted && canDelete && (
           <>
-            {/* ------------------------------------------------
-                RESTORE
-            ------------------------------------------------ */}
+            {/* 
+                RESTORE */}
 
             <button
               className="gd-sel-action-btn gd-sel-action-success"
@@ -299,9 +248,7 @@ export default function SelectionBar({
               <IconRestore size={18} />
             </button>
 
-            {/* ------------------------------------------------
-                DELETE FOREVER
-            ------------------------------------------------ */}
+            {/* DELETE FOREVER */}
 
             <button
               className="gd-sel-action-btn gd-sel-action-danger"
@@ -313,9 +260,7 @@ export default function SelectionBar({
           </>
         )}
 
-        {/* ====================================================
-            GOOGLE DRIVE DELETE
-        ==================================================== */}
+        {/* GOOGLE DRIVE DELETE */}
 
         {isGoogleDriveRoute && !isDeleted && canDelete && (
           <button

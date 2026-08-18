@@ -174,9 +174,6 @@ export default function ShareModal({
       : allUsers
   )?.filter((u) => !selectedUsers.find((s) => s.id === u.id));
 
-  useEffect(() => {
-    console.log("selectedUsers", selectedUsers);
-  }, [selectedUsers]);
   function handleSelectUser(e, user) {
     e.stopPropagation();
     setSelectedUsers([{ ...user, role: DRIVE_ROLES[inviteRole] }]);
@@ -320,6 +317,7 @@ export default function ShareModal({
       });
 
       setShareItem(null);
+      setSelectedUsers([]);
     } catch (error) {
       console.error(error);
 
@@ -333,65 +331,64 @@ export default function ShareModal({
   }
 
   async function handleSendLink(e) {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (isShareLoading) return;
+    if (isShareLoading) return;
 
-  if (!selectedUsers.length) {
-    toast({
-      message: "Please select a person",
-      type: "error",
-    });
-    return;
+    if (!selectedUsers.length) {
+      toast({
+        message: "Please select a person",
+        type: "error",
+      });
+      return;
+    }
+
+    const type = getResourceType(item);
+
+    const { emailAddress } = item.owners?.[0];
+
+    const url = item.webViewLink
+      ? item.webViewLink
+      : item
+        ? `${window.location.origin}/${
+            item.isDirectory ? "directory" : "file"
+          }/${item._id}?usp=drive_link`
+        : window.location.href;
+
+    try {
+      setIsShareLoading(true);
+
+      await sendLink({
+        toEmail: emailAddress,
+        message,
+        type,
+        id: item._id ?? item.id,
+        name: item.name,
+        url,
+        isPublic:
+          item.isPublic || item.permissions?.some((p) => p.type === "anyone"),
+        publicRole:
+          item.publicRole ||
+          item.permissions?.find((p) => p.type === "anyone")?.role,
+      });
+
+      toast({
+        message: "Link sent successfully",
+        type: "success",
+      });
+      setSelectedUsers([]);
+      setShareItem(null);
+    } catch (error) {
+      console.log(error);
+
+      toast({
+        message: error.message || "Something went wrong",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
   }
-
-  const type = getResourceType(item);
-
-  const { email } = selectedUsers[0];
-
-  const url = item.webViewLink
-    ? item.webViewLink
-    : item
-      ? `${window.location.origin}/${
-          item.isDirectory ? "directory" : "file"
-        }/${item._id}?usp=drive_link`
-      : window.location.href;
-
-  try {
-    setIsShareLoading(true);
-
-    await sendLink({
-      toEmail: email,
-      message,
-      type,
-      id: item._id ?? item.id,
-      name: item.name,
-      url,
-      isPublic:
-        item.isPublic ||
-        item.permissions?.some((p) => p.type === "anyone"),
-      publicRole:
-        item.publicRole ||
-        item.permissions?.find((p) => p.type === "anyone")?.role,
-    });
-
-    toast({
-      message: "Link sent successfully",
-      type: "success",
-    });
-setSelectedUsers([]);
-    setShareItem(null);
-  } catch (error) {
-    console.log(error);
-
-    toast({
-      message: error.message || "Something went wrong",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-}
   function handleCancel() {
     setShowInvitePanel(false);
     setSelectedUsers([]);
@@ -470,11 +467,14 @@ setSelectedUsers([]);
 
           return {
             ...resource,
-            permissions: type === "google" ? 
-              resource.permissions.map((p)=> p.emailAddress === result.permission.emailAddress ? {...p,
-                 ...newPermission,
-              } : p)
-             : result.permissions,
+            permissions:
+              type === "google"
+                ? resource.permissions.map((p) =>
+                    p.emailAddress === result.permission.emailAddress
+                      ? { ...p, ...newPermission }
+                      : p,
+                  )
+                : result.permissions,
           };
         };
 
@@ -528,10 +528,10 @@ setSelectedUsers([]);
   async function cancelOwnershipTransferMail(person) {
     try {
       setIsShareLoading(true);
-      const {message} = await cancelPendingOwnership({
+      const { message } = await cancelPendingOwnership({
         newOwner: person,
         itemId: item._id ?? item.id,
-        type
+        type,
       });
 
       const update = () => {
@@ -633,9 +633,10 @@ setSelectedUsers([]);
         <div
           key={item}
           className="gd-modal-overlay"
-          onClick={() =>
-            isChanged ? setIsConfirmation(true) : setShareItem(null)
-          }
+          onClick={() => {
+            isChanged ? setIsConfirmation(true) : setSelectedUsers([]);
+            setShareItem(null);
+          }}
         >
           <div className="gd-share-modal" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
@@ -643,7 +644,10 @@ setSelectedUsers([]);
               <h2>Send the link for "{item.name}"</h2>
               <button
                 className="gd-icon-btn"
-                onClick={() => setShareItem(null)}
+                onClick={() => {
+                  setSelectedUsers([]);
+                  setShareItem(null);
+                }}
               >
                 <IconClose size={20} />
               </button>
@@ -704,7 +708,10 @@ setSelectedUsers([]);
                           {u.name?.charAt(0)?.toUpperCase()}
                         </span>
                       )}
-                      <span>{(u.email ?? u.emailAddress) || (u.displayName ?? u.name)}</span>
+                      <span>
+                        {(u.email ?? u.emailAddress) ||
+                          (u.displayName ?? u.name)}
+                      </span>
                       <button
                         type="button"
                         className="gd-invite-chip-remove"
@@ -731,43 +738,36 @@ setSelectedUsers([]);
                     className={`people-card-container ${showSuggestions ? "transition-grow" : ""}`}
                   >
                     {!selectedUsers.length &&
-                      suggestions
-                        .filter((user) => user?.email)
-                        .filter((user) => {
-                          const owners =
-                            item.owners?.map((o) => o.emailAddress) || [];
-
-                          return owners.includes(user.email);
-                        })
-
-                        .map((user) => (
+                      item.owners.map((user) => (
+                        <div
+                          key={user.id || user.permissionId}
+                          className="people-row"
+                          onClick={(e) => handleSelectUser(e, user)}
+                        >
                           <div
-                            key={user.id}
-                            className="people-row"
-                            onClick={(e) => handleSelectUser(e, user)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                            }}
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                              }}
-                            >
-                              <UseAvatar
-                                name={user.name || user.displayName}
-                                avatar={user.avatar || user.photolink}
-                                size={36}
-                              />
+                            <UseAvatar
+                              name={user.name || user.displayName}
+                              avatar={user.avatar || user.photoLink}
+                              size={46}
+                            />
 
-                              <div className="people-details">
-                                <span className="people-name">{user.name || user.displayName}</span>
-                                <span className="people-email">
-                                  {user.email || user.emailAddress}
-                                </span>
-                              </div>
+                            <div className="people-details">
+                              <span className="people-name">
+                                {user.name || user.displayName}
+                              </span>
+                              <span className="people-email">
+                                {user.email || user.emailAddress}
+                              </span>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))}
                   </div>
                 </div>
 
@@ -852,7 +852,10 @@ setSelectedUsers([]);
                     <button
                       type="button"
                       className="gd-btn gd-btn-text"
-                      onClick={() => setShareItem(null)}
+                      onClick={() => {
+                        setSelectedUsers([]);
+                        setShareItem(null);
+                      }}
                     >
                       Cancel
                     </button>
@@ -983,42 +986,44 @@ setSelectedUsers([]);
                     {showInviteSuggestions && inviteSuggestions.length > 0 && (
                       <div className="people-card-container transition-grow">
                         {inviteSuggestions
-                        .filter((user) => user?.email)
-                        .filter((user) => {
-                          const owners =
-                            item.owners?.map((o) => o.emailAddress) || [];
+                          .filter((user) => user?.email)
+                          .filter((user) => {
+                            const owners =
+                              item.owners?.map((o) => o.emailAddress) || [];
 
-                          return !owners.includes(user.email);
-                        })
+                            return !owners.includes(user.email);
+                          })
 
-                        .map((user) => (
-                          <div
-                            key={user.id}
-                            className="people-row"
-                            onClick={() => handleAddUser(user)}
-                          >
+                          .map((user) => (
                             <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                              }}
+                              key={user.id}
+                              className="people-row"
+                              onClick={() => handleAddUser(user)}
                             >
-                              <UseAvatar
-                                name={user.name}
-                                avatar={user.avatar}
-                                size={36}
-                              />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                }}
+                              >
+                                <UseAvatar
+                                  name={user.name}
+                                  avatar={user.avatar}
+                                  size={36}
+                                />
 
-                              <div className="people-details">
-                                <span className="people-name">{user.name}</span>
-                                <span className="people-email">
-                                  {user.email}
-                                </span>
+                                <div className="people-details">
+                                  <span className="people-name">
+                                    {user.name}
+                                  </span>
+                                  <span className="people-email">
+                                    {user.email}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     )}
                   </div>

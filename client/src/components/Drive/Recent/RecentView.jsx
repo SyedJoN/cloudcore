@@ -1,21 +1,30 @@
 import { useState, useMemo, useEffect } from "react"; // adjust to your actual barrel export path
 import RecentFilters from "./RecentFilters";
 import { groupItemsByRecency } from "./RecencyBuckets";
-import { applyRecentFilters, DEFAULT_RECENT_FILTERS } from "./ApplyRecentFilters";
+import {
+  applyRecentFilters,
+  DEFAULT_RECENT_FILTERS,
+} from "./ApplyRecentFilters";
 import { GridItem, ListRow } from "..";
 import { useAuth } from "../../../Contexts";
-
 
 export default function RecentView({
   items,
   viewMode,
   isRecentRoute,
   dirId,
+  isStarred,
+  setIsStarred,
   selectedItems,
   onSelect,
   onRowClick,
   onDoubleClick,
   onContextMenu,
+  onShare,
+  onRename,
+  onDownload,
+  onStar,
+  route,
   listHeaderRow,
 }) {
   const { user } = useAuth();
@@ -26,13 +35,22 @@ export default function RecentView({
     [items, filters, user],
   );
 
-  const groups = useMemo(() => groupItemsByRecency(filteredItems), [filteredItems]);
+  const groups = useMemo(
+    () => groupItemsByRecency(filteredItems),
+    [filteredItems],
+  );
 
   const ItemComponent = viewMode === "grid" ? GridItem : ListRow;
 
   return (
     <div className="gd-recent">
-      <RecentFilters items={items} filters={filters} onChange={setFilters} user={user} isRecentRoute={isRecentRoute} />
+      <RecentFilters
+        items={items}
+        filters={filters}
+        onChange={setFilters}
+        user={user}
+        isRecentRoute={isRecentRoute}
+      />
       {viewMode === "list" && listHeaderRow}
 
       {groups.length === 0 ? (
@@ -51,13 +69,20 @@ export default function RecentView({
                   item={item}
                   dirId={dirId}
                   avatar={item.userId?.avatar}
-                  owner={item.userId?.name}
+                  owner={item.userId?.name || item.owners?.[0].displayName}
                   selected={selectedItems.has(item.id ?? item._id)}
                   onSelect={onSelect}
                   selectionActive={selectedItems.size > 0}
                   onRowClick={onRowClick}
+                  onDownload={onDownload}
+                  onRename={onRename}
                   onDoubleClick={onDoubleClick}
                   onContextMenu={onContextMenu}
+                  isStarred={isStarred}
+                  setIsStarred={setIsStarred}
+                  route={route}
+                  onShare={onShare}
+                  onStar={onStar}
                 />
               ))}
             </div>

@@ -15,6 +15,9 @@ body {
 .hide {
   display: none;
 }
+.visible-hidden {
+  visibility: hidden;
+}
 .loader-container {
   width: 100%;
   display: flex;

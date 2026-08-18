@@ -31,6 +31,7 @@ import { getAncestorDirectories } from "../utils/permissions/getAncestorDirector
 import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
+import SharedAccess from "../models/sharedAccess.model.js";
 const roleMap = {
   viewer: "reader",
   editor: "writer",
@@ -39,15 +40,22 @@ const roleMap = {
 
 const getObject = (resourceType, resourceId) => `${resourceType}:${resourceId}`;
 
+async function getSharedWithMeTime({ itemId, itemType, userId }) {
+  if (!itemId || !userId) return null;
+
+  const record = await SharedAccess.findOne({ itemId, itemType, userId })
+    .select("sharedWithMeTime")
+    .lean();
+
+  return record?.sharedWithMeTime || null;
+}
+
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
-  const objectType = type === "folder" ? "folder" : "file";
-
-  const object = `${objectType}:${item._id}`;
-
-  // Direct permissions
-
-  const directPermissions = await resolveObjectPermissions(object);
+  const object = getObject(type, item._id);
   const permissionMap = new Map();
+
+  // Direct permissions 
+  const directPermissions = await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
     mergePermission({
@@ -60,7 +68,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   }
 
   // Inherited permissions
-
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
@@ -70,16 +77,17 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       );
 
       for (const { user, relation } of inheritedPermissions) {
+        // An ancestor's owner only passes down writer access to
+        // descendants, not ownership of them.
+        const inheritedRelation = relation === "owner" ? "writer" : relation;
+
         mergePermission({
           permissionMap,
-
           user,
-
-          relation: relation,
-
+          relation: inheritedRelation,
           source: "parent",
-
           inheritedFrom: ancestor,
+          isShared,
         });
       }
     }
@@ -87,44 +95,31 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
   const permissions = Array.from(permissionMap.values());
 
-  // Owners
-
   const owners = permissions
-    .filter((permission) => permission.role === "owner")
+    .filter((permission) => permission.directRole === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
-
       kind: "drive#user",
-
       me: permission.id?.toString() === userId?.toString(),
-
       permissionId: permission.id,
-
       emailAddress: permission.emailAddress,
-
       photoLink: permission.photoLink,
     }));
 
+  // Current user's effective role, factoring in public access 
   const currentUserId = getIdString(userId);
-
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
     : null;
 
   const isPublic = Boolean(item?.isPublic);
-
   const publicRole = isPublic ? item?.publicRole || "reader" : null;
 
-  const directRole =
-    currentUserPermission?.permissionDetails?.[0].directRole || null;
-
-  const inheritedRole =
-    currentUserPermission?.permissionDetails?.[0].inheritedRole || null;
+  const directRole = currentUserPermission?.directRole || null;
+  const inheritedRole = currentUserPermission?.inheritedRole || null;
 
   const directPriority = directRole ? ROLE_PRIORITY[directRole] : 0;
-
   const inheritedPriority = inheritedRole ? ROLE_PRIORITY[inheritedRole] : 0;
-
   const publicPriority = publicRole ? ROLE_PRIORITY[publicRole] : 0;
 
   const highestPriority = Math.max(
@@ -134,14 +129,18 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   );
 
   let currentRole = null;
+  let roleSource = null; // "direct" || "inherited" || "public"
 
   if (highestPriority > 0) {
     if (publicPriority === highestPriority) {
       currentRole = publicRole;
+      roleSource = "public";
     } else if (directPriority >= inheritedPriority) {
       currentRole = directRole;
+      roleSource = "direct";
     } else {
       currentRole = inheritedRole;
+      roleSource = "inherited";
     }
   }
 
@@ -149,40 +148,40 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     currentRole && publicRole && publicPriority === highestPriority,
   );
 
-  // Root checks
-
   const parentId = getIdString(parentDir?.parentDirId);
-
   const isRootDirectory = Boolean(parentDir?._id) && !parentId;
-
   const isRootLevelFile = type === "file" && isRootDirectory;
 
-  // Current user capabilities
+  const currentUserCapabilities = getCapabilities(
+    currentRole,
+    type,
+    isRootLevelFile,
+  );
 
-  const isOwner = currentRole === "owner";
 
-  const isWriter = currentRole === "writer" || currentRole === "owner";
+  if (isPublicEffective && !directRole && !inheritedRole) {
+    currentUserCapabilities.canChangeRole = false;
+  }
 
-  let canChangeRole = isOwner || isWriter;
+  
+  let sharedWithMeTime = null;
 
-  // Add capabilities to each user
-  let currentUserCapabilities;
-  const permissionsWithCapabilities = permissions.map((permission) => {
-    console.log("permission", permission);
-    const permissionId = permission.id;
-    if (permissionId.toString() === userId) {
-      currentUserCapabilities = getCapabilities(
-        permission.role,
-        type,
-        isRootLevelFile,
-      );
-    }
-    return {
-      ...permission,
-    };
-  });
-
-  // Public / anyone permission
+  if (roleSource === "direct") {
+    sharedWithMeTime = await getSharedWithMeTime({
+      itemId: item._id,
+      itemType: type,
+      userId: currentUserId,
+    });
+  } else if (
+    roleSource === "inherited" &&
+    currentUserPermission?.inheritedFrom?.id
+  ) {
+    sharedWithMeTime = await getSharedWithMeTime({
+      itemId: currentUserPermission.inheritedFrom.id,
+      itemType: "folder",
+      userId: currentUserId,
+    });
+  }
 
   if (isPublic) {
     const publicCapabilities = getCapabilities(
@@ -190,58 +189,42 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       type,
       isRootLevelFile,
     );
-
     publicCapabilities.canChangeRole = false;
 
-    permissionsWithCapabilities.push({
+    permissions.push({
       id: "anyoneWithLink",
-
       type: "anyone",
-
       role: publicRole,
-
       capabilities: publicCapabilities,
-
       inherited: false,
-
       inheritedFrom: null,
     });
   }
 
-  // Ownership transfer
 
-  const ownership = await Ownership.findOne({
-    itemId: item?._id,
-  })
+  const ownership = await Ownership.findOne({ itemId: item?._id })
     .sort({ createdAt: -1 })
     .lean();
 
   const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
 
-  const updatedPermissions = permissionsWithCapabilities.map((permission) => {
+  const updatedPermissions = permissions.map((permission) => {
     const permissionId = getIdString(permission.id);
 
     if (ownership?.status === "pending" && permissionId === ownerId) {
-      return {
-        ...permission,
-        pendingOwner: true,
-      };
+      return { ...permission, pendingOwner: true };
     }
 
     return permission;
   });
 
-  // Final response
-
   return {
     capabilities: currentUserCapabilities,
     permissions: updatedPermissions,
-
     owners,
-
     isRootLevelFile,
-
     isRootDirectory,
+    sharedWithMeTime,
   };
 };
 
@@ -631,31 +614,35 @@ export const getRecentFiles = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       sharedFiles.map(async (file) => {
-        const { capabilities, permissions } = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           file,
           "file",
           userId,
           file.parentDirId,
+          true,
         );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
+          isShared: true,
         };
       }),
     );
 
     const ownFilesWithRoles = await Promise.all(
       ownFiles.map(async (file) => {
-        const { capabilities, permissions } = await resolveRole(
+        const { owners, capabilities, permissions } = await resolveRole(
           file,
           "file",
           userId,
         );
         return {
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
         };
       }),
     );
@@ -803,6 +790,7 @@ export const softDeleteFile = async (req, res, next) => {
 
     if (isOwner) {
       file.isDeleted = true;
+      file.trashedTime = Date.now();
       await file.save();
     } else {
       await Promise.allSettled([
@@ -1025,7 +1013,6 @@ export const giveAccessById = async (req, res, next) => {
 
       const drive = getDriveClient(drive_access_token);
 
-      // Get existing permissions
       const { data } = await drive.permissions.list({
         fileId: id,
         fields: "permissions(id,type,role,emailAddress,displayName)",
@@ -1117,22 +1104,6 @@ export const giveAccessById = async (req, res, next) => {
       }
     }
 
-    const removeDirectRole = async (object, userId) => {
-      await Promise.allSettled(
-        ["reader", "writer"].map((relation) =>
-          fgaClient.write({
-            deletes: [
-              {
-                user: `user:${userId}`,
-                relation,
-                object,
-              },
-            ],
-          }),
-        ),
-      );
-    };
-
     const writeRole = async (object, userId, role) => {
       await fgaClient.write(
         {
@@ -1161,15 +1132,15 @@ export const giveAccessById = async (req, res, next) => {
       const tuples = result?.tuples || [];
 
       const tuple = tuples.find(
-        (item) =>
-          item.key?.user === `user:${userId}` &&
-          ["reader", "writer"].includes(item.key?.relation),
+        (t) =>
+          t.key?.user === `user:${userId}` &&
+          ["reader", "writer"].includes(t.key?.relation),
       );
 
       return tuple?.key || null;
     };
 
-    const findexistingPermissionSource = async ({
+    const findExistingPermissionSource = async ({
       resourceType,
       resourceId,
       userId,
@@ -1184,6 +1155,7 @@ export const giveAccessById = async (req, res, next) => {
           currentObject,
           userId,
         );
+
         if (directPermission) {
           return {
             object: currentObject,
@@ -1230,7 +1202,7 @@ export const giveAccessById = async (req, res, next) => {
 
         const userId = user.id;
 
-        const existingPermissionSource = await findexistingPermissionSource({
+        const existingPermissionSource = await findExistingPermissionSource({
           resourceType: type,
           resourceId: id,
           userId,
@@ -1258,10 +1230,17 @@ export const giveAccessById = async (req, res, next) => {
             .lean();
 
           if (rootOwner) {
-            return res.status(400).json({
-              message:
-                "Cannot change an inherited permission from the root directory",
-            });
+            // This used to call res.status(400).json(...) directly from
+            // inside a Promise.all'd map callback. That doesn't stop the
+            // request — the other users in usersArray kept being
+            // processed, and the code below still called res.json()
+            // again once Promise.all settled, which crashes with
+            // "Cannot set headers after they are sent". Throwing instead
+            // lets the try/catch below handle it exactly once, same as
+            // the other validation errors in this loop.
+            throw new Error(
+              "Cannot change an inherited permission from the root directory",
+            );
           }
         }
 
@@ -1284,6 +1263,16 @@ export const giveAccessById = async (req, res, next) => {
         await writeRole(targetObject, userId, user.role);
 
         if (!existingPermissionSource) {
+          // First time this user has gotten access to this item — record
+          // it for a Google-style "sharedWithMeTime". Upsert +
+          // setOnInsert so this can never reset an existing record, only
+          // create it once.
+          await SharedAccess.updateOne(
+            { itemId: id, itemType: type, userId },
+            { $setOnInsert: { sharedWithMeTime: new Date() } },
+            { upsert: true },
+          );
+
           const userData = await User.findById(userId)
             .select("name email avatar")
             .lean();
@@ -1306,14 +1295,23 @@ export const giveAccessById = async (req, res, next) => {
         }
       }),
     );
+
+    // NOTE: this passes item.userId (the item's owner) as the "current
+    // user" for resolveRole, same as your original code — worth double
+    // checking that's actually what you want back in the response,
+    // rather than the requesting user (e.g. req.user._id), since that
+    // decides whose capabilities/sharedWithMeTime come back here.
     const finalResult = await resolveRole(
       item,
       type,
       item?.userId,
       item.parentDirId,
+      true,
     );
+
     return res.status(200).json({
       message: `${type} access updated successfully`,
+      ...finalResult,
     });
   } catch (error) {
     console.error("giveAccessById error:", error);

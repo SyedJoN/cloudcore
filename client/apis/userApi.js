@@ -15,8 +15,8 @@ export async function fetchUsers() {
   return data;
 }
 
-export async function searchUsers(type) {
-  const { data } = await axiosWithCreds.patch(`/user/search/${type}`);
+export async function searchUsers() {
+  const { data } = await axiosWithCreds.patch(`/user/search`);
   return data;
 }
 

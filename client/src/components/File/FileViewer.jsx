@@ -36,11 +36,11 @@ export default function FileViewer({
   onNavigate,
   files = [],
   isSharedRoute,
-  onSoftDelete,
+  onTrash,
   onRename,
   onDownload,
   onRestore,
-  onDelete,
+  onDeleteForever,
   onDeleteSuccess,
   meta = false,
 }) {
@@ -355,7 +355,7 @@ export default function FileViewer({
             <button
               className="fv-action-btn gd-icon-btn"
               title="Share"
-              onClick={() => onShare?.(item)}
+              onClick={() => onShare?.()}
             >
               <IconShare size={20} />
             </button>
@@ -392,7 +392,7 @@ export default function FileViewer({
               className="fv-action-btn gd-icon-btn fv-action-danger"
               title="Move to trash"
               onClick={async () => {
-                await onSoftDelete?.(item);
+                await onTrash?.();
 
                 onDeleteSuccess?.(item?._id);
 
@@ -409,7 +409,7 @@ export default function FileViewer({
             <button
               className="fv-action-btn gd-icon-btn"
               title="Restore"
-              onClick={() => onRestore?.(item)}
+              onClick={() => onRestore?.()}
             >
               <IconRestore size={20} />
             </button>
@@ -421,7 +421,7 @@ export default function FileViewer({
             <button
               className="fv-action-btn gd-icon-btn fv-action-danger"
               title="Delete Forever"
-              onClick={() => onDelete?.(item)}
+              onClick={() => onDeleteForever?.()}
             >
               <IconTrash size={20} />
             </button>
@@ -433,7 +433,7 @@ export default function FileViewer({
             <button
               className="fv-action-btn gd-icon-btn fv-action-danger"
               title="Delete Forever"
-              onClick={() => onDelete?.(item)}
+              onClick={() => onDeleteForever?.()}
             >
               <IconTrash size={20} />
             </button>
