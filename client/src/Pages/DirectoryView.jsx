@@ -488,6 +488,11 @@ export default function DirectoryView({ route }) {
     if (type === "google-file") return;
     try {
       await updateFileViewTime(id);
+      setFilesList((prev) =>
+        prev.map((item) =>
+          item._id === id ? { ...item, viewedByMeTime: new Date().toISOString() } : item,
+        ),
+      );
     } catch (err) {
       console.log("err", err.message);
     }
@@ -689,7 +694,7 @@ export default function DirectoryView({ route }) {
       setFilesList((prev) =>
         prev.map((item) =>
           (item.id ?? item._id) === renameId
-            ? { ...item, name: renameValue }
+            ? { ...item, name: renameValue, modifiedByMeTime: new Date().toISOString() }
             : item,
         ),
       );
@@ -1164,13 +1169,21 @@ export default function DirectoryView({ route }) {
               { label: "Shared By", key: null },
               { label: "Date Shared", key: "sharedWithMeTime" },
             ]
-          : [
-              { label: "Name", key: null },
-              { label: "Owner", key: null },
-              { label: "Last modified", key: null },
-              { label: "File size", key: null },
-              { label: "Location", key: null },
-            ];
+          : isRecentRoute
+            ? [
+                { label: "Name", key: null },
+                { label: "", key: null },
+                { label: "Owner", key: null },
+                { label: "File size", key: null },
+                { label: "Location", key: null },
+              ]
+            : [
+                { label: "Name", key: null },
+                { label: "Owner", key: null },
+                { label: "Last modified", key: null },
+                { label: "File size", key: null },
+                { label: "Location", key: null },
+              ];
 
   const listHeaderRow = (
     <div
@@ -1180,7 +1193,7 @@ export default function DirectoryView({ route }) {
         <span
           key={index}
           onClick={() => column.key && handleSort(column.key)}
-          className={column.key ? "sortable-column" : ""}
+          className={column.key ? "sortable-column" : "py-0 px-1.5"}
         >
           {column.label}
           {sortConfig.key === column.key &&
@@ -1475,7 +1488,6 @@ export default function DirectoryView({ route }) {
           clearSelection();
           setContextItem(null);
         }}
-      
         onDownload={() => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);

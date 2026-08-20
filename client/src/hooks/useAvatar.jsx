@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getColor } from "../../Utils/getProfileColor";
 
-export function UseAvatar({ name, avatar, size = 36 }) {
+export function UseAvatar({ name, avatar, size = 36, fontSize = 18 }) {
   const [hasImgError, setHasImgError] = useState(false);
 
   const avatarEl =
@@ -24,7 +24,7 @@ export function UseAvatar({ name, avatar, size = 36 }) {
         style={{
           width: size,
           height: size,
-          fontSize: 18,
+          fontSize: fontSize,
           fontWeight: 100,
           background: getColor(name),
           borderRadius: "50%",

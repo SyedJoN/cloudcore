@@ -11,7 +11,7 @@ export default function SharedRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-        <UseAvatar name={owner} avatar={avatar} size={24} /> {owner}
+        <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14} /> {owner}
       </div>
 
       <div className="gd-list-row-cell md:text-[11px]">{sharedWithMeTime}</div>

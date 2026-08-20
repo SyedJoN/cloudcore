@@ -31,44 +31,40 @@ export default function SelectionBar({
 
   // SELECTED ITEM
   const item = combinedItems.find((item) =>
-    selectedItems.has(item.id ?? item._id),
+    selectedItems.has(item.id ?? item._id)
   );
 
   if (!item) {
     return null;
   }
 
-  // ITEM TYPE
-
+  // ITEM TYPE / ROUTE
   const isGoogle = Boolean(item.webViewLink);
-
   const isTrashRoute = route === "trash";
-
   const isSharedRoute = route === "shared";
-
   const isGoogleDriveRoute = route === "google-drive";
+  const isDeleted = Boolean(item.isDeleted);
 
-  const isDeleted = item?.isDeleted;
-
-  // Capabilities
-
+  // CAPABILITIES
   const capabilities = item.capabilities || {};
 
-  const canRead = capabilities.canRead === true;
+  const canDownload = capabilities.canDownload === true;
+  const canRename = capabilities.canRename === true;
+  const canDelete = capabilities.canDelete === true;
+  const canTrash = capabilities.canTrash === true;
 
+  // SHARE
   const canShare = true;
 
-  const canDownload = capabilities.canDownload === true;
-
-  const canRename = capabilities.canRename === true;
-
-  const canDelete = capabilities.canDelete === true;
-
-  const canTrash = capabilities.canTrash === true;
 
   // COPY LINK
 
+
   const handleCopyLink = async () => {
+    if (isDeleted) {
+      return;
+    }
+
     const url =
       item.webViewLink ??
       (item.isDirectory
@@ -92,14 +88,87 @@ export default function SelectionBar({
     }
   };
 
-  // NORMAL ACTIONS
-  const showNormalActions = !isTrashRoute && !isDeleted;
+  // TRASH ROUTE
 
-  // RENDER
+  if (isTrashRoute) {
+    return (
+      <div className="gd-selection-bar">
+        {/* CLEAR SELECTION */}
+        <button
+          className="gd-icon-btn gd-sel-close"
+          title="Clear selection"
+          onClick={onClear}
+        >
+          <IconClose size={18} />
+        </button>
+
+        <span className="gd-selection-count">
+          {selectedItems.size} selected
+        </span>
+
+        <div className="gd-selection-actions">
+          {/* RESTORE */}
+          <button
+            className="gd-sel-action-btn gd-sel-action-success"
+            title="Restore"
+            disabled={!canDelete}
+            onClick={onRestore}
+          >
+            <IconRestore size={18} />
+          </button>
+
+          {/* DELETE FOREVER */}
+          <button
+            className="gd-sel-action-btn gd-sel-action-danger"
+            title="Delete Forever"
+            disabled={!canDelete}
+            onClick={() =>
+              onDeleteForever(isGoogle ? "google" : "local")
+            }
+          >
+            <IconTrash size={18} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+
+  // NORMAL ROUTES
+
+
+  const downloadDisabled =
+    isDeleted || !canDownload;
+
+  const shareDisabled =
+    isDeleted || !canShare;
+
+  const copyLinkDisabled =
+    isDeleted
+
+  const renameDisabled =
+    isDeleted || !canRename;
+
+  const trashDisabled =
+    isDeleted ||
+    isGoogle ||
+    isSharedRoute ||
+    !canTrash;
+
+  const removeDisabled =
+    isDeleted ||
+    isGoogle ||
+    !isSharedRoute ||
+    !canDelete;
+
+  const googleDeleteDisabled =
+    isDeleted ||
+    !isGoogleDriveRoute ||
+    !canDelete;
+
   return (
     <div className="gd-selection-bar">
-      {/* CLEAR SELECTION*/}
-
+      {/* CLEAR SELECTION */}
       <button
         className="gd-icon-btn gd-sel-close"
         title="Clear selection"
@@ -108,128 +177,81 @@ export default function SelectionBar({
         <IconClose size={18} />
       </button>
 
-      <span className="gd-selection-count">{selectedItems.size} selected</span>
+      <span className="gd-selection-count">
+        {selectedItems.size} selected
+      </span>
 
       <div className="gd-selection-actions">
-        {/* NORMAL ACTIONS */}
+        {/* DOWNLOAD */}
+        <button
+          className="gd-sel-action-btn"
+          title="Download"
+          disabled={downloadDisabled}
+          onClick={onDownload}
+        >
+          <IconDownload size={18} />
+        </button>
 
-        {showNormalActions && (
-          <>
-            {/* DOWNLOAD */}
+        {/* SHARE */}
+        <button
+          className="gd-sel-action-btn"
+          title="Share"
+          disabled={shareDisabled}
+          onClick={onShare}
+        >
+          <IconShare size={18} />
+        </button>
 
-            {canDownload && (
-              <button
-                className="gd-sel-action-btn"
-                title="Download"
-                onClick={onDownload}
-              >
-                <IconDownload size={18} />
-              </button>
-            )}
+        {/* COPY LINK */}
+        <button
+          className="gd-sel-action-btn"
+          title="Copy link"
+          disabled={copyLinkDisabled}
+          onClick={handleCopyLink}
+        >
+          <IconLink size={18} />
+        </button>
 
-            {/* SHARE */}
+        {/* RENAME / EDIT */}
+        <button
+          className="gd-sel-action-btn"
+          title="Edit"
+          disabled={renameDisabled}
+          onClick={onRename}
+        >
+          <IconRename size={18} />
+        </button>
 
-            {canShare && (
-              <button
-                className="gd-sel-action-btn"
-                title="Share"
-                onClick={onShare}
-              >
-                <IconShare size={18} />
-              </button>
-            )}
-
-          
-          </>
-        )}
-
-        {/*COPY LINK */}
-
-        {!isDeleted && canRead && (
-          <button
-            className="gd-sel-action-btn"
-            title="Copy link"
-            onClick={handleCopyLink}
-          >
-            <IconLink size={18} />
-          </button>
-        )}
-
-        {/*
-            RENAME / EDIT*/}
-
-        {!isDeleted && canRename && (
-          <button className="gd-sel-action-btn" title="Edit" onClick={onRename}>
-            <IconRename size={18} />
-          </button>
-        )}
-
-        {/*
-            TRASH / REMOVE FOR LOCAL ITEMS
-      */}
-
-        {!isGoogle && !isDeleted && !isSharedRoute && canTrash && (
+        {/* MOVE TO TRASH */}
+        {!isGoogle && !isSharedRoute && !isGoogleDriveRoute && (
           <button
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Move to trash"
+            disabled={trashDisabled}
             onClick={onTrash}
           >
             <IconTrash size={18} />
           </button>
         )}
 
-        {/*
-            REMOVE ACCESS
-          */}
-
-        {!isGoogle &&
-          !isDeleted &&
-          !isSharedRoute &&
-          !canTrash &&
-          canDelete && (
-            <button
-              className="gd-sel-action-btn gd-sel-action-danger"
-              title="Remove"
-              onClick={onDeleteForever}
-            >
-              <IconTrash size={18} />
-            </button>
-          )}
-
-        {/* 
-            DELETED ITEMS*/}
-
-        {isDeleted && canDelete && (
-          <>
-            {/* 
-                RESTORE */}
-
-            <button
-              className="gd-sel-action-btn gd-sel-action-success"
-              title="Restore"
-              onClick={onRestore}
-            >
-              <IconRestore size={18} />
-            </button>
-
-            {/* DELETE FOREVER */}
-
-            <button
-              className="gd-sel-action-btn gd-sel-action-danger"
-              title="Delete Forever"
-              onClick={() => onDeleteForever(isGoogle ? "google" : "local")}
-            >
-              <IconTrash size={18} />
-            </button>
-          </>
+        {/* REMOVE FROM SHARED */}
+        {!isGoogle && isSharedRoute && (
+          <button
+            className="gd-sel-action-btn gd-sel-action-danger"
+            title="Remove"
+            disabled={removeDisabled}
+            onClick={onDeleteForever}
+          >
+            <IconTrash size={18} />
+          </button>
         )}
 
         {/* GOOGLE DRIVE DELETE */}
-
-        {isGoogleDriveRoute && !isDeleted && canDelete && (
+        {isGoogleDriveRoute && (
           <button
             className="gd-sel-action-btn gd-sel-action-danger"
-            title="Delete Forever"
+            title="Delete"
+            disabled={googleDeleteDisabled}
             onClick={() => onDeleteForever("google")}
           >
             <IconTrash size={18} />

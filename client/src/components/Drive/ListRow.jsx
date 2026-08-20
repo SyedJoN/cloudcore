@@ -3,16 +3,48 @@ import FileBadge from "../File/FileBadge";
 import { getFileType } from "../../../Utils/displayUtils";
 import { formatDate } from "../../../Utils/formatDate";
 import { formatSize } from "../../../Utils/formatHelpers";
-import { useGDrive } from "../../Contexts";
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth, useGDrive } from "../../Contexts";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import HomeRoute from "../ListRow/HomeRoute";
 import SharedRoute from "../ListRow/SharedRoute";
 import RecentRoute from "../ListRow/RecentRoute";
 import { FolderIcon, InboxIcon, UsersIcon } from "@heroicons/react/24/solid";
 import TrashRoute from "../ListRow/TrashRoute";
+import StarredRoute from "../ListRow/StarredRoute";
 
+const currentYear = new Date().getFullYear();
+
+const formatDateToUS = (value) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return null;
+
+  const now = new Date();
+
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isToday) {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    ...(date.getFullYear() !== currentYear && {
+      year: "numeric",
+    }),
+  });
+};
 export default function ListRow({
   item,
   sortConfig,
@@ -22,6 +54,7 @@ export default function ListRow({
   setIsStarred,
   route,
   owner,
+  email,
   avatar,
   onRowClick,
   onDoubleClick,
@@ -33,9 +66,12 @@ export default function ListRow({
   onContextMenu,
 }) {
   const { isGoogleDrive } = useGDrive();
+  const { user } = useAuth();
+
+  const ownerName =
+    email === (user.email || user.owners?.[0].emailAddress) ? "Me" : owner;
 
   const navigate = useNavigate();
-  const location = useLocation();
 
   const isGoogleDriveRoute = route === "google-drive";
 
@@ -45,9 +81,9 @@ export default function ListRow({
 
   const isSharedRoute = route === "shared";
 
-  const isRecentRoute = route === "recent";
-
   const isTrashRoute = route === "trash";
+
+  const isRecentRoute = route === "recent";
 
   const [isListHovered, setIsListHovered] = useState(false);
 
@@ -93,9 +129,34 @@ export default function ListRow({
 
   const itemId = item.id ?? item._id;
 
-  const lastModified = formatDate(item.modifiedTime || item.updatedAt);
-  const sharedWithMeTime = formatDate(item.sharedWithMeTime);
-  const trashedTime = formatDate(item.trashedTime);
+  const date = new Date(item.modifiedTime || item.updatedAt);
+
+  const lastModifiedAt = formatDateToUS(date);
+
+  const modifiedBy =
+    (item?.lastModifyingUser?.name || item?.lastModifyingUser?.displayName) ===
+    user.name
+      ? "me"
+      : item?.lastModifyingUser?.name || item?.lastModifyingUser?.displayName;
+
+  const sharedWithMeTime =
+    isSharedRoute && formatDateToUS(item.sharedWithMeTime);
+  const trashedTime = isTrashRoute && formatDateToUS(item.trashedTime);
+
+  const viewedTime = item.viewedByMeTime
+    ? new Date(item.viewedByMeTime).getTime()
+    : 0;
+
+  const modifiedTime = item.modifiedByMeTime
+    ? new Date(item.modifiedByMeTime).getTime()
+    : 0;
+
+  const myActivityDate = Math.max(viewedTime, modifiedTime);
+
+  const myActivityTime = myActivityDate ? formatDateToUS(myActivityDate) : null;
+
+  const myActivityType =
+    viewedTime > modifiedTime ? "Opened" : modifiedTime > 0 ? "Modified" : null;
 
   const size = formatSize(item.size);
 
@@ -163,33 +224,29 @@ export default function ListRow({
       }}
     >
       <div className="gd-list-row-name">
-        {item.isDirectory ? (
-          <IconFolder
-            size={20}
-            style={{
-              color: "#5f6368",
-              flexShrink: 0,
-            }}
-          />
-        ) : (
-          <FileBadge type={iconType} />
-        )}
-
+        <div className="flex justify-center grow-0 shrink-0 basis-14">
+          {item.isDirectory ? (
+            <IconFolder size={24} />
+          ) : (
+            <FileBadge size={24} type={iconType} />
+          )}
+        </div>
         <span>{item.name}</span>
       </div>
 
       {isHomeRoute || isGoogleDriveRoute || isDriveRoute ? (
         <HomeRoute
           {...commonRouteProps}
-          owner={owner}
+          owner={ownerName}
           avatar={avatar}
-          lastModified={lastModified}
+          modifiedBy={modifiedBy}
+          lastModifiedAt={lastModifiedAt}
           size={size}
         />
       ) : isSharedRoute ? (
         <SharedRoute
           {...commonRouteProps}
-          owner={owner}
+          owner={ownerName}
           avatar={avatar}
           sharedWithMeTime={sharedWithMeTime}
         />
@@ -197,20 +254,33 @@ export default function ListRow({
         <TrashRoute
           {...commonRouteProps}
           locationIcon={locationIcon}
-          owner={owner}
+          owner={ownerName}
           avatar={avatar}
           trashedTime={trashedTime}
           size={size}
           locationDetails={locationDetails}
           navigate={navigate}
         />
-      ) : (
+      ) : isRecentRoute ? (
         <RecentRoute
           {...commonRouteProps}
           locationIcon={locationIcon}
-          owner={owner}
+          myActivityType={myActivityType}
+          myActivityTime={myActivityTime}
+          owner={ownerName}
           avatar={avatar}
-          lastModified={lastModified}
+          size={size}
+          locationDetails={locationDetails}
+          navigate={navigate}
+        />
+      ) : (
+        <StarredRoute
+          {...commonRouteProps}
+          locationIcon={locationIcon}
+          owner={ownerName}
+          avatar={avatar}
+          modifiedBy={modifiedBy}
+          lastModifiedAt={lastModifiedAt}
           size={size}
           locationDetails={locationDetails}
           navigate={navigate}

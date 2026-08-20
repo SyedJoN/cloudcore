@@ -32,6 +32,7 @@ import { getIdString } from "../utils/permissions/getIdString.js";
 import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 import SharedAccess from "../models/sharedAccess.model.js";
+import FileActivity from "../models/fileActivity.model.js";
 const roleMap = {
   viewer: "reader",
   editor: "writer",
@@ -54,7 +55,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const object = getObject(type, item._id);
   const permissionMap = new Map();
 
-  // Direct permissions 
+  // Direct permissions
   const directPermissions = await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
@@ -106,7 +107,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       photoLink: permission.photoLink,
     }));
 
-  // Current user's effective role, factoring in public access 
+  // Current user's effective role, factoring in public access
   const currentUserId = getIdString(userId);
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
@@ -158,12 +159,30 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
   );
 
-
   if (isPublicEffective && !directRole && !inheritedRole) {
     currentUserCapabilities.canChangeRole = false;
   }
 
-  
+  const [viewActivity, modifiedActivity] = await Promise.all([
+    FileActivity.findOne({
+      file: item._id,
+      user: userId,
+      type: "view",
+    }).lean(),
+
+    FileActivity.findOne({
+      file: item._id,
+      user: userId,
+      type: { $in: ["rename", "move"] },
+    })
+      .sort({ occuredAt: -1 })
+      .lean(),
+  ]);
+
+  const viewedByMeTime = viewActivity?.occuredAt || null;
+  const modifiedByMeTime = modifiedActivity?.occuredAt || null;
+
+
   let sharedWithMeTime = null;
 
   if (roleSource === "direct") {
@@ -201,7 +220,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     });
   }
 
-
   const ownership = await Ownership.findOne({ itemId: item?._id })
     .sort({ createdAt: -1 })
     .lean();
@@ -225,6 +243,8 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
     isRootDirectory,
     sharedWithMeTime,
+    viewedByMeTime,
+    modifiedByMeTime,
   };
 };
 
@@ -526,23 +546,30 @@ export const getFileMetaById = async (req, res, next) => {
         });
       }
 
-      const [canRead, canWrite] = await Promise.all([
+      const canRead = await Promise.all(
         fgaClient.check({
           user: `user:${userId}`,
           role: "can_read",
           object: `file:${id}`,
         }),
-        fgaClient.check({
-          user: `user:${userId}`,
-          role: "can_write",
-          object: `file:${id}`,
-        }),
-      ]);
+      );
 
       if (!canRead.allowed) {
         return res.status(403).json({ message: "Access denied" });
       }
-
+      await FileActivity.findOneAndUpdate(
+        {
+          file: file._id,
+          user: userId,
+          type: "view",
+        },
+        {
+          $set: { lastOccurredAt: new Date() },
+        },
+        {
+          upsert: true,
+        },
+      );
       return res.status(200).json({
         ...file,
         ...capabilities,
@@ -565,6 +592,19 @@ export const getFileMetaById = async (req, res, next) => {
       ]);
 
       if (canRead.checked || canWrite.checked) {
+        await FileActivity.findOneAndUpdate(
+          {
+            file: file._id,
+            user: userId,
+            type: "view",
+          },
+          {
+            $set: { lastOccurredAt: new Date() },
+          },
+          {
+            upsert: true,
+          },
+        );
         return res.status(200).json({
           ...file,
           ...capabilities,
@@ -572,7 +612,19 @@ export const getFileMetaById = async (req, res, next) => {
         });
       }
     }
-    file.viewedByMeTime = new Date();
+    await FileActivity.findOneAndUpdate(
+      {
+        file: file._id,
+        user: userId,
+        type: "view",
+      },
+      {
+        $set: { lastOccurredAt: new Date() },
+      },
+      {
+        upsert: true,
+      },
+    );
     await file.save();
   } catch (error) {
     next(error);
@@ -614,18 +666,20 @@ export const getRecentFiles = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       sharedFiles.map(async (file) => {
-        const { owners, capabilities, permissions } = await resolveRole(
-          file,
-          "file",
-          userId,
-          file.parentDirId,
-          true,
-        );
+        const {
+          owners,
+          capabilities,
+          permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
+        } = await resolveRole(file, "file", userId, file.parentDirId, true);
         return {
           ...file,
           owners,
           capabilities,
           permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
           isShared: true,
         };
       }),
@@ -633,16 +687,20 @@ export const getRecentFiles = async (req, res, next) => {
 
     const ownFilesWithRoles = await Promise.all(
       ownFiles.map(async (file) => {
-        const { owners, capabilities, permissions } = await resolveRole(
-          file,
-          "file",
-          userId,
-        );
+        const {
+          owners,
+          capabilities,
+          permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
+        } = await resolveRole(file, "file", userId);
         return {
           ...file,
           owners,
           capabilities,
           permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
         };
       }),
     );
@@ -731,7 +789,7 @@ export const updateFile = async (req, res, next) => {
       const isOwner = file.userId?.toString() === userId?.toString();
 
       if (req.user?.role === "superuser" || isOwner) {
-        return await performRename(file, fileId, finalName, res);
+        return await performRename(file, finalName, res, userId);
       }
 
       const canWrite = await fgaClient.check({
@@ -741,7 +799,7 @@ export const updateFile = async (req, res, next) => {
       });
 
       if (canWrite.allowed) {
-        return await performRename(file, fileId, finalName, res);
+        return await performRename(file, finalName, res, userId);
       }
 
       const parentDir = file.parentDirId
@@ -755,7 +813,7 @@ export const updateFile = async (req, res, next) => {
           : null;
 
       if (publicRole === "editor") {
-        return await performRename(file, fileId, finalName, res);
+        return await performRename(file, finalName, res, userId);
       }
 
       return res.status(403).json({
@@ -767,12 +825,27 @@ export const updateFile = async (req, res, next) => {
   }
 };
 
-const performRename = async (file, fileId, fileName, res) => {
+const performRename = async (file, fileName, res, userId) => {
   const ext = file.extension;
 
   file.name = fileName;
   file.extension = ext;
   file.modifiedTime = new Date();
+  file.lastModifyingUser = userId;
+  await FileActivity.findOneAndUpdate(
+    {
+      file: file._id,
+      user: userId,
+      type: "rename",
+    },
+    {
+      $set: { lastOccurredAt: new Date() },
+    },
+    {
+      upsert: true,
+    },
+  );
+
   await file.save();
 
   return res.status(200).json({ message: "File renamed successfully" });
@@ -1610,20 +1683,43 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
 
 export const updateFileViewTime = async (req, res, next) => {
   const { id } = req.params;
+  const userId = req.user?._id;
 
   if (!id) {
-    return res.status(400).json({ message: "File Id is required!" });
+    return res.status(400).json({
+      message: "File Id is required!",
+    });
   }
+
+  if (!userId) {
+    return res.status(401).json({
+      message: "Unauthorized",
+    });
+  }
+
   try {
-    const file = await File.findById(id);
-    if (!file) {
-      return res.status(404).json({ message: "File not found" });
-    }
-    file.viewedByMeTime = Date.now();
-    await file.save();
-    return res.status(200).json({ message: "View record updated!" });
+    await FileActivity.findOneAndUpdate(
+      {
+        file: id,
+        user: userId,
+        type: "view",
+      },
+      {
+        $set: {
+          lastOccurredAt: new Date(),
+        },
+      },
+      {
+        upsert: true,
+        returnDocument: "after",
+      }
+    );
+
+    return res.status(200).json({
+      message: "View record updated!",
+    });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     next(error);
   }
 };

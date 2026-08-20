@@ -33,7 +33,6 @@ const DefaultView = ({
   onStar,
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
-  const navigate = useNavigate();
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -152,6 +151,7 @@ const DefaultView = ({
                     dirId={dirId}
                     avatar={item.userId?.avatar || item.owners?.[0]?.photoLink}
                     owner={item.userId?.name || item.owners?.[0]?.displayName}
+                    email={item.userId?.email || item.owners?.[0]?.emailAddress}
                     selected={selectedItems.has(item.id ?? item._id)}
                     onSelect={onSelect}
                     onDownload={onDownload}
@@ -179,6 +179,7 @@ const DefaultView = ({
                   dirId={dirId}
                   avatar={item.userId?.avatar || item.owners?.[0]?.photoLink}
                   owner={item.userId?.name || item.owners?.[0]?.displayName}
+                  email={item.userId?.email || item.owners?.[0]?.emailAddress}
                   selected={selectedItems.has(item.id ?? item._id)}
                   onSelect={onSelect}
                   onDownload={onDownload}

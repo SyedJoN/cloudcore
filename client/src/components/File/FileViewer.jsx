@@ -70,19 +70,11 @@ export default function FileViewer({
 
   const canRead = capabilities.canRead === true;
 
-  const canWrite = capabilities.canWrite === true;
-
   const canShare = capabilities.canShare === true;
-
-  const canChangeRole = capabilities.canChangeRole === true;
 
   const canDownload = capabilities.canDownload === true;
 
   const canRename = capabilities.canRename === true;
-
-  const canMove =
-    capabilities.canMove === true ||
-    capabilities.canMoveItemWithinDrive === true;
 
   const canTrash = capabilities.canTrash === true;
 

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-
 import {
   IconShare,
   IconDownload,
@@ -12,23 +11,20 @@ import {
   IconLink,
   IconRestore,
 } from "../Icons/Icons";
-
 import { useToast } from "../../Contexts/ToastContext";
 import {
   Portal,
   useTransitionClass,
   useSelfMountedTransition,
 } from "../../hooks/useFloatingMenu";
-import { useAuth } from "../../Contexts";
 import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { FolderOpenIcon, StarIcon } from "@heroicons/react/24/outline";
-
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { FolderInput } from "lucide-react";
 
-/*
+/* 
    SUB MENU
-*/
+ */
 
 function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
   const { mounted, animate, nodeRef, onTransitionEnd } =
@@ -58,14 +54,14 @@ function SubMenu({ open, openLeft, onMouseEnter, onMouseLeave, children }) {
   );
 }
 
-/*
+/* 
    SUB MENU CONSTANTS
  */
 
 const SUBMENU_OPEN_DELAY = 150;
 const SUBMENU_CLOSE_DELAY = 120;
 
-/*
+/* 
    HOVER INTENT
  */
 
@@ -97,9 +93,9 @@ function useHoverIntent(setOpen) {
   };
 }
 
-/*
+/* 
    CONTEXT MENU CONTENT
-*/
+ */
 
 function ContextMenuContent({
   open,
@@ -126,9 +122,14 @@ function ContextMenuContent({
     open,
     onExited,
   );
-  const { user } = useAuth();
+
   const { toast } = useToast();
 
+  /*
+   * IMPORTANT:
+   * Keep these declarations ONLY here.
+   * Do not redeclare them elsewhere in this component.
+   */
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showOrganize, setShowOrganize] = useState(false);
@@ -148,12 +149,15 @@ function ContextMenuContent({
     }
 
     document.addEventListener("click", handleClick, true);
-    return () => document.removeEventListener("click", handleClick, true);
+
+    return () => {
+      document.removeEventListener("click", handleClick, true);
+    };
   }, [onClose]);
 
-  /*
+  /* 
      ITEM
- */
+   */
 
   if (!item) {
     return null;
@@ -163,17 +167,18 @@ function ContextMenuContent({
   const isSharedRoute = route === "shared";
   const isGoogleDriveRoute = route === "google-drive";
   const isTrashRoute = route === "trash";
+
   const isFile = !item.isDirectory;
+  const isFolder = Boolean(item.isDirectory);
 
-  const showFileActions = isFile;
-
-  /*
+  /* 
      CAPABILITIES
- */
+   */
 
   const capabilities = item.capabilities || {};
 
   const canRead = isGoogle ? true : capabilities.canRead === true;
+
   const canDownload = capabilities.canDownload === true;
   const canCopy = true;
   const canMove = capabilities.canMove === true;
@@ -182,17 +187,13 @@ function ContextMenuContent({
   const canTrash = capabilities.canTrash === true;
   const canDelete = capabilities.canDelete === true;
 
-  /*
-     ROUTES / STATE
- */
-
-  const isDeleted = item?.isDeleted;
+  const isDeleted = Boolean(item?.isDeleted);
 
   const showDeleteActions = isTrashRoute && isDeleted && !dirId;
 
-  /*
+  /* 
      CLOSE WRAPPER
- */
+   */
 
   const close =
     (action) =>
@@ -201,7 +202,7 @@ function ContextMenuContent({
       onClose();
     };
 
-  /*
+  /* 
      COPY LINK
    */
 
@@ -231,18 +232,19 @@ function ContextMenuContent({
     }
   }
 
-  /*
+  /* 
      OPEN IN NEW TAB
- */
+   */
 
   function handleOpenInNewTab() {
     window.open(item.webViewLink || `/file/${item._id}`, "_blank");
+
     onClose();
   }
 
-  /*
+  /* 
      RENDER
- */
+   */
 
   return (
     <div
@@ -257,51 +259,68 @@ function ContextMenuContent({
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* 
+          TRASH MENU
+     */}
+
       {showDeleteActions ? (
         <>
-          {canDelete && (
-            <button
-              className="gd-context-item"
-              onClick={close(() => onRestore(item))}
-            >
-              <IconRestore size={18} />
-              Restore
-            </button>
-          )}
+          <button
+            className="gd-context-item"
+            disabled={!canDelete}
+            onClick={close(() => onRestore(item))}
+          >
+            <IconRestore size={18} />
+            Restore
+          </button>
 
-          {canDelete && (
-            <>
-              <button
-                className="gd-context-item danger"
-                onClick={close(() =>
-                  onDeleteForever(isGoogle ? "google" : "local"),
-                )}
-              >
-                <IconTrash size={18} />
-                Delete forever
-              </button>
-            </>
-          )}
+          <button
+            className="gd-context-item danger"
+            disabled={!canDelete}
+            onClick={close(() =>
+              onDeleteForever(isGoogle ? "google" : "local"),
+            )}
+          >
+            <IconTrash size={18} />
+            Delete forever
+          </button>
         </>
       ) : (
+        /* ====
+           NORMAL MENU
+        ==== */
         <div>
-          {/* OPEN WITH */}
+          {/* 
+              OPEN WITH
+              FILES ONLY
+           */}
 
-          {showFileActions && !isDeleted && canRead && (
+          {isFile && (
             <>
               <div style={{ position: "relative" }}>
                 <button
                   className="gd-context-item"
-                  onMouseEnter={openWithHover.onMouseEnter}
-                  onMouseLeave={openWithHover.onMouseLeave}
+                  disabled={isDeleted || !canRead}
+                  onMouseEnter={
+                    !isDeleted && canRead
+                      ? openWithHover.onMouseEnter
+                      : undefined
+                  }
+                  onMouseLeave={
+                    !isDeleted && canRead
+                      ? openWithHover.onMouseLeave
+                      : undefined
+                  }
                 >
                   <IconOpenWith size={18} />
+
                   <span style={{ flex: 1 }}>Open with</span>
+
                   <IconChevronRight size={16} />
                 </button>
 
                 <SubMenu
-                  open={showOpenWith}
+                  open={showOpenWith && !isDeleted && canRead}
                   openLeft={openLeft}
                   onMouseEnter={openWithHover.onMouseEnter}
                   onMouseLeave={openWithHover.onMouseLeave}
@@ -323,142 +342,176 @@ function ContextMenuContent({
                   </button>
                 </SubMenu>
               </div>
+
               <div className="gd-context-divider" />
             </>
           )}
 
-          {/* DOWNLOAD */}
-
-          {!isDeleted && canDownload && (
-            <button
-              className="gd-context-item"
-              onClick={close(() => onDownload(item))}
-            >
-              <IconDownload size={18} />
-              Download
-            </button>
-          )}
-          {/* RENAME */}
-
-          {!isDeleted && canRename && (
-            <>
-              <button
-                className="gd-context-item"
-                onClick={close(() => onRename(item))}
-              >
-                <IconRename size={18} />
-                Rename
-              </button>
-            </>
-          )}
           {/* 
-                COPY
-             */}
+              DOWNLOAD
+           */}
 
-          {canCopy && !isSharedRoute && (
-            <button
-              className="gd-context-item"
-              title="Copy"
-              onClick={close(() => onCopy(item))}
-            >
-              <DocumentDuplicateIcon className="w-5 h-5" />
-              Make a Copy
-            </button>
-          )}
+          <button
+            className="gd-context-item"
+            disabled={isDeleted || !canDownload}
+            onClick={close(() => onDownload(item))}
+          >
+            <IconDownload size={18} />
+            Download
+          </button>
+
+          {/* 
+              RENAME
+           */}
+
+          <button
+            className="gd-context-item"
+            disabled={isDeleted || !canRename}
+            onClick={close(() => onRename(item))}
+          >
+            <IconRename size={18} />
+            Rename
+          </button>
+
+          {/* 
+              COPY
+           */}
+
+          <button
+            className="gd-context-item"
+            disabled={isSharedRoute || !canCopy}
+            title="Copy"
+            onClick={close(() => onCopy(item))}
+          >
+            <DocumentDuplicateIcon className="w-5 h-5" />
+            Make a Copy
+          </button>
+
           <div className="gd-context-divider" />
 
-          {/* SHARE */}
+          {/* 
+              SHARE
+           */}
 
-          {!isDeleted && canShare && (
-            <div style={{ position: "relative" }}>
+          <div style={{ position: "relative" }}>
+            <button
+              className="gd-context-item"
+              disabled={isDeleted || !canShare}
+              onMouseEnter={
+                !isDeleted && canShare ? shareHover.onMouseEnter : undefined
+              }
+              onMouseLeave={
+                !isDeleted && canShare ? shareHover.onMouseLeave : undefined
+              }
+            >
+              <IconShare size={18} />
+
+              <span style={{ flex: 1 }}>Share</span>
+
+              <IconChevronRight size={16} />
+            </button>
+
+            <SubMenu
+              open={showShare && !isDeleted && canShare}
+              openLeft={openLeft}
+              onMouseEnter={shareHover.onMouseEnter}
+              onMouseLeave={shareHover.onMouseLeave}
+            >
               <button
                 className="gd-context-item"
-                onMouseEnter={shareHover.onMouseEnter}
-                onMouseLeave={shareHover.onMouseLeave}
+                onClick={close(() => onShare(item))}
               >
                 <IconShare size={18} />
-                <span style={{ flex: 1 }}>Share</span>
-                <IconChevronRight size={16} />
+                Share
               </button>
 
-              <SubMenu
-                open={showShare}
-                openLeft={openLeft}
-                onMouseEnter={shareHover.onMouseEnter}
-                onMouseLeave={shareHover.onMouseLeave}
-              >
-                <button
-                  className="gd-context-item"
-                  onClick={close(() => onShare(item))}
-                >
-                  <IconShare size={18} />
-                  Share
-                </button>
-
-                {canRead && (
-                  <button className="gd-context-item" onClick={handleCopyLink}>
-                    <IconLink size={18} />
-                    Copy link
-                  </button>
-                )}
-              </SubMenu>
-            </div>
-          )}
-
-          {/* Move */}
-
-          {!isDeleted && canMove && !isGoogleDriveRoute && (
-            <div style={{ position: "relative" }}>
               <button
                 className="gd-context-item"
-                onMouseEnter={organizeHover.onMouseEnter}
-                onMouseLeave={organizeHover.onMouseLeave}
+                disabled={!canRead}
+                onClick={handleCopyLink}
               >
-                <FolderOpenIcon className="w-5 h-5" />
-                <span style={{ flex: 1 }}>Organize</span>
-                <IconChevronRight size={16} />
+                <IconLink size={18} />
+                Copy link
+              </button>
+            </SubMenu>
+          </div>
+
+          {/* 
+              ORGANIZE / MOVE / STAR
+
+              Folders ALSO get this.
+              Open with is the thing restricted to files.
+           */}
+
+          <div style={{ position: "relative" }}>
+            <button
+              className="gd-context-item"
+              disabled={isDeleted || !canMove || isGoogleDriveRoute}
+              onMouseEnter={
+                !isDeleted && canMove && !isGoogleDriveRoute
+                  ? organizeHover.onMouseEnter
+                  : undefined
+              }
+              onMouseLeave={
+                !isDeleted && canMove && !isGoogleDriveRoute
+                  ? organizeHover.onMouseLeave
+                  : undefined
+              }
+            >
+              <FolderOpenIcon className="w-5 h-5" />
+
+              <span style={{ flex: 1 }}>Organize</span>
+
+              <IconChevronRight size={16} />
+            </button>
+
+            <SubMenu
+              open={
+                showOrganize && !isDeleted && canMove && !isGoogleDriveRoute
+              }
+              openLeft={openLeft}
+              onMouseEnter={organizeHover.onMouseEnter}
+              onMouseLeave={organizeHover.onMouseLeave}
+            >
+              {/* MOVE */}
+
+              <button
+                className="gd-context-item"
+                disabled={isSharedRoute || isDeleted || !canMove}
+                onClick={close(() => onMove(item._id))}
+              >
+                <FolderInput width={18} height={18} />
+                Move
               </button>
 
-              <SubMenu
-                open={showOrganize}
-                openLeft={openLeft}
-                onMouseEnter={organizeHover.onMouseEnter}
-                onMouseLeave={organizeHover.onMouseLeave}
+              {/* STAR */}
+
+              <button
+                className="gd-context-item"
+                disabled={isDeleted || isGoogleDriveRoute}
+                title="Star"
+                onClick={close(() => onStar(item))}
               >
-                {!isSharedRoute && (
-                  <button
-                    className="gd-context-item"
-                    onClick={close(() => onMove(item._id))}
-                  >
-                    <FolderInput width={18} height={18}/>
-                    Move
-                  </button>
+                {isStarred[item._id] ? (
+                  <StarIconSolid className="w-5 h-5" />
+                ) : (
+                  <StarIcon className="w-5 h-5" />
                 )}
-                {!isGoogleDriveRoute && (
-                  <button
-                    className="gd-context-item"
-                    title="Star"
-                    onClick={onStar}
-                  >
-                    {isStarred[item._id] ? (
-                      <StarIconSolid className="w-5 h-5" />
-                    ) : (
-                      <StarIcon className="w-5 h-5" />
-                    )}
-                    Add to starred
-                  </button>
-                )}
-              </SubMenu>
-            </div>
-          )}
+                Add to starred
+              </button>
+            </SubMenu>
+          </div>
 
-          {(canTrash || canDelete) && <div className="gd-context-divider" />}
+          <div className="gd-context-divider" />
 
-          {/* MOVE TO TRASH */}
+          {/* 
+              MOVE TO TRASH
+           */}
 
-          {!isDeleted && canTrash && (
+          {!isDeleted && !isGoogleDriveRoute && (
             <button
               className="gd-context-item danger"
+              disabled={isDeleted || !canDelete || !canTrash}
               onClick={close(() => onTrash(item))}
             >
               <IconTrash size={18} />
@@ -466,9 +519,14 @@ function ContextMenuContent({
             </button>
           )}
 
-          {isGoogleDriveRoute && !isDeleted && canDelete && (
+          {/* 
+              GOOGLE DRIVE DELETE
+           */}
+
+          {isGoogleDriveRoute && (
             <button
               className="gd-context-item danger"
+              disabled={isDeleted || !canDelete}
               onClick={close(() => onDeleteForever("google"))}
             >
               <IconTrash size={18} />
@@ -481,9 +539,9 @@ function ContextMenuContent({
   );
 }
 
-/* ============================================================
+/* 
    CONTEXT MENU
-============================================================ */
+ */
 
 export default function ContextMenu({ open, item, position, ...rest }) {
   const [mounted, setMounted] = useState(false);
@@ -499,16 +557,20 @@ export default function ContextMenu({ open, item, position, ...rest }) {
       return;
     }
 
-    const instanceKey = `${position.x},${position.y},${item?._id ?? ""},${
-      item?.isDirectory ? "dir" : "file"
-    }`;
+    const instanceKey = `${position.x},${position.y},${
+      item?._id ?? ""
+    },${item?.isDirectory ? "dir" : "file"}`;
 
     setRender((prev) => {
       if (prev.key === instanceKey) {
         return prev;
       }
 
-      return { item, position, key: instanceKey };
+      return {
+        item,
+        position,
+        key: instanceKey,
+      };
     });
 
     setMounted(true);

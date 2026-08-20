@@ -48,6 +48,7 @@ import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 import copyS3File from "../services/s3/copy.js";
 import { getDriveClient } from "../services/googleDriveClient.js";
 import SharedAccess from "../models/sharedAccess.model.js";
+import FileActivity from "../models/fileActivity.model.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const getObject = (resourceType, resourceId) => `${resourceType}:${resourceId}`;
@@ -174,6 +175,25 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     currentUserCapabilities.canChangeRole = false;
   }
 
+  const [viewActivity, modifiedActivity] = await Promise.all([
+    FileActivity.findOne({
+      file: item._id,
+      user: userId,
+      type: "view",
+    }).lean(),
+
+    FileActivity.findOne({
+      file: item._id,
+      user: userId,
+      type: { $in: ["rename", "move"] },
+    })
+      .sort({ occuredAt: -1 })
+      .lean(),
+  ]);
+
+  const viewedByMeTime = viewActivity?.occuredAt || null;
+  const modifiedByMeTime = modifiedActivity?.occuredAt || null;
+
   let sharedWithMeTime = null;
 
   if (roleSource === "direct") {
@@ -234,6 +254,8 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
     isRootDirectory,
     sharedWithMeTime,
+    viewedByMeTime,
+    modifiedByMeTime,
   };
 };
 
@@ -268,10 +290,12 @@ export const getDirectory = async (req, res, next) => {
         File.find({ parentDirId: parentDir._id, isDeleted: false })
           .populate("userId", "name email avatar")
           .populate("path", "name")
+          .populate("lastModifyingUser")
           .lean(),
         Directory.find({ parentDirId: parentDir._id, isDeleted: false })
           .populate("userId", "name email avatar")
           .populate("path", "name")
+          .populate("lastModifyingUser")
           .lean(),
       ]);
 
@@ -304,17 +328,20 @@ export const getDirectory = async (req, res, next) => {
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
           files.map(async (f) => {
-            const { owners, capabilities, permissions } = await resolveRole(
-              f,
-              "file",
-              userId,
-              parentDir,
-            );
+            const {
+              owners,
+              capabilities,
+              permissions,
+              viewedByMeTime,
+              modifiedByMeTime,
+            } = await resolveRole(f, "file", userId, parentDir);
             return {
               ...f,
               owners,
               capabilities,
               permissions,
+              viewedByMeTime,
+              modifiedByMeTime,
             };
           }),
         ),
@@ -387,6 +414,8 @@ export const getDirectory = async (req, res, next) => {
       })
         .populate("userId", "name email avatar")
         .populate("path", "name")
+        .populate("lastModifyingUser")
+
         .lean(),
       Directory.find({
         _id: { $in: allowedFolderIds },
@@ -395,22 +424,27 @@ export const getDirectory = async (req, res, next) => {
       })
         .populate("userId", "name email avatar")
         .populate("path", "name")
+        .populate("lastModifyingUser")
+
         .lean(),
     ]);
 
     const filesWithRoles = await Promise.all(
       files.map(async (file) => {
-        const { owners, capabilities, permissions } = await resolveRole(
-          file,
-          "file",
-          userId,
-          parentDir,
-        );
+        const {
+          owners,
+          capabilities,
+          permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
+        } = await resolveRole(file, "file", userId, parentDir);
         return {
           ...file,
           owners,
           capabilities,
           permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
         };
       }),
     );
@@ -888,6 +922,7 @@ export const addDirectory = async (req, res, next) => {
 export const editDirectory = async (req, res, next) => {
   const { id } = req.params;
   const { newDirName } = req.body;
+  const userId = req.user?._id;
   if (!newDirName) {
     return res.status(404).json({ message: "Dirname is required" });
   }
@@ -900,7 +935,14 @@ export const editDirectory = async (req, res, next) => {
     return res.status(403).json({ message: "Unauthorized" });
   }
   try {
-    await Directory.updateOne({ _id: id }, { name: sanitizeText(newDirName) });
+    await Directory.updateOne(
+      { _id: id },
+      {
+        name: sanitizeText(newDirName),
+        modifiedTime: new Date(),
+        lastModifyingUser: userId,
+      },
+    );
 
     return res.status(200).json({ message: "Renamed" });
   } catch (error) {
@@ -2651,6 +2693,7 @@ export const copyItem = async (req, res, next) => {
 
 export const moveItem = async (req, res, next) => {
   const { item, destinationId, destinationName } = req.body;
+  const userId = req.user?._id;
 
   if (!item || !destinationId || !destinationName) {
     return res.status(400).json({
@@ -2710,9 +2753,21 @@ export const moveItem = async (req, res, next) => {
     });
 
     await itemToBeMoved.save();
-  }
 
-  else {
+    await FileActivity.findOneAndUpdate(
+      {
+        file: itemToBeMoved._id,
+        user: userId,
+        type: "move",
+      },
+      {
+        $set: { lastOccurredAt: new Date() },
+      },
+      {
+        upsert: true,
+      },
+    );
+  } else {
     const oldPath = [...(itemToBeMoved.path || [])];
 
     const newPath = [...oldPath];
@@ -2758,29 +2813,17 @@ export const moveItem = async (req, res, next) => {
     });
 
     for (const child of childFolders) {
-      const relativePath = child.path.slice(
-        oldPath.length
-      );
+      const relativePath = child.path.slice(oldPath.length);
 
-      child.path = [
-        ...newPath,
-        itemToBeMoved._id,
-        ...relativePath,
-      ];
+      child.path = [...newPath, itemToBeMoved._id, ...relativePath];
 
       await child.save();
     }
 
     for (const file of childFiles) {
-      const relativePath = file.path.slice(
-        oldPath.length
-      );
+      const relativePath = file.path.slice(oldPath.length);
 
-      file.path = [
-        ...newPath,
-        itemToBeMoved._id,
-        ...relativePath,
-      ];
+      file.path = [...newPath, itemToBeMoved._id, ...relativePath];
 
       await file.save();
     }

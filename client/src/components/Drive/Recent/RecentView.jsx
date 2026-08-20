@@ -11,7 +11,6 @@ import { useAuth } from "../../../Contexts";
 export default function RecentView({
   items,
   sortConfig,
-  setSortConfig,
   viewMode,
   isRecentRoute,
   dirId,
@@ -124,6 +123,7 @@ const sortedItems = useMemo(() => {
                   dirId={dirId}
                   avatar={item.userId?.avatar}
                   owner={item.userId?.name || item.owners?.[0].displayName}
+                  email={item.userId?.email || item.owners?.[0]?.emailAddress}
                   selected={selectedItems.has(item.id ?? item._id)}
                   onSelect={onSelect}
                   selectionActive={selectedItems.size > 0}

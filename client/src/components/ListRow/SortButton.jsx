@@ -44,7 +44,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
           rounded-full
           px-4 py-2
           text-sm
-          text-[#3c4043]
+          text-(--text-secondary)
           hover:bg-[#f1f3f4]
           cursor-pointer
         "

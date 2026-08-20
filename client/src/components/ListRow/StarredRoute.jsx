@@ -1,11 +1,12 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import RowActions from "./RowActions";
 import { UseAvatar } from "../../Hooks/useAvatar";
 
-export default function TrashRoute({
+export default function StarredRoute({
   owner,
   avatar,
-  trashedTime,
+  lastModifiedAt,
+  modifiedBy,
   size,
   locationDetails,
   locationIcon,
@@ -17,11 +18,12 @@ export default function TrashRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-        {" "}
         <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14} /> {owner}
       </div>
 
-      <div className="gd-list-row-cell md:text-[11px]">{trashedTime}</div>
+        <div className="gd-list-row-cell md:text-[11px]">
+        {lastModifiedAt} {modifiedBy ? modifiedBy : ''}
+      </div>
 
       <div className="gd-list-row-cell md:text-[11px]">{size}</div>
 

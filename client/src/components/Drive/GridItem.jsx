@@ -124,7 +124,7 @@ export default function GridItem({
         className={`gd-grid-item-preview ${showActiviyBar ? "h-50.25" : "h-41.75"}`}
       >
         {item.isDirectory ? (
-          <IconFolder size={48} style={{ color: "#5f6368" }} />
+          <IconFolder size={48} />
         ) : (
           <FilePreview item={item} />
         )}

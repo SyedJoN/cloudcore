@@ -22,7 +22,7 @@ export default function RowActions({
   return (
     <>
       <div className="gd-list-row-cell flex">
-        <div className={`flex ${isListHovered ? "" : "visible-hidden"} justify-end flex-1`}>
+        <div className={`flex ${isListHovered ? "" : "visible-hidden"} justify-end flex-1 gap-1`}>
           {canShare && (
             <button
               className="gd-sel-action-btn-list-row"
@@ -34,7 +34,7 @@ export default function RowActions({
                 onShare?.(itemId);
               }}
             >
-              <IconShare size={18} />
+              <IconShare size={17} />
             </button>
           )}
 
@@ -48,7 +48,7 @@ export default function RowActions({
                 onDownload?.(itemId);
               }}
             >
-              <IconDownload size={18} />
+              <IconDownload size={17} />
             </button>
           )}
 
@@ -63,7 +63,7 @@ export default function RowActions({
                 onRename?.(itemId);
               }}
             >
-              <IconRename size={18} />
+              <IconRename size={17} />
             </button>
           )}
 
@@ -79,9 +79,9 @@ export default function RowActions({
               }}
             >
               {isStarred?.[itemId] ? (
-                <StarIconSolid className="w-5 h-5" />
+                <StarIconSolid className="w-4 h-4" />
               ) : (
-                <StarIcon className="w-5 h-5" />
+                <StarIcon className="w-4 h-4" />
               )}
             </button>
             

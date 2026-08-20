@@ -72,16 +72,14 @@ const directorySchema = new Schema(
       default: [],
     },
 
-    viewedByMeTime: {
-      type: Date,
-      default: Date.now,
-      index: true,
-    },
-
     modifiedTime: {
       type: Date,
       default: Date.now,
       index: true,
+    },
+    lastModifyingUser: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
     trashedTime: {
       type: Date,

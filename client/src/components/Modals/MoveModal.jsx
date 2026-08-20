@@ -44,7 +44,8 @@ export default function MoveModal({
     );
 
   useEffect(() => {
-    loadFolders(currentCrumb.id);
+    loadFolders(currentCrumb.id || "");
+
   }, [currentCrumb.id]);
 
   async function loadFolders(parentId) {
@@ -120,7 +121,7 @@ export default function MoveModal({
     <div className="gd-modal-overlay" onClick={onClose}>
       <div className="mv-modal" onClick={(e) => e.stopPropagation()}>
         <div className="mv-header">
-          <span className="mv-title">Move "{item?.name}"</span>
+          <h2 className="mv-title">Move "{item?.name}"</h2>
           <button className="gd-icon-btn" onClick={onClose}>
             <IconClose size={18} />
           </button>
@@ -141,7 +142,7 @@ export default function MoveModal({
                         {crumb.name === "My Drive" ? (
                           <InboxIcon className="w-5 h-5" />
                         ) : (
-                          <FolderIcon className="w-5 h-5" />
+                          <FolderIcon className="text-(--text-secondary) w-5 h-5" />
                         )}
                         {crumb.name}
                       </span>
@@ -150,18 +151,18 @@ export default function MoveModal({
                       size={14}
                       style={{
                         transform: "rotate(-90deg)",
-                        color: "#80868b",
+                        color: "var(--text-primary)",
                         flexShrink: 0,
                       }}
                     />
                   </>
                 ) : (
-                  <>
+                  <button className="mv-breadcrumb-btn">
                     <span className="mv-breadcrumb-current">
-                     {locationIcon}
+                      {locationIcon}
                       {crumb.name}
                     </span>
-                  </>
+                  </button>
                 )}
               </span>
             );

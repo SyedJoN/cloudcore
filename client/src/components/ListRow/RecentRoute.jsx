@@ -5,8 +5,9 @@ import { UseAvatar } from "../../Hooks/useAvatar";
 export default function RecentRoute({
   owner,
   avatar,
-  lastModified,
   size,
+  myActivityType,
+  myActivityTime,
   locationDetails,
   locationIcon,
   navigate,
@@ -17,10 +18,12 @@ export default function RecentRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-        <UseAvatar name={owner} avatar={avatar} size={24} /> {owner}
+        {myActivityTime !== null ? `${myActivityTime} · ${myActivityType} by me` : ''}
       </div>
 
-      <div className="gd-list-row-cell md:text-[11px]">{lastModified}</div>
+      <div className="gd-list-row-cell md:text-[11px]">
+        <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14}/> {owner}
+      </div>
 
       <div className="gd-list-row-cell md:text-[11px]">{size}</div>
 

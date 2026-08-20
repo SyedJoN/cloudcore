@@ -78,7 +78,6 @@ const fileSchema = new Schema(
       },
     },
 
-    // Specific users this resource has been directly shared with
     sharedWith: {
       type: [sharedWithSchema],
       default: [],
@@ -99,19 +98,18 @@ const fileSchema = new Schema(
       default: true,
     },
 
-    viewedByMeTime: {
+    trashedTime: {
       type: Date,
-      default: Date.now,
       index: true,
     },
-   trashedTime: {
-    type: Date,
-    index: true
-   },
     modifiedTime: {
       type: Date,
       default: Date.now,
       index: true,
+    },
+    lastModifyingUser: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   {
