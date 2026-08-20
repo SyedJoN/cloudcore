@@ -11,7 +11,6 @@ import {
   IconNewTab,
   IconLink,
   IconRestore,
-  IconMove,
 } from "../Icons/Icons";
 
 import { useToast } from "../../Contexts/ToastContext";
@@ -25,6 +24,7 @@ import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { FolderOpenIcon, StarIcon } from "@heroicons/react/24/outline";
 
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { FolderInput } from "lucide-react";
 
 /*
    SUB MENU
@@ -107,8 +107,7 @@ function ContextMenuContent({
   openLeft,
   item,
   position,
-  isGoogleDriveRoute,
-  isTrashRoute,
+  route,
   isStarred,
   dirId,
   onClose,
@@ -161,6 +160,9 @@ function ContextMenuContent({
   }
 
   const isGoogle = Boolean(item.webViewLink);
+  const isSharedRoute = route === "shared";
+  const isGoogleDriveRoute = route === "google-drive";
+  const isTrashRoute = route === "trash";
   const isFile = !item.isDirectory;
 
   const showFileActions = isFile;
@@ -175,7 +177,7 @@ function ContextMenuContent({
   const canDownload = capabilities.canDownload === true;
   const canCopy = true;
   const canMove = capabilities.canMove === true;
-  const canShare = capabilities.canShare === true;
+  const canShare = true;
   const canRename = capabilities.canRename === true;
   const canTrash = capabilities.canTrash === true;
   const canDelete = capabilities.canDelete === true;
@@ -286,42 +288,44 @@ function ContextMenuContent({
           {/* OPEN WITH */}
 
           {showFileActions && !isDeleted && canRead && (
-            <div style={{ position: "relative" }}>
-              <button
-                className="gd-context-item"
-                onMouseEnter={openWithHover.onMouseEnter}
-                onMouseLeave={openWithHover.onMouseLeave}
-              >
-                <IconOpenWith size={18} />
-                <span style={{ flex: 1 }}>Open with</span>
-                <IconChevronRight size={16} />
-              </button>
-
-              <SubMenu
-                open={showOpenWith}
-                openLeft={openLeft}
-                onMouseEnter={openWithHover.onMouseEnter}
-                onMouseLeave={openWithHover.onMouseLeave}
-              >
+            <>
+              <div style={{ position: "relative" }}>
                 <button
                   className="gd-context-item"
-                  onClick={close(() => onPreview(item))}
+                  onMouseEnter={openWithHover.onMouseEnter}
+                  onMouseLeave={openWithHover.onMouseLeave}
                 >
-                  <IconPreview size={18} />
-                  Preview
+                  <IconOpenWith size={18} />
+                  <span style={{ flex: 1 }}>Open with</span>
+                  <IconChevronRight size={16} />
                 </button>
 
-                <button
-                  className="gd-context-item"
-                  onClick={handleOpenInNewTab}
+                <SubMenu
+                  open={showOpenWith}
+                  openLeft={openLeft}
+                  onMouseEnter={openWithHover.onMouseEnter}
+                  onMouseLeave={openWithHover.onMouseLeave}
                 >
-                  <IconNewTab size={18} />
-                  Open in new tab
-                </button>
-              </SubMenu>
-            </div>
+                  <button
+                    className="gd-context-item"
+                    onClick={close(() => onPreview(item))}
+                  >
+                    <IconPreview size={18} />
+                    Preview
+                  </button>
+
+                  <button
+                    className="gd-context-item"
+                    onClick={handleOpenInNewTab}
+                  >
+                    <IconNewTab size={18} />
+                    Open in new tab
+                  </button>
+                </SubMenu>
+              </div>
+              <div className="gd-context-divider" />
+            </>
           )}
-          <div className="gd-context-divider" />
 
           {/* DOWNLOAD */}
 
@@ -347,11 +351,11 @@ function ContextMenuContent({
               </button>
             </>
           )}
-          {/* ------------------------------------------------
+          {/* 
                 COPY
-            ------------------------------------------------ */}
+             */}
 
-          {canCopy && (
+          {canCopy && !isSharedRoute && (
             <button
               className="gd-context-item"
               title="Copy"
@@ -361,7 +365,7 @@ function ContextMenuContent({
               Make a Copy
             </button>
           )}
-          {canTrash && <div className="gd-context-divider" />}
+          <div className="gd-context-divider" />
 
           {/* SHARE */}
 
@@ -421,14 +425,15 @@ function ContextMenuContent({
                 onMouseEnter={organizeHover.onMouseEnter}
                 onMouseLeave={organizeHover.onMouseLeave}
               >
-                <button
-                  className="gd-context-item"
-                  onClick={close(() => onMove(item._id))}
-                >
-                  <IconMove size={18} />
-                  Move
-                </button>
-
+                {!isSharedRoute && (
+                  <button
+                    className="gd-context-item"
+                    onClick={close(() => onMove(item._id))}
+                  >
+                    <FolderInput width={18} height={18}/>
+                    Move
+                  </button>
+                )}
                 {!isGoogleDriveRoute && (
                   <button
                     className="gd-context-item"
@@ -447,16 +452,7 @@ function ContextMenuContent({
             </div>
           )}
 
-          {/* COPY LINK (no Share submenu available) */}
-
-          {!isDeleted && canRead && !canShare && (
-            <button className="gd-context-item" onClick={handleCopyLink}>
-              <IconLink size={18} />
-              Copy link
-            </button>
-          )}
-
-          {canTrash && <div className="gd-context-divider" />}
+          {(canTrash || canDelete) && <div className="gd-context-divider" />}
 
           {/* MOVE TO TRASH */}
 

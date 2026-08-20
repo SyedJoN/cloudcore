@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 import {
   IconClose,
   IconDownload,
@@ -8,23 +8,15 @@ import {
   IconLink,
   IconTrash,
 } from "../../Components/Icons/Icons";
-import { useAuth, useToast } from "../../Contexts";
+import { useToast } from "../../Contexts";
 
-import { DocumentDuplicateIcon, StarIcon } from "@heroicons/react/24/outline";
-import { ArrowTurnDownLeftIcon, StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 export default function SelectionBar({
-  dirId,
   combinedItems,
   selectedItems,
-  isStarred,
-  setIsStarred,
-  hasFileSelected,
   route,
-  onStar,
   onClear,
   onDownload,
-  onCopy,
   onRename,
   onShare,
   onRestore,
@@ -36,7 +28,6 @@ export default function SelectionBar({
   }
 
   const { toast } = useToast();
-  const { user } = useAuth();
 
   // SELECTED ITEM
   const item = combinedItems.find((item) =>
@@ -51,8 +42,6 @@ export default function SelectionBar({
 
   const isGoogle = Boolean(item.webViewLink);
 
-  const isFile = !item.isDirectory;
-
   const isTrashRoute = route === "trash";
 
   const isSharedRoute = route === "shared";
@@ -60,8 +49,6 @@ export default function SelectionBar({
   const isGoogleDriveRoute = route === "google-drive";
 
   const isDeleted = item?.isDeleted;
-
-  const showFileActions = isFile;
 
   // Capabilities
 
@@ -73,17 +60,11 @@ export default function SelectionBar({
 
   const canDownload = capabilities.canDownload === true;
 
-  const canCopy = capabilities.canCopy === true;
-
   const canRename = capabilities.canRename === true;
-
-  const canMove = capabilities.canMove === true;
 
   const canDelete = capabilities.canDelete === true;
 
   const canTrash = capabilities.canTrash === true;
-
-  const canChangeRole = capabilities.canChangeRole === true;
 
   // COPY LINK
 
@@ -157,20 +138,8 @@ export default function SelectionBar({
                 <IconShare size={18} />
               </button>
             )}
+
           
-            {!isGoogle && (
-              <button
-                className="gd-sel-action-btn"
-                title="Star"
-                onClick={onStar}
-              >
-                {isStarred[item._id] ? (
-                  <StarIconSolid className="w-5 h-5" />
-                ) : (
-                  <StarIcon className="w-5 h-5" />
-                )}
-              </button>
-            )}
           </>
         )}
 

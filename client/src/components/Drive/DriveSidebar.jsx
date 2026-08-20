@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowUpOnSquareIcon,
   ArrowUpOnSquareStackIcon,
+  ClockIcon,
   FolderPlusIcon,
   HomeIcon,
   InboxStackIcon,
@@ -17,6 +18,7 @@ import {
   ShareIcon as ShareIconSolid,
   TrashIcon as TrashIconSolid,
   StarIcon as StarIconSolid,
+  ClockIcon as ClockIconSolid
 } from "@heroicons/react/24/solid";
 
 import {
@@ -69,8 +71,8 @@ const NAV_ITEMS = [
     key: "recent",
     label: "Recent",
     path: "/recent",
-    Icon: History,
-    IconSolid: History,
+    Icon: ClockIcon,
+    IconSolid: ClockIconSolid,
     isActive: ({ dirContext }) => dirContext === "recent",
   },
   {

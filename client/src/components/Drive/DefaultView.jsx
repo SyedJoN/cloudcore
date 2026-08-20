@@ -112,7 +112,7 @@ const DefaultView = ({
 
   const FoldersOnTop = viewMode === "grid" && sortConfig.folders === "top";
 
-  const containsDirectory = sortedItems.some(item=> item.isDirectory)
+  const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
   return (
     <div className="gd-drive">

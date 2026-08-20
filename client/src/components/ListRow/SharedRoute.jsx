@@ -1,4 +1,5 @@
 import { UseAvatar } from "../../Hooks/useAvatar";
+import { IconDots } from "../Icons/Icons";
 import RowActions from "./RowActions";
 
 export default function SharedRoute({
@@ -10,19 +11,13 @@ export default function SharedRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-               <UseAvatar name={owner} avatar={avatar} size={24}/> {owner}
-        
+        <UseAvatar name={owner} avatar={avatar} size={24} /> {owner}
       </div>
 
-      <div className="gd-list-row-cell md:text-[11px]">
-        {sharedWithMeTime}
-      </div>
-
-      <div className="gd-list-row-cell md:text-[11px]">
-        {/* Empty column */}
-      </div>
+      <div className="gd-list-row-cell md:text-[11px]">{sharedWithMeTime}</div>
 
       <RowActions {...actionProps} />
+
     </>
   );
 }

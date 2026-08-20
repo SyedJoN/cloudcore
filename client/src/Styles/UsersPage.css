@@ -152,6 +152,21 @@ font-weight: 500;
   background: var(--surface-white);
   border-bottom: 1px solid #e5e7eb;
 }
+.user-files {
+  list-style-type: none;
+}
+.user-files a {
+  color: #000;
+  text-decoration: none;
+}
+
+.user-files a:hover {
+  color: #6d6d6d;
+}
+
+.error-danger {
+  color: rgb(187, 41, 41);
+}
 .input {
   width: 100%;
   padding: 6px 8px;
@@ -249,9 +264,9 @@ font-weight: 500;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-/* ========================= */
-/* 📱 Mobile View (Card Style) */
-/* ========================= */
+
+/*  Mobile View */
+
 
 @media (max-width: 768px) {
   .user-table thead {

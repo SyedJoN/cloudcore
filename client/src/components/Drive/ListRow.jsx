@@ -123,6 +123,7 @@ export default function ListRow({
     isListHovered,
     isDeleted,
 
+    route,
     isGoogleDriveRoute,
 
     canRead,
@@ -149,7 +150,7 @@ export default function ListRow({
 
   return (
     <div
-      className={`gd-list-row ${selected ? "selected" : ""}`}
+      className={`gd-list-row ${selected ? "selected" : ""} ${route === "home" || route === "google-drive" || route === undefined ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"}`}
       data-id={itemId}
       onClick={() => onRowClick(itemId)}
       onMouseEnter={() => setIsListHovered(true)}

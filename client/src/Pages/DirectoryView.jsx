@@ -1149,7 +1149,6 @@ export default function DirectoryView({ route }) {
           { label: "Owner", key: null },
           { label: "Date modified", key: "modifiedTime" },
           { label: "File size", key: null },
-          { label: "", key: null },
         ]
       : isTrashRoute
         ? [
@@ -1158,15 +1157,12 @@ export default function DirectoryView({ route }) {
             { label: "Date trashed", key: "trashedTime" },
             { label: "File size", key: null },
             { label: "Original Location", key: null },
-            { label: "", key: null },
           ]
         : isSharedRoute
           ? [
               { label: "Name", key: "name" },
               { label: "Shared By", key: null },
               { label: "Date Shared", key: "sharedWithMeTime" },
-              { label: "", key: null },
-              { label: "", key: null },
             ]
           : [
               { label: "Name", key: null },
@@ -1174,11 +1170,12 @@ export default function DirectoryView({ route }) {
               { label: "Last modified", key: null },
               { label: "File size", key: null },
               { label: "Location", key: null },
-              { label: "", key: null },
             ];
 
   const listHeaderRow = (
-    <div className="gd-list-header md:text-[11px]">
+    <div
+      className={`gd-list-header ${route === "home" || route === "google-drive" || route === undefined ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"} md:text-[11px]`}
+    >
       {headerColumns.map((column, index) => (
         <span
           key={index}
@@ -1188,18 +1185,18 @@ export default function DirectoryView({ route }) {
           {column.label}
           {sortConfig.key === column.key &&
             (sortConfig.direction === "asc" ? (
-              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-[4px]">
+              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-1">
                 <ArrowUpIcon className="text-[#06062f] w-5 h-5" />
               </div>
             ) : (
-              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-[4px]">
+              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-1">
                 <ArrowDownIcon className="text-[#06062f] w-5 h-5" />
               </div>
             ))}
         </span>
       ))}
 
-      {!isRecentRoute && !isStarredRoute && (
+      {!isRecentRoute && (
         <SortButton sortConfig={sortConfig} setSortConfig={setSortConfig} />
       )}
     </div>
@@ -1473,20 +1470,12 @@ export default function DirectoryView({ route }) {
         combinedItems={combinedItems}
         selectedItems={selectedItems}
         hasFileSelected={hasFileSelected}
-        isStarred={isStarred}
-        setIsStarred={setIsStarred}
         route={route}
         onClear={() => {
           clearSelection();
           setContextItem(null);
         }}
-        onStar={async () => {
-          const items = combinedItems.filter((item) =>
-            selectedItems.has(item.id ?? item._id),
-          );
-          if (!items.length) return;
-          await handleToggleStar(items);
-        }}
+      
         onDownload={() => {
           selectedItems.forEach((id) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1547,8 +1536,7 @@ export default function DirectoryView({ route }) {
         openLeft={openLeft}
         item={contextItem}
         position={contextPos}
-        isGoogleDriveRoute={isGoogleDriveRoute}
-        isTrashRoute={isTrashRoute}
+        route={route}
         isStarred={isStarred}
         dirId={dirId}
         viewMode={viewMode}
@@ -1634,13 +1622,13 @@ export default function DirectoryView({ route }) {
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
-            onStar={async () => {
-          const items = combinedItems.filter((item) =>
-            selectedItems.has(item.id ?? item._id),
-          );
-          if (!items.length) return;
-          await handleToggleStar(items);
-        }}
+          onStar={async () => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
+            if (!items.length) return;
+            await handleToggleStar(items);
+          }}
           onShare={() => {
             const id = [...selectedItems][0];
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);

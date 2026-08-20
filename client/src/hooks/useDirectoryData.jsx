@@ -152,16 +152,16 @@ export function useDirectoryData({
     },
     [dirId, isTrashRoute],
   );
+  const q = searchQuery.trim().toLowerCase();
 
   const combinedItems = useMemo(
     () => [
-      ...directoriesList.map((d) => ({ ...d, isDirectory: true })),
-      ...filesList.map((f) => ({ ...f, isDirectory: false })),
+      ...directoriesList.map((d) => ({ ...d, isDirectory: true })).filter((item)=> !q || item.name.toLowerCase().includes(q)),
+      ...filesList.map((f) => ({ ...f, isDirectory: false })).filter((item)=> !q || item.name.toLowerCase().includes(q)),
     ],
-    [directoriesList, filesList],
+    [directoriesList, filesList, q],
   );
 
-  const q = searchQuery.trim().toLowerCase();
 
   const filteredFiles = useMemo(
     () =>

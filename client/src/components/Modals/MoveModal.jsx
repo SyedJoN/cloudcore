@@ -5,6 +5,7 @@ import FileBadge from "../File/FileBadge";
 import { getFileIcon } from "../../../Utils/displayUtils";
 import { moveItem } from "../../../apis/resourceApi";
 import { useToast } from "../../Contexts";
+import { FolderIcon, InboxIcon, UsersIcon } from "@heroicons/react/24/solid";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -29,12 +30,18 @@ export default function MoveModal({
 
   const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
 
-
   const isSameLocation =
     currentCrumb.id === currentDirId ||
     (currentCrumb.id === null && !currentDirId);
 
   const isEmpty = folders.length === 0 && files.length === 0 && !isCreating;
+
+  const locationIcon =
+    currentCrumb.name === "My Drive" ? (
+      <InboxIcon className="w-5 h-5" />
+    ) : (
+      <FolderIcon className="w-5 h-5" />
+    );
 
   useEffect(() => {
     loadFolders(currentCrumb.id);
@@ -79,7 +86,7 @@ export default function MoveModal({
       if (isSameLocation) {
         setDirectoriesList((prev) => [response.data, ...prev]);
       }
-      setFolders((prev)=> [response.data, ...prev])
+      setFolders((prev) => [response.data, ...prev]);
     } catch (_) {}
   }
 
@@ -88,7 +95,7 @@ export default function MoveModal({
     try {
       const message = await moveItem({
         item,
-        destinationId: currentCrumb.id && currentCrumb.id || rootDirId,
+        destinationId: (currentCrumb.id && currentCrumb.id) || rootDirId,
         destinationName: currentCrumb.name,
       });
       onClose();
@@ -112,14 +119,12 @@ export default function MoveModal({
   return (
     <div className="gd-modal-overlay" onClick={onClose}>
       <div className="mv-modal" onClick={(e) => e.stopPropagation()}>
-  
         <div className="mv-header">
           <span className="mv-title">Move "{item?.name}"</span>
           <button className="gd-icon-btn" onClick={onClose}>
             <IconClose size={18} />
           </button>
         </div>
-
 
         <div className="mv-breadcrumb">
           {breadcrumbs.map((crumb, i) => {
@@ -132,7 +137,14 @@ export default function MoveModal({
                       className="mv-breadcrumb-btn"
                       onClick={() => navigateTo(i)}
                     >
-                      {crumb.name}
+                      <span className="mv-breadcrumb-current">
+                        {crumb.name === "My Drive" ? (
+                          <InboxIcon className="w-5 h-5" />
+                        ) : (
+                          <FolderIcon className="w-5 h-5" />
+                        )}
+                        {crumb.name}
+                      </span>
                     </button>
                     <IconChevronDown
                       size={14}
@@ -144,14 +156,18 @@ export default function MoveModal({
                     />
                   </>
                 ) : (
-                  <span className="mv-breadcrumb-current">{crumb.name}</span>
+                  <>
+                    <span className="mv-breadcrumb-current">
+                     {locationIcon}
+                      {crumb.name}
+                    </span>
+                  </>
                 )}
               </span>
             );
           })}
         </div>
 
- 
         <div className="mv-folder-list">
           {isLoading ? (
             <div className="mv-loading">
@@ -161,7 +177,6 @@ export default function MoveModal({
             <div className="mv-empty">No items in this location</div>
           ) : (
             <>
-           
               {folders.map((folder) => (
                 <div
                   key={folder._id}
@@ -189,7 +204,6 @@ export default function MoveModal({
                 </div>
               ))}
 
-      
               {files.map((file) => (
                 <div key={file._id} className="mv-folder-row mv-file-row">
                   <FileBadge type={getFileIcon(file.name)} />
@@ -201,7 +215,6 @@ export default function MoveModal({
             </>
           )}
 
- 
           {isCreating && (
             <form className="mv-new-folder-row" onSubmit={handleCreateFolder}>
               <IconFolder
@@ -234,7 +247,6 @@ export default function MoveModal({
           )}
         </div>
 
-    
         <div className="mv-footer">
           <button
             className="mv-new-folder-btn"

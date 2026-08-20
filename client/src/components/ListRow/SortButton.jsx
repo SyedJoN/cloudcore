@@ -35,7 +35,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
   };
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className="relative ml-auto">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}

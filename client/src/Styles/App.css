@@ -1,13 +1,71 @@
-
 @import url("https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&family=Roboto:wght@300;400;500&display=swap");
 
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
-
 :root {
   --font-main: "Google Sans", "Roboto", sans-serif;
-  
+
+  --scrollbar-color: #aaa;
+  --surface: #f0f4f9;
+  --surface-white: #ffffff;
+  --surface-container: #f8fafd;
+  --surface-container-primary: #c2e7ff;
+  --surface-container-dark: #e9eef6;
+  --surface-container-dark-hover: #f6fafe;
+  --btn-bg-medium: rgba(32, 33, 36, 0.08);
+  --border-inverse: #000000;
+  --border: #e0e0e0;
+  --border-hover: #dadce0;
+  --text-primary: #202124;
+  --text-secondary: #444746;
+  --text-tertiary: #80868b;
+  --text-bright: #c4c7c5;
+  --accent-blue: #1a73e8;
+  --accent-blue-hover-dark: #add1e9;
+  --accent-blue-hover: #1765cc;
+  --accent-blue-light: #c2e7ff;
+  --accent-blue-light-hover: #cee6f6;
+  --btn-hover-primary: rgba(32, 33, 36, 0.08);
+  --sidebar-width: 256px;
+  --header-height: 64px;
+  --chip-height: 36px;
+  --shadow-1:
+    0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow-2:
+    0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-dynamic:
+    0 1px 2px 0 rgba(95, 99, 101, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --folder-color: #5f6368;
+  --transition: 0.15s ease;
 }
+.dark {
+  --surface-container: #1b1b1b;
+  --surface-container-dark-hover: #424445;
+  --surface-white: #131314;
+  --accent-blue: #c2e7ff;
+  --accent-blue-light: #004a77;
+  --accent-blue-hover-dark: #023f65;
+  --text-primary: #e3e3e3;
+  --text-secondary: #c4c7c5;
+  --surface-container-dark: #282a2c;
+  --shadow-1: none;
+  --shadow-dynamic:
+    0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --border-inverse: #cdc9c9;
+  --border: #5f6368;
+  --btn-hover-primary: rgba(173, 173, 173, 0.24);
+  --btn-bg-medium: #37393b;
+}
+body {
+  font-family: var(--font-main);
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
 body {
   margin: 0;
   font-family: var(--font-main);
@@ -31,21 +89,6 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-.user-files {
-  list-style-type: none;
-}
-.user-files a {
-  color: #000;
-  text-decoration: none;
-}
-
-.user-files a:hover {
-  color: #6d6d6d;
-}
-/**** ERROR ****/
-.error-danger {
-  color: rgb(187, 41, 41)
-}
 
 @keyframes spin {
   to {
@@ -53,6 +96,12 @@ body {
   }
 }
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
