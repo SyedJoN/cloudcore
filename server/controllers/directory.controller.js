@@ -947,9 +947,15 @@ export const softDeleteDirectory = async (req, res, next) => {
 
     await Promise.all([
       allFileIds.length
-        ? File.updateMany({ _id: { $in: allFileIds } }, { isDeleted: true, trashedTime: Date.now() })
+        ? File.updateMany(
+            { _id: { $in: allFileIds } },
+            { isDeleted: true, trashedTime: Date.now() },
+          )
         : Promise.resolve(),
-      Directory.updateMany({ _id: { $in: allDirIds } }, { isDeleted: true, trashedTime: Date.now() }),
+      Directory.updateMany(
+        { _id: { $in: allDirIds } },
+        { isDeleted: true, trashedTime: Date.now() },
+      ),
     ]);
     await updateParentDirSize(
       currentDirectory.parentDirId,
@@ -2641,4 +2647,148 @@ export const copyItem = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+export const moveItem = async (req, res, next) => {
+  const { item, destinationId, destinationName } = req.body;
+
+  if (!item || !destinationId || !destinationName) {
+    return res.status(400).json({
+      message: "Invalid or missing ids",
+    });
+  }
+
+  let itemToBeMoved = await File.findById(item._id);
+  let type = "file";
+
+  if (!itemToBeMoved) {
+    itemToBeMoved = await Directory.findById(item._id);
+    type = "folder";
+  }
+
+  if (!itemToBeMoved) {
+    return res.status(404).json({
+      message: `Invalid ${item.isDirectory ? "Folder" : "File"} ID`,
+    });
+  }
+
+  if (itemToBeMoved.parentDirId == null) {
+    return res.status(400).json({
+      message: "Root items cannot be moved",
+    });
+  }
+
+  const oldParentId = itemToBeMoved.parentDirId;
+
+  if (type === "file") {
+    const path = [...(itemToBeMoved.path || [])];
+
+    if (path.length > 0) {
+      path[path.length - 1] = destinationId;
+    } else {
+      path.push(destinationId);
+    }
+
+    itemToBeMoved.parentDirId = destinationId;
+    itemToBeMoved.path = path;
+
+    await fgaClient.write({
+      writes: [
+        {
+          user: `folder:${destinationId}`,
+          relation: "parent",
+          object: `file:${itemToBeMoved._id}`,
+        },
+      ],
+      deletes: [
+        {
+          user: `folder:${oldParentId}`,
+          relation: "parent",
+          object: `file:${itemToBeMoved._id}`,
+        },
+      ],
+    });
+
+    await itemToBeMoved.save();
+  }
+
+  else {
+    const oldPath = [...(itemToBeMoved.path || [])];
+
+    const newPath = [...oldPath];
+
+    if (newPath.length > 0) {
+      newPath[newPath.length - 1] = destinationId;
+    } else {
+      newPath.push(destinationId);
+    }
+
+    const descendants = await Promise.all([
+      Directory.find({
+        path: { $in: [itemToBeMoved._id] },
+      }),
+
+      File.find({
+        path: { $in: [itemToBeMoved._id] },
+      }),
+    ]);
+
+    const [childFolders, childFiles] = descendants;
+
+    itemToBeMoved.parentDirId = destinationId;
+    itemToBeMoved.path = newPath;
+
+    await itemToBeMoved.save();
+
+    await fgaClient.write({
+      writes: [
+        {
+          user: `folder:${destinationId}`,
+          relation: "parent",
+          object: `folder:${itemToBeMoved._id}`,
+        },
+      ],
+      deletes: [
+        {
+          user: `folder:${oldParentId}`,
+          relation: "parent",
+          object: `folder:${itemToBeMoved._id}`,
+        },
+      ],
+    });
+
+    for (const child of childFolders) {
+      const relativePath = child.path.slice(
+        oldPath.length
+      );
+
+      child.path = [
+        ...newPath,
+        itemToBeMoved._id,
+        ...relativePath,
+      ];
+
+      await child.save();
+    }
+
+    for (const file of childFiles) {
+      const relativePath = file.path.slice(
+        oldPath.length
+      );
+
+      file.path = [
+        ...newPath,
+        itemToBeMoved._id,
+        ...relativePath,
+      ];
+
+      await file.save();
+    }
+  }
+
+  return res.status(200).json({
+    message: `${
+      type === "folder" ? "Folder" : "File"
+    } moved to ${destinationName} successfully`,
+  });
 };

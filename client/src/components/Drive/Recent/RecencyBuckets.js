@@ -56,9 +56,7 @@ const FIXED_ORDER = [
 export function groupItemsByRecency(items) {
   const buckets = new Map();
 
-  const sorted = [...items].sort(
-    (a, b) => (getLastActivityTime(b) ?? 0) - (getLastActivityTime(a) ?? 0),
-  );
+  const sorted = [...items]
 
   for (const item of sorted) {
     const bucket = getRecencyBucket(getLastActivityTime(item));

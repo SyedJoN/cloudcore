@@ -11,7 +11,7 @@ import {
 import { useAuth, useToast } from "../../Contexts";
 
 import { DocumentDuplicateIcon, StarIcon } from "@heroicons/react/24/outline";
-import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { ArrowTurnDownLeftIcon, StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 export default function SelectionBar({
   dirId,
@@ -157,12 +157,7 @@ export default function SelectionBar({
                 <IconShare size={18} />
               </button>
             )}
-
-            {/* 
-                STAR
-                Local only
-           */}
-
+          
             {!isGoogle && (
               <button
                 className="gd-sel-action-btn"

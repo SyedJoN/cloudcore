@@ -63,3 +63,12 @@ export async function copyItem({ item, type, providerType }) {
 
   return data;
 }
+export async function moveItem({ item, destinationId, destinationName }) {
+  const { data } = await axiosWithCreds.post(`/item/move`, {
+    item,
+    destinationId,
+    destinationName
+  });
+
+  return data.message;
+}

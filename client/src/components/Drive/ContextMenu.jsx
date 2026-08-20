@@ -11,6 +11,7 @@ import {
   IconNewTab,
   IconLink,
   IconRestore,
+  IconMove,
 } from "../Icons/Icons";
 
 import { useToast } from "../../Contexts/ToastContext";
@@ -21,6 +22,9 @@ import {
 } from "../../hooks/useFloatingMenu";
 import { useAuth } from "../../Contexts";
 import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import { FolderOpenIcon, StarIcon } from "@heroicons/react/24/outline";
+
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 /*
    SUB MENU
@@ -105,6 +109,7 @@ function ContextMenuContent({
   position,
   isGoogleDriveRoute,
   isTrashRoute,
+  isStarred,
   dirId,
   onClose,
   onShare,
@@ -114,6 +119,8 @@ function ContextMenuContent({
   onRestore,
   onDownload,
   onCopy,
+  onMove,
+  onStar,
   onPreview,
 }) {
   const { animate, nodeRef, onTransitionEnd } = useTransitionClass(
@@ -125,9 +132,11 @@ function ContextMenuContent({
 
   const [showOpenWith, setShowOpenWith] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showOrganize, setShowOrganize] = useState(false);
 
   const openWithHover = useHoverIntent(setShowOpenWith);
   const shareHover = useHoverIntent(setShowShare);
+  const organizeHover = useHoverIntent(setShowOrganize);
 
   useEffect(() => {
     function handleClick(e) {
@@ -162,9 +171,10 @@ function ContextMenuContent({
 
   const capabilities = item.capabilities || {};
 
-  const canRead = capabilities.canRead === true;
+  const canRead = isGoogle ? true : capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
   const canCopy = true;
+  const canMove = capabilities.canMove === true;
   const canShare = capabilities.canShare === true;
   const canRename = capabilities.canRename === true;
   const canTrash = capabilities.canTrash === true;
@@ -259,8 +269,6 @@ function ContextMenuContent({
 
           {canDelete && (
             <>
-              <div className="gd-context-divider" />
-
               <button
                 className="gd-context-item danger"
                 onClick={close(() =>
@@ -313,6 +321,47 @@ function ContextMenuContent({
               </SubMenu>
             </div>
           )}
+          <div className="gd-context-divider" />
+
+          {/* DOWNLOAD */}
+
+          {!isDeleted && canDownload && (
+            <button
+              className="gd-context-item"
+              onClick={close(() => onDownload(item))}
+            >
+              <IconDownload size={18} />
+              Download
+            </button>
+          )}
+          {/* RENAME */}
+
+          {!isDeleted && canRename && (
+            <>
+              <button
+                className="gd-context-item"
+                onClick={close(() => onRename(item))}
+              >
+                <IconRename size={18} />
+                Rename
+              </button>
+            </>
+          )}
+          {/* ------------------------------------------------
+                COPY
+            ------------------------------------------------ */}
+
+          {canCopy && (
+            <button
+              className="gd-context-item"
+              title="Copy"
+              onClick={close(() => onCopy(item))}
+            >
+              <DocumentDuplicateIcon className="w-5 h-5" />
+              Make a Copy
+            </button>
+          )}
+          {canTrash && <div className="gd-context-divider" />}
 
           {/* SHARE */}
 
@@ -352,6 +401,52 @@ function ContextMenuContent({
             </div>
           )}
 
+          {/* Move */}
+
+          {!isDeleted && canMove && !isGoogleDriveRoute && (
+            <div style={{ position: "relative" }}>
+              <button
+                className="gd-context-item"
+                onMouseEnter={organizeHover.onMouseEnter}
+                onMouseLeave={organizeHover.onMouseLeave}
+              >
+                <FolderOpenIcon className="w-5 h-5" />
+                <span style={{ flex: 1 }}>Organize</span>
+                <IconChevronRight size={16} />
+              </button>
+
+              <SubMenu
+                open={showOrganize}
+                openLeft={openLeft}
+                onMouseEnter={organizeHover.onMouseEnter}
+                onMouseLeave={organizeHover.onMouseLeave}
+              >
+                <button
+                  className="gd-context-item"
+                  onClick={close(() => onMove(item._id))}
+                >
+                  <IconMove size={18} />
+                  Move
+                </button>
+
+                {!isGoogleDriveRoute && (
+                  <button
+                    className="gd-context-item"
+                    title="Star"
+                    onClick={onStar}
+                  >
+                    {isStarred[item._id] ? (
+                      <StarIconSolid className="w-5 h-5" />
+                    ) : (
+                      <StarIcon className="w-5 h-5" />
+                    )}
+                    Add to starred
+                  </button>
+                )}
+              </SubMenu>
+            </div>
+          )}
+
           {/* COPY LINK (no Share submenu available) */}
 
           {!isDeleted && canRead && !canShare && (
@@ -361,46 +456,7 @@ function ContextMenuContent({
             </button>
           )}
 
-          {/* DOWNLOAD */}
-
-          {!isDeleted && canDownload && (
-            <button
-              className="gd-context-item"
-              onClick={close(() => onDownload(item))}
-            >
-              <IconDownload size={18} />
-              Download
-            </button>
-          )}
-        {/* ------------------------------------------------
-                COPY
-            ------------------------------------------------ */}
-
-            {canCopy && (
-              <button
-                className="gd-context-item"
-                title="Copy"
-                onClick={close(() => onCopy(item))}
-              >
-                <DocumentDuplicateIcon className="w-5 h-5" />
-                Make a Copy
-              </button>
-            )}
-          {/* RENAME */}
-
-          {!isDeleted && canRename && (
-            <>
-              <button
-                className="gd-context-item"
-                onClick={close(() => onRename(item))}
-              >
-                <IconRename size={18} />
-                Rename
-              </button>
-
-              {canTrash && <div className="gd-context-divider" />}
-            </>
-          )}
+          {canTrash && <div className="gd-context-divider" />}
 
           {/* MOVE TO TRASH */}
 

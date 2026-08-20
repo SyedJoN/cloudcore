@@ -15,16 +15,17 @@ import TrashRoute from "../ListRow/TrashRoute";
 
 export default function ListRow({
   item,
+  sortConfig,
+  setSortConfig,
   onStar,
   isStarred,
   setIsStarred,
   route,
   owner,
-  dirId,
+  avatar,
   onRowClick,
   onDoubleClick,
   onDownload,
-  handleSelect,
   onRename,
   onShare,
   selected,
@@ -142,6 +143,8 @@ export default function ListRow({
     onContextMenu,
 
     selected,
+    sortConfig,
+    setSortConfig,
   };
 
   return (
@@ -178,6 +181,7 @@ export default function ListRow({
         <HomeRoute
           {...commonRouteProps}
           owner={owner}
+          avatar={avatar}
           lastModified={lastModified}
           size={size}
         />
@@ -185,13 +189,15 @@ export default function ListRow({
         <SharedRoute
           {...commonRouteProps}
           owner={owner}
+          avatar={avatar}
           sharedWithMeTime={sharedWithMeTime}
         />
       ) : isTrashRoute ? (
-        <TrashRoute 
-         {...commonRouteProps}
+        <TrashRoute
+          {...commonRouteProps}
           locationIcon={locationIcon}
           owner={owner}
+          avatar={avatar}
           trashedTime={trashedTime}
           size={size}
           locationDetails={locationDetails}
@@ -202,6 +208,7 @@ export default function ListRow({
           {...commonRouteProps}
           locationIcon={locationIcon}
           owner={owner}
+          avatar={avatar}
           lastModified={lastModified}
           size={size}
           locationDetails={locationDetails}

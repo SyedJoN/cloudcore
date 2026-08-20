@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 function CreateDirectoryModal({
-  newDirname,
+  value,
   setNewDirname,
   onClose,
   onCreateDirectory,
@@ -44,7 +44,7 @@ function CreateDirectoryModal({
             type="text"
             className="modal-input"
             placeholder="Enter folder name"
-            value={newDirname}
+            value={value}
             onChange={(e) => setNewDirname(e.target.value)}
           />
           <div className="gd-modal-actions">

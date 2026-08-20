@@ -100,7 +100,7 @@ export default function GridItem({
         }}
       >
         {item.isDirectory ? (
-          <IconFolder size={16} style={{ color: "#5f6368", flexShrink: 0 }} />
+          <IconFolder size={24} style={{ color: "#5f6368", flexShrink: 0 }} />
         ) : (
           <FileBadge type={iconType} />
         )}

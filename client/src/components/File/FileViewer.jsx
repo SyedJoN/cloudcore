@@ -25,19 +25,22 @@ import getCategory from "../../../Utils/getFileCategory";
 import { useAuth, useToast } from "../../Contexts";
 import getExt from "../../../Utils/getExtension";
 
-const BASE_URL = "http://localhost:4000";
+import { StarIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
-// ─── FileViewer ───────────────────────────────────────────────────────────────
+const BASE_URL = "http://localhost:4000";
 
 export default function FileViewer({
   item,
   onClose,
   onShare,
   onNavigate,
+  isStarred,
   files = [],
   isSharedRoute,
   onTrash,
   onRename,
+  onStar,
   onDownload,
   onRestore,
   onDeleteForever,
@@ -47,9 +50,9 @@ export default function FileViewer({
   const { refreshUser } = useAuth();
   const { toast } = useToast();
 
-  // ---------------------------------------------------------------------------
   // BASIC ITEM INFO
-  // ---------------------------------------------------------------------------
+
+  const isGoogle = Boolean(item.webViewLink);
 
   const isDeleted = item?.isDeleted;
 
@@ -61,15 +64,7 @@ export default function FileViewer({
     ? item?.webContentLink || item?.webViewLink
     : `${BASE_URL}/file/${item?._id}`;
 
-  // ---------------------------------------------------------------------------
   // CAPABILITIES
-  //
-  // Backend is now the single source of truth for BOTH:
-  //   - local files
-  //   - Google Drive files
-  //
-  // Do not calculate permissions from owners/userRole/permissions here.
-  // ---------------------------------------------------------------------------
 
   const capabilities = item?.capabilities ?? {};
 
@@ -85,15 +80,15 @@ export default function FileViewer({
 
   const canRename = capabilities.canRename === true;
 
-  const canMove = capabilities.canMove === true || capabilities.canMoveItemWithinDrive === true;
+  const canMove =
+    capabilities.canMove === true ||
+    capabilities.canMoveItemWithinDrive === true;
 
   const canTrash = capabilities.canTrash === true;
 
   const canDelete = capabilities.canDelete === true;
 
-  // ---------------------------------------------------------------------------
   // NAVIGATION
-  // ---------------------------------------------------------------------------
 
   const currentIndex = files?.findIndex(
     (file) => String(file?._id ?? file?.id) === String(item?._id ?? item?.id),
@@ -103,9 +98,7 @@ export default function FileViewer({
 
   const hasNext = currentIndex >= 0 && currentIndex < files.length - 1;
 
-  // ---------------------------------------------------------------------------
   // KEYBOARD NAVIGATION
-  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     const handler = (event) => {
@@ -131,9 +124,7 @@ export default function FileViewer({
     };
   }, [onClose, onNavigate, files, currentIndex, hasPrev, hasNext]);
 
-  // ---------------------------------------------------------------------------
   // LOCK BODY SCROLL
-  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     document.body.classList.add("gd-overlay-open");
@@ -143,17 +134,13 @@ export default function FileViewer({
     };
   }, []);
 
-  // ---------------------------------------------------------------------------
   // REFRESH USER
-  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     refreshUser?.();
   }, []);
 
-  // ---------------------------------------------------------------------------
   // COPY LINK
-  // ---------------------------------------------------------------------------
 
   const handleCopyLink = async () => {
     const url =
@@ -179,9 +166,7 @@ export default function FileViewer({
     }
   };
 
-  // ---------------------------------------------------------------------------
   // VIEWER
-  // ---------------------------------------------------------------------------
 
   const renderViewer = () => {
     if (isGDrive) {
@@ -223,9 +208,7 @@ export default function FileViewer({
     }
   };
 
-  // ---------------------------------------------------------------------------
   // FILE EXTENSION / BADGE
-  // ---------------------------------------------------------------------------
 
   const ext = getExt(item?.name || "").toUpperCase();
 
@@ -243,9 +226,7 @@ export default function FileViewer({
 
   const badgeColor = categoryColors[category] || "#5f6368";
 
-  // ---------------------------------------------------------------------------
   // ITEM CHECK
-  // ---------------------------------------------------------------------------
 
   if (!item) {
     return null;
@@ -360,7 +341,19 @@ export default function FileViewer({
               <IconShare size={20} />
             </button>
           )}
-
+          {!isGoogle && (
+            <button
+              className="fv-action-btn gd-icon-btn"
+              title="Star"
+              onClick={onStar}
+            >
+              {isStarred[item._id] ? (
+                <StarIconSolid className="w-5 h-5" />
+              ) : (
+                <StarIcon className="w-5 h-5" />
+              )}
+            </button>
+          )}
           {/* Copy link */}
 
           {!isDeleted && canRead && (

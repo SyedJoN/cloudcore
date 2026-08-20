@@ -16,7 +16,7 @@ import {
   InboxStackIcon as InboxStackIconSolid,
   ShareIcon as ShareIconSolid,
   TrashIcon as TrashIconSolid,
-  StarIcon as StarIconSolid
+  StarIcon as StarIconSolid,
 } from "@heroicons/react/24/solid";
 
 import {
@@ -73,7 +73,7 @@ const NAV_ITEMS = [
     IconSolid: History,
     isActive: ({ dirContext }) => dirContext === "recent",
   },
-   {
+  {
     key: "starred",
     label: "Starred",
     path: "/starred",
@@ -142,7 +142,7 @@ function NewMenu({
     <>
       <div
         ref={menuRef}
-        className="gd-menu"
+        className="gd-menu origin-top animate-[sortDropdown_80ms_ease-out]"
         style={{
           position: "fixed",
           left: rect.left,
@@ -169,7 +169,7 @@ function NewMenu({
           <ArrowUpOnSquareIcon className="text-(--border-inverse) w-5 h-5" />
           File upload
         </button>
-      <button
+        <button
           className="gd-context-item"
           onClick={close(() => onUploadFolders())}
           disabled={disabled}
@@ -318,8 +318,6 @@ export default function DriveSidebar({
             </button>
           );
         })}
-
-       
       </nav>
 
       {/* Storage */}

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import "./RecentFilters.css";
-import { CATEGORY_LABELS } from "./itemCategory";
+import { CATEGORY_LABELS } from "./ItemCategory";
 
 const TYPE_OPTIONS = Object.entries(CATEGORY_LABELS).map(([key, label]) => ({
   key,

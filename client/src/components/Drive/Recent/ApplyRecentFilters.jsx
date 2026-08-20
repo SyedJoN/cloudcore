@@ -1,5 +1,6 @@
-import { getItemCategory } from "./itemCategory";
-import { getLastActivityTime } from "./recencyBuckets";
+
+import { getItemCategory } from "./itemCategory.js";
+import { getLastActivityTime } from "./RecencyBuckets.js";
 
 const DAY = 86400000;
 

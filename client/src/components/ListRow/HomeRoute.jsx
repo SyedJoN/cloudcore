@@ -1,7 +1,8 @@
+import { UseAvatar } from "../../Hooks/useAvatar";
 import RowActions from "./RowActions";
-
 export default function HomeRoute({
   owner,
+  avatar,
   lastModified,
   size,
   ...actionProps
@@ -9,7 +10,7 @@ export default function HomeRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-        {owner}
+       <UseAvatar name={owner} avatar={avatar} size={24}/> {owner}
       </div>
 
       <div className="gd-list-row-cell md:text-[11px]">
@@ -21,6 +22,7 @@ export default function HomeRoute({
       </div>
 
       <RowActions {...actionProps} />
+    
     </>
   );
 }

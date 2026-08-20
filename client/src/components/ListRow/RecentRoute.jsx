@@ -1,8 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import RowActions from "./RowActions";
+import { UseAvatar } from "../../Hooks/useAvatar";
 
 export default function RecentRoute({
   owner,
+  avatar,
   lastModified,
   size,
   locationDetails,
@@ -14,7 +16,9 @@ export default function RecentRoute({
 
   return (
     <>
-      <div className="gd-list-row-cell md:text-[11px]">{owner}</div>
+      <div className="gd-list-row-cell md:text-[11px]">
+        <UseAvatar name={owner} avatar={avatar} size={24} /> {owner}
+      </div>
 
       <div className="gd-list-row-cell md:text-[11px]">{lastModified}</div>
 

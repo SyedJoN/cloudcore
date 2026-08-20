@@ -49,16 +49,31 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     [combinedItems],
   );
 
-  const handleMainMouseDown = useCallback(
-    (e) => {
-      if (e.target.closest(".gd-grid-item, .gd-list-row, .gd-context-menu")) return;
-      clearSelection();
-      setContextItem(null);
-      const { clientX, clientY } = e;
-      setDragBox({ x1: clientX, y1: clientY, x2: clientX, y2: clientY });
-    },
-    [clearSelection],
-  );
+const handleMainMouseDown = useCallback(
+  (e) => {
+    if (
+      e.target.closest(
+        ".gd-grid-item, .gd-list-row, .gd-context-menu, .gd-modal-overlay"
+      )
+    ) {
+      return;
+    }
+
+    clearSelection();
+    setContextItem(null);
+
+    const { clientX, clientY } = e;
+
+    setDragBox({
+      x1: clientX,
+      y1: clientY,
+      x2: clientX,
+      y2: clientY,
+    });
+  },
+  [clearSelection],
+);
+
 
   const handleMainMouseMove = useCallback(
     (e) => {

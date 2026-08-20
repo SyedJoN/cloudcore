@@ -59,6 +59,14 @@ import DownloadTray from "../Components/Drive/DownloadTray";
 import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
 import { addDirectory } from "../../apis/directoryApi";
 import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
+import {
+  ArrowDownCircleIcon,
+  ArrowDownIcon,
+  ArrowUpCircleIcon,
+  ArrowUpIcon,
+} from "@heroicons/react/24/solid";
+import SortButton from "../Components/ListRow/SortButton";
+import MoveModal from "../Components/Modals/MoveModal";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -103,13 +111,14 @@ export default function DirectoryView({ route }) {
   const [linkRole, setLinkRole] = useState("");
   const [viewMode, setViewMode] = useState("grid");
   const [showCreateDir, setShowCreateDir] = useState(false);
-  const [newDirname, setNewDirname] = useState("New Folder");
+  const [newDirname, setNewDirname] = useState("Untitled folder");
   const [showRename, setShowRename] = useState(false);
   const [renameType, setRenameType] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [shareItem, setShareItem] = useState(null);
   const [viewItem, setViewItem] = useState(null);
+  const [moveItem, setMoveItem] = useState(null);
   const [isRenameLoading, setIsRenameLoading] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -631,8 +640,8 @@ export default function DirectoryView({ route }) {
     try {
       const response = await addDirectory(dirId, newDirname, type);
       setShowCreateDir(false);
-      setNewDirname("New Folder");
-      setDirectoriesList((prev) => [...prev, response.data].reverse());
+      setNewDirname("Untitled folder");
+      setDirectoriesList((prev) => [response.data, ...prev]);
     } catch (err) {
       showError(err.message);
     }
@@ -1121,21 +1130,81 @@ export default function DirectoryView({ route }) {
       );
     }
   }
+  const [sortConfig, setSortConfig] = useState({
+    key: "name",
+    direction: "asc",
+    folders: "top",
+  });
 
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
   const headerColumns =
     isHomeRoute || isGoogleDriveRoute || route === undefined
-      ? ["Name", "Owner", "Date modified", "File size", ""] 
-      : isTrashRoute ? ["Name", "Owner", "Date trashed", "File size", "Original Location", ""] : isSharedRoute
-        ? ["Name", "Shared By", "Date Shared", "", ""]
-        : ["Name", "Owner", "Last modified", "File size", "Location", ""];
+      ? [
+          { label: "Name", key: "name" },
+          { label: "Owner", key: null },
+          { label: "Date modified", key: "modifiedTime" },
+          { label: "File size", key: null },
+          { label: "", key: null },
+        ]
+      : isTrashRoute
+        ? [
+            { label: "Name", key: "name" },
+            { label: "Owner", key: null },
+            { label: "Date trashed", key: "trashedTime" },
+            { label: "File size", key: null },
+            { label: "Original Location", key: null },
+            { label: "", key: null },
+          ]
+        : isSharedRoute
+          ? [
+              { label: "Name", key: "name" },
+              { label: "Shared By", key: null },
+              { label: "Date Shared", key: "sharedWithMeTime" },
+              { label: "", key: null },
+              { label: "", key: null },
+            ]
+          : [
+              { label: "Name", key: null },
+              { label: "Owner", key: null },
+              { label: "Last modified", key: null },
+              { label: "File size", key: null },
+              { label: "Location", key: null },
+              { label: "", key: null },
+            ];
 
   const listHeaderRow = (
     <div className="gd-list-header md:text-[11px]">
-      {headerColumns.map((title, index) => (
-        <span key={index}>{title}</span>
+      {headerColumns.map((column, index) => (
+        <span
+          key={index}
+          onClick={() => column.key && handleSort(column.key)}
+          className={column.key ? "sortable-column" : ""}
+        >
+          {column.label}
+          {sortConfig.key === column.key &&
+            (sortConfig.direction === "asc" ? (
+              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-[4px]">
+                <ArrowUpIcon className="text-[#06062f] w-5 h-5" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-6 h-6 bg-(--accent-blue-light) rounded-full ml-[4px]">
+                <ArrowDownIcon className="text-[#06062f] w-5 h-5" />
+              </div>
+            ))}
+        </span>
       ))}
+
+      {!isRecentRoute && !isStarredRoute && (
+        <SortButton sortConfig={sortConfig} setSortConfig={setSortConfig} />
+      )}
     </div>
   );
+
   const hasFileSelected = [...selectedItems].some((id) => {
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
     return item && !item.isDirectory;
@@ -1237,6 +1306,16 @@ export default function DirectoryView({ route }) {
                 <IconInfo size={16} /> {error}
               </div>
             )}
+            {moveItem && (
+              <MoveModal
+                currentDirId={dirId}
+                item={moveItem}
+                setDirectoriesList={setDirectoriesList}
+                setFilesList={setFilesList}
+                onClose={() => setMoveItem(null)}
+                open={Boolean(moveItem)}
+              />
+            )}
 
             {isLoading ? (
               <div className="gd-loading">
@@ -1248,7 +1327,9 @@ export default function DirectoryView({ route }) {
                   <DriveEmptyState />
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
-                    items={isSharedRoute ? combinedItems : filteredFiles}
+                    items={isRecentRoute ? filteredFiles : combinedItems}
+                    sortConfig={sortConfig}
+                    setSortConfig={setSortConfig}
                     isRecentRoute={isRecentRoute}
                     viewMode={viewMode}
                     selectedItems={selectedItems}
@@ -1256,31 +1337,28 @@ export default function DirectoryView({ route }) {
                     onRowClick={handleRowClick}
                     onDoubleClick={handleRowDoubleClick}
                     onShare={(itemId) => {
-                      
                       const item = combinedItems.find(
                         (i) => (i.id ?? i._id) === itemId,
                       );
                       if (item) setShareItem(item);
                     }}
                     onRename={(itemId) => {
-                      
-                        const item = combinedItems.find(
-                          (i) => (i.id ?? i._id) === itemId,
-                        );
-                        if (item) openRename(item);
-                     
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) openRename(item);
                     }}
                     onDownload={(itemId) => {
-                       const item = combinedItems.find(
+                      const item = combinedItems.find(
                         (item) => (item.id ?? item._id) === itemId,
                       );
                       if (!item) return;
-                        if (item && item.isDirectory) {
-                          handleDownloadFolder(item);
-                        } else {
-                          handleDownload(item);
-                        }
-                     
+                      if (item && item.isDirectory) {
+                        handleDownloadFolder(item);
+                      } else {
+                        handleDownload(item);
+                      }
+
                       clearSelection();
                     }}
                     onContextMenu={handleContextMenu}
@@ -1288,9 +1366,8 @@ export default function DirectoryView({ route }) {
                     isStarred={isStarred}
                     setIsStarred={setIsStarred}
                     route={route}
-              
                     combinedItems={combinedItems}
-                      onStar={async (itemId) => {
+                    onStar={async (itemId) => {
                       const items = combinedItems.filter(
                         (item) => (item.id ?? item._id) === itemId,
                       );
@@ -1305,6 +1382,8 @@ export default function DirectoryView({ route }) {
                     isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
                     items={combinedItems}
+                    sortConfig={sortConfig}
+                    setSortConfig={setSortConfig}
                     viewMode={viewMode}
                     user={user}
                     dirId={dirId}
@@ -1312,32 +1391,29 @@ export default function DirectoryView({ route }) {
                     onSelect={handleSelect}
                     onRowClick={handleRowClick}
                     onDoubleClick={handleRowDoubleClick}
-                     onShare={(itemId) => {
-                      
+                    onShare={(itemId) => {
                       const item = combinedItems.find(
                         (i) => (i.id ?? i._id) === itemId,
                       );
                       if (item) setShareItem(item);
                     }}
                     onRename={(itemId) => {
-                      
-                        const item = combinedItems.find(
-                          (i) => (i.id ?? i._id) === itemId,
-                        );
-                        if (item) openRename(item);
-                     
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) openRename(item);
                     }}
                     onDownload={(itemId) => {
-                       const item = combinedItems.find(
+                      const item = combinedItems.find(
                         (item) => (item.id ?? item._id) === itemId,
                       );
                       if (!item) return;
-                        if (item && item.isDirectory) {
-                          handleDownloadFolder(item);
-                        } else {
-                          handleDownload(item);
-                        }
-                     
+                      if (item && item.isDirectory) {
+                        handleDownloadFolder(item);
+                      } else {
+                        handleDownload(item);
+                      }
+
                       clearSelection();
                     }}
                     onContextMenu={handleContextMenu}
@@ -1345,7 +1421,6 @@ export default function DirectoryView({ route }) {
                     isStarred={isStarred}
                     setIsStarred={setIsStarred}
                     route={route}
-          
                     combinedItems={combinedItems}
                     onStar={async (itemId) => {
                       const items = combinedItems.filter(
@@ -1474,8 +1549,10 @@ export default function DirectoryView({ route }) {
         position={contextPos}
         isGoogleDriveRoute={isGoogleDriveRoute}
         isTrashRoute={isTrashRoute}
+        isStarred={isStarred}
         dirId={dirId}
         viewMode={viewMode}
+        setContextItem={setContextItem}
         onClose={() => {
           setOpen(false);
           setContextItem(null);
@@ -1500,6 +1577,17 @@ export default function DirectoryView({ route }) {
             }
           });
           clearSelection();
+        }}
+        onMove={(itemId) => {
+          const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
+          if (item) setMoveItem(item);
+        }}
+        onStar={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleToggleStar(items);
         }}
         onRename={() => {
           selectedItems.forEach((id) => {
@@ -1541,10 +1629,18 @@ export default function DirectoryView({ route }) {
         <FileViewer
           key={viewItem._id}
           item={viewItem}
+          isStarred={isStarred}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
+            onStar={async () => {
+          const items = combinedItems.filter((item) =>
+            selectedItems.has(item.id ?? item._id),
+          );
+          if (!items.length) return;
+          await handleToggleStar(items);
+        }}
           onShare={() => {
             const id = [...selectedItems][0];
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
