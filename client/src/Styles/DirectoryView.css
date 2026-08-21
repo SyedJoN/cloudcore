@@ -1556,12 +1556,12 @@ body.gd-overlay-open {
 
 /* ── Breadcrumb ── */
 .mv-breadcrumb {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 2px;
-    padding: 8px 16px;
-    border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e0e0e0;
 }
 .mv-breadcrumb-item {
   display: flex;
@@ -1726,4 +1726,99 @@ body.gd-overlay-open {
 .mv-footer-actions {
   display: flex;
   gap: 8px;
+}
+
+@media (max-width: 1500px) {
+  .gd-list-header,
+  .gd-list-row {
+    grid-template-columns: 8fr 3fr 3fr 4fr;
+  }
+  .gd-list-header.four-columns,
+  .gd-list-row.four-columns {
+    grid-template-columns: 9fr 5fr 3fr 6fr;
+  }
+
+  .gd-list-header.five-columns,
+  .gd-list-row.five-columns {
+    grid-template-columns: 4fr 3fr 3fr 2fr 5fr;
+  }
+
+  .gd-list-header.six-columns,
+  .gd-list-row.six-columns {
+    grid-template-columns: 3fr 3fr 3fr 2fr 4fr 4fr;
+  }
+  .row-actions {
+    gap: 0;
+  }
+}
+@media (max-width: 900px) {
+  .gd-list-header,
+  .gd-list-row {
+    grid-template-columns: 8fr 3fr 3fr 4fr;
+  }
+  .gd-list-header.four-columns,
+  .gd-list-row.four-columns {
+    grid-template-columns: 5fr 3fr 3fr 7fr;
+  }
+
+  .gd-list-header.five-columns,
+  .gd-list-row.five-columns {
+    grid-template-columns: 4fr 3fr 3fr 2fr 7fr;
+  }
+
+  .gd-list-header.six-columns,
+  .gd-list-row.six-columns {
+    grid-template-columns: 5fr 4fr 3fr 2fr 4fr 7fr;
+  }
+}
+@media (max-width: 768px) {
+  .gd-list-header,
+  .gd-list-row {
+    grid-template-columns: 6fr 3fr 3fr 4fr;
+  }
+  .gd-list-header.four-columns,
+  .gd-list-row.four-columns {
+    grid-template-columns: 6fr 4fr 2fr 7fr;
+  }
+
+  .gd-list-header.five-columns,
+  .gd-list-row.five-columns {
+    grid-template-columns: 3fr 3fr 3fr 2fr 5fr;
+  }
+
+  .gd-list-header.six-columns,
+  .gd-list-row.six-columns {
+    grid-template-columns: 8fr 4fr 2fr 2fr 2fr 7fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .gd-list-header,
+  .gd-list-row {
+    grid-template-columns: 4fr 3fr 3fr 7fr;
+  }
+  .gd-list-header.four-columns,
+  .gd-list-row.four-columns {
+    grid-template-columns: 4fr 3fr 3fr 4fr;
+  }
+
+  .gd-list-header.five-columns,
+  .gd-list-row.five-columns {
+    grid-template-columns: 4fr 2fr 2fr 2fr 5fr;
+  }
+
+  .gd-list-header.six-columns,
+  .gd-list-row.six-columns {
+    grid-template-columns: 6fr 2fr 2fr 2fr 4fr 5fr;
+  }
+  .row-actions {
+    gap: 2;
+  }
+
+  .gd-sel-action-btn-list-row {
+    padding: 2px;
+  }
+  .list-row-action {
+    gap: 0
+  }
 }

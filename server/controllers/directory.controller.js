@@ -2692,146 +2692,214 @@ export const copyItem = async (req, res, next) => {
 };
 
 export const moveItem = async (req, res, next) => {
-  const { item, destinationId, destinationName } = req.body;
-  const userId = req.user?._id;
+  try {
+    const { item, destinationId, destinationName } = req.body;
+    const userId = req.user?._id;
 
-  if (!item || !destinationId || !destinationName) {
-    return res.status(400).json({
-      message: "Invalid or missing ids",
-    });
-  }
-
-  let itemToBeMoved = await File.findById(item._id);
-  let type = "file";
-
-  if (!itemToBeMoved) {
-    itemToBeMoved = await Directory.findById(item._id);
-    type = "folder";
-  }
-
-  if (!itemToBeMoved) {
-    return res.status(404).json({
-      message: `Invalid ${item.isDirectory ? "Folder" : "File"} ID`,
-    });
-  }
-
-  if (itemToBeMoved.parentDirId == null) {
-    return res.status(400).json({
-      message: "Root items cannot be moved",
-    });
-  }
-
-  const oldParentId = itemToBeMoved.parentDirId;
-
-  if (type === "file") {
-    const path = [...(itemToBeMoved.path || [])];
-
-    if (path.length > 0) {
-      path[path.length - 1] = destinationId;
-    } else {
-      path.push(destinationId);
+    if (!item?._id || !destinationId || !destinationName) {
+      return res.status(400).json({
+        message: "Invalid or missing move details",
+      });
     }
 
-    itemToBeMoved.parentDirId = destinationId;
-    itemToBeMoved.path = path;
+    let itemToBeMoved = await File.findById(item._id);
+    let type = "file";
 
-    await fgaClient.write({
-      writes: [
-        {
-          user: `folder:${destinationId}`,
-          relation: "parent",
-          object: `file:${itemToBeMoved._id}`,
-        },
-      ],
-      deletes: [
-        {
-          user: `folder:${oldParentId}`,
-          relation: "parent",
-          object: `file:${itemToBeMoved._id}`,
-        },
-      ],
+    if (!itemToBeMoved) {
+      itemToBeMoved = await Directory.findById(item._id);
+      type = "folder";
+    }
+
+    if (!itemToBeMoved) {
+      return res.status(404).json({
+        message: `Invalid ${
+          item?.isDirectory ? "Folder" : "File"
+        } ID`,
+      });
+    }
+
+
+    if (itemToBeMoved.parentDirId == null) {
+      return res.status(400).json({
+        message: "Root items cannot be moved",
+      });
+    }
+
+    const itemId = itemToBeMoved._id.toString();
+    const oldParentId = itemToBeMoved.parentDirId.toString();
+
+ 
+    const destinationFolder = await Directory.findById(destinationId);
+
+    if (!destinationFolder) {
+      return res.status(404).json({
+        message: "Destination folder not found",
+      });
+    }
+
+    const destinationFolderId =
+      destinationFolder._id.toString();
+
+
+
+    if (oldParentId === destinationFolderId) {
+      return res.status(400).json({
+        message: `Item is already in ${destinationName}`,
+      });
+    }
+
+
+    if (type === "folder") {
+      if (itemId === destinationFolderId) {
+        return res.status(400).json({
+          message: "A folder cannot be moved into itself",
+        });
+      }
+
+      const destinationPath = destinationFolder.path || [];
+
+      const isDescendant = destinationPath.some(
+        (id) => id.toString() === itemId,
+      );
+
+      if (isDescendant) {
+        return res.status(400).json({
+          message:
+            "A folder cannot be moved into one of its own subfolders",
+        });
+      }
+    }
+
+    const getFgaObject = () => {
+      return type === "folder"
+        ? `folder:${itemId}`
+        : `file:${itemId}`;
+    };
+
+    const getParentTuple = (parentId) => ({
+      user: `folder:${parentId}`,
+      relation: "parent",
+      object: getFgaObject(),
     });
 
-    await itemToBeMoved.save();
+    const oldParentTuple = getParentTuple(oldParentId);
+    const newParentTuple = getParentTuple(destinationFolderId);
 
-    await FileActivity.findOneAndUpdate(
-      {
-        file: itemToBeMoved._id,
-        user: userId,
-        type: "move",
-      },
-      {
-        $set: { lastOccurredAt: new Date() },
-      },
-      {
-        upsert: true,
-      },
-    );
-  } else {
+
     const oldPath = [...(itemToBeMoved.path || [])];
 
     const newPath = [...oldPath];
 
     if (newPath.length > 0) {
-      newPath[newPath.length - 1] = destinationId;
+      newPath[newPath.length - 1] =
+        destinationFolderId;
     } else {
-      newPath.push(destinationId);
+      newPath.push(destinationFolderId);
     }
-
-    const descendants = await Promise.all([
-      Directory.find({
-        path: { $in: [itemToBeMoved._id] },
-      }),
-
-      File.find({
-        path: { $in: [itemToBeMoved._id] },
-      }),
-    ]);
-
-    const [childFolders, childFiles] = descendants;
-
-    itemToBeMoved.parentDirId = destinationId;
-    itemToBeMoved.path = newPath;
-
-    await itemToBeMoved.save();
 
     await fgaClient.write({
-      writes: [
-        {
-          user: `folder:${destinationId}`,
-          relation: "parent",
-          object: `folder:${itemToBeMoved._id}`,
-        },
-      ],
-      deletes: [
-        {
-          user: `folder:${oldParentId}`,
-          relation: "parent",
-          object: `folder:${itemToBeMoved._id}`,
-        },
-      ],
+      writes: [newParentTuple],
+      deletes: [oldParentTuple],
     });
 
-    for (const child of childFolders) {
-      const relativePath = child.path.slice(oldPath.length);
 
-      child.path = [...newPath, itemToBeMoved._id, ...relativePath];
+    if (type === "file") {
+      itemToBeMoved.parentDirId = destinationFolderId;
+      itemToBeMoved.path = newPath;
 
-      await child.save();
+      await itemToBeMoved.save();
+
+      if (userId) {
+        await FileActivity.findOneAndUpdate(
+          {
+            file: itemToBeMoved._id,
+            user: userId,
+            type: "move",
+          },
+          {
+            $set: {
+              lastOccurredAt: new Date(),
+            },
+          },
+          {
+            upsert: true,
+          },
+        );
+      }
     }
 
-    for (const file of childFiles) {
-      const relativePath = file.path.slice(oldPath.length);
 
-      file.path = [...newPath, itemToBeMoved._id, ...relativePath];
+    else {
+   
+      const [childFolders, childFiles] =
+        await Promise.all([
+          Directory.find({
+            path: { $in: [itemToBeMoved._id] },
+          }),
 
-      await file.save();
+          File.find({
+            path: { $in: [itemToBeMoved._id] },
+          }),
+        ]);
+
+
+
+      itemToBeMoved.parentDirId = destinationFolderId;
+      itemToBeMoved.path = newPath;
+
+      await itemToBeMoved.save();
+
+
+      const descendantFolderOperations =
+        childFolders.map((childFolder) => {
+          const childPath = childFolder.path || [];
+
+          const relativePath = childPath.slice(
+            oldPath.length + 1,
+          );
+
+          childFolder.path = [
+            ...newPath,
+            itemToBeMoved._id,
+            ...relativePath,
+          ];
+
+          return childFolder.save();
+        });
+
+
+      const descendantFileOperations =
+        childFiles.map((childFile) => {
+          const childPath = childFile.path || [];
+
+          const relativePath = childPath.slice(
+            oldPath.length + 1,
+          );
+
+          childFile.path = [
+            ...newPath,
+            itemToBeMoved._id,
+            ...relativePath,
+          ];
+
+          return childFile.save();
+        });
+
+      await Promise.all([
+        ...descendantFolderOperations,
+        ...descendantFileOperations,
+      ]);
     }
+
+
+    return res.status(200).json({
+      message: `${
+        type === "folder" ? "Folder" : "File"
+      } moved to ${destinationName} successfully`,
+    });
+  } catch (error) {
+    console.error("MOVE ITEM ERROR:", error);
+
+    return next(error);
   }
-
-  return res.status(200).json({
-    message: `${
-      type === "folder" ? "Folder" : "File"
-    } moved to ${destinationName} successfully`,
-  });
 };

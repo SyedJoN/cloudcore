@@ -11,11 +11,13 @@ const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function MoveModal({
   item,
+  route,
   currentDirId,
   setDirectoriesList,
   setFilesList,
   onClose,
 }) {
+
   const { toast } = useToast();
   const [breadcrumbs, setBreadcrumbs] = useState([
     { id: null, name: "My Drive" },
@@ -28,11 +30,13 @@ export default function MoveModal({
   const [newFolderName, setNewFolderName] = useState("Untitled folder");
   const [rootDirId, setRootDirId] = useState(null);
 
+  const isStarredRoute = route === "starred";
+  const isRecentRoute = route === "recent";
+
   const currentCrumb = breadcrumbs[breadcrumbs.length - 1];
 
-  const isSameLocation =
-    currentCrumb.id === currentDirId ||
-    (currentCrumb.id === null && !currentDirId);
+ const isSameLocation =
+  currentCrumb?.id === item?.parentDirId;
 
   const isEmpty = folders.length === 0 && files.length === 0 && !isCreating;
 
@@ -101,6 +105,8 @@ export default function MoveModal({
       });
       onClose();
       const type = item.isDirectory ? "folder" : "file";
+      toast({ message, type: "success" });
+      if (isRecentRoute || isStarredRoute) return;
       if (type === "folder") {
         setDirectoriesList((prev) =>
           prev.filter((list) => list._id !== item._id),
@@ -109,7 +115,6 @@ export default function MoveModal({
         setFilesList((prev) => prev.filter((list) => list._id !== item._id));
       }
 
-      toast({ message, type: "success" });
     } catch (err) {
       toast({ message: err.message || "Something went wrong", type: "error" });
       console.log(err.message);

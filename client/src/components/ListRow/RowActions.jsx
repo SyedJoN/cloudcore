@@ -21,8 +21,8 @@ export default function RowActions({
 }) {
   return (
     <>
-      <div className="gd-list-row-cell flex">
-        <div className={`flex ${isListHovered ? "" : "visible-hidden"} justify-end flex-1 gap-1`}>
+      <div className="gd-list-row-cell list-row-action flex">
+        <div className={`flex ${isListHovered ? "" : "visible-hidden"} justify-end flex-1 gap-1 row-actions`}>
           {canShare && (
             <button
               className="gd-sel-action-btn-list-row"

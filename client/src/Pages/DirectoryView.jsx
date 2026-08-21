@@ -1320,6 +1320,7 @@ export default function DirectoryView({ route }) {
               <MoveModal
                 currentDirId={dirId}
                 item={moveItem}
+                route={route}
                 setDirectoriesList={setDirectoriesList}
                 setFilesList={setFilesList}
                 onClose={() => setMoveItem(null)}
