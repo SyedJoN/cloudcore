@@ -339,7 +339,7 @@ export default function FileViewer({
               title="Star"
               onClick={onStar}
             >
-              {isStarred[item._id] ? (
+              {isStarred[item?._id || ""] ? (
                 <StarIconSolid className="w-5 h-5" />
               ) : (
                 <StarIcon className="w-5 h-5" />

@@ -391,6 +391,7 @@ const handleSharedRoleUpdate = async (
     <>
       <FileViewer
         key={item._id}
+        isStarred={isStarred}
         shareItem={shareItem}
         item={item}
         onClose={() => window.close()}

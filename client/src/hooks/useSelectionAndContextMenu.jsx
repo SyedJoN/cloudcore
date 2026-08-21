@@ -17,6 +17,7 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     setSelectedItems(new Set(combinedItems.map((i) => i.id ?? i._id)));
   }, [combinedItems]);
 
+  
   const handleContextMenu = useCallback(
     (e, id) => {
       e.stopPropagation();
@@ -99,6 +100,8 @@ const handleMainMouseDown = useCallback(
             r.bottom > selBox.top
           ) {
             newSelected.add(el.dataset.id);
+          } else {
+            clearSelection();
           }
         });
         if (newSelected.size > 0) setSelectedItems(newSelected);

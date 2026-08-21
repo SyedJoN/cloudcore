@@ -600,7 +600,7 @@
 
 .gd-list-header.five-columns,
 .gd-list-row.five-columns {
-  grid-template-columns: 17fr 3fr 3fr 2fr 4fr;
+  grid-template-columns: 8fr 3fr 3fr 2fr 3fr;
 }
 
 .gd-list-header.six-columns,
@@ -1740,7 +1740,8 @@ body.gd-overlay-open {
 
   .gd-list-header.five-columns,
   .gd-list-row.five-columns {
-    grid-template-columns: 4fr 3fr 3fr 2fr 5fr;
+    
+    grid-template-columns: 7fr 7fr 3fr 2fr 7fr;
   }
 
   .gd-list-header.six-columns,
@@ -1763,7 +1764,7 @@ body.gd-overlay-open {
 
   .gd-list-header.five-columns,
   .gd-list-row.five-columns {
-    grid-template-columns: 4fr 3fr 3fr 2fr 7fr;
+    grid-template-columns: 9fr 8fr 3fr 2fr 11fr;
   }
 
   .gd-list-header.six-columns,
@@ -1771,7 +1772,7 @@ body.gd-overlay-open {
     grid-template-columns: 5fr 4fr 3fr 2fr 4fr 7fr;
   }
 }
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .gd-list-header,
   .gd-list-row {
     grid-template-columns: 6fr 3fr 3fr 4fr;
@@ -1783,7 +1784,7 @@ body.gd-overlay-open {
 
   .gd-list-header.five-columns,
   .gd-list-row.five-columns {
-    grid-template-columns: 3fr 3fr 3fr 2fr 5fr;
+    grid-template-columns: 12fr 10fr 4fr 7fr 16fr;
   }
 
   .gd-list-header.six-columns,

@@ -12,7 +12,7 @@ export default function HomeRoute({
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-       <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14}/> <span className="min-w-32">{owner}</span>
+       <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14}/> <span>{owner}</span>
       </div>
 
       <div className="gd-list-row-cell md:text-[11px]">

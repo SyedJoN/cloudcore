@@ -33,13 +33,7 @@ import { ROLE_PRIORITY } from "../utils/permissions/getRolePriority.js";
 import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
-const roleMap = {
-  viewer: "reader",
-  editor: "writer",
-  commenter: "commenter",
-};
-
-const getObject = (resourceType, resourceId) => `${resourceType}:${resourceId}`;
+import { getFgaObject } from "../utils/getFgaObject.js";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -52,7 +46,7 @@ async function getSharedWithMeTime({ itemId, itemType, userId }) {
 }
 
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
-  const object = getObject(type, item._id);
+  const object = getFgaObject(type, item._id);
   const permissionMap = new Map();
 
   // Direct permissions
@@ -182,7 +176,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const viewedByMeTime = viewActivity?.occuredAt || null;
   const modifiedByMeTime = modifiedActivity?.occuredAt || null;
 
-
   let sharedWithMeTime = null;
 
   if (roleSource === "direct") {
@@ -249,8 +242,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 };
 
 export const uploadDriveFileToS3 = async (req, res, next) => {
-  const { fileId, driveFileId } = req.body;
-  const userId = req.user?._id;
+  const { driveFileId } = req.body;
   const { drive_access_token } = req.signedCookies;
 
   if (!drive_access_token) {
@@ -410,14 +402,14 @@ export const completeUpload = async (req, res, next) => {
       await fgaClient.write({
         writes: [
           {
-            user: `user:${userId.toString()}`,
+            user: getFgaObject("user", userId),
             relation: "owner",
-            object: `file:${uploadedFile._id.toString()}`,
+            object: getFgaObject("file", uploadedFile._id),
           },
           {
-            user: `folder:${uploadedFile.parentDirId.toString()}`,
+            user: getFgaObject("folder", uploadedFile.parentDirId),
             relation: "parent",
-            object: `file:${uploadedFile._id.toString()}`,
+            object: getFgaObject("file", uploadedFile._id),
           },
         ],
       });
@@ -460,9 +452,9 @@ export const getFileById = async (req, res, next) => {
         }
 
         const canRead = await fgaClient.check({
-          user: `user:${userId}`,
+          user: getFgaObject("user", userId),
           relation: "can_read",
-          object: `file:${id}`,
+          object: getFgaObject("file", id),
         });
 
         if (!canRead.allowed) {
@@ -520,7 +512,11 @@ export const getFileMetaById = async (req, res, next) => {
       .lean();
 
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
-    const { capabilities, permissions } = await resolveRole(
+    const {  owners,
+          capabilities,
+          permissions,
+          viewedByMeTime,
+          modifiedByMeTime, } = await resolveRole(
       file,
       "file",
       userId,
@@ -530,8 +526,8 @@ export const getFileMetaById = async (req, res, next) => {
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
-        ...capabilities,
-        ...permissions,
+        capabilities,
+        permissions,
       });
     }
 
@@ -548,9 +544,9 @@ export const getFileMetaById = async (req, res, next) => {
 
       const canRead = await Promise.all(
         fgaClient.check({
-          user: `user:${userId}`,
+          user: getFgaObject("user", userId),
           role: "can_read",
-          object: `file:${id}`,
+          object: getFgaObject("file", id),
         }),
       );
 
@@ -572,22 +568,25 @@ export const getFileMetaById = async (req, res, next) => {
       );
       return res.status(200).json({
         ...file,
-        ...capabilities,
-        ...permissions,
+        owners,
+        capabilities,
+        permissions,
+        viewedByMeTime,
+        modifiedByMeTime,
       });
     }
 
     if (userId) {
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
-          user: `user:${userId}`,
+          user: getFgaObject("user", userId),
           role: "can_read",
-          object: `file:${id}`,
+          object: getFgaObject("file", id),
         }),
         fgaClient.check({
-          user: `user:${userId}`,
+          user: getFgaObject("user", userId),
           role: "can_write",
-          object: `file:${id}`,
+          object: getFgaObject("file", id),
         }),
       ]);
 
@@ -607,8 +606,11 @@ export const getFileMetaById = async (req, res, next) => {
         );
         return res.status(200).json({
           ...file,
-          ...capabilities,
-          ...permissions,
+          owners,
+          capabilities,
+          permissions,
+          viewedByMeTime,
+          modifiedByMeTime,
         });
       }
     }
@@ -637,7 +639,7 @@ export const getRecentFiles = async (req, res, next) => {
     if (!userId) return res.status(403).json({ message: "Access denied" });
 
     const allowedFiles = await fgaClient.listObjects({
-      user: `user:${userId.toString()}`,
+      user: getFgaObject("user", userId),
       relation: "can_read",
       type: "file",
     });
@@ -793,7 +795,7 @@ export const updateFile = async (req, res, next) => {
       }
 
       const canWrite = await fgaClient.check({
-        user: `user:${userId}`,
+        user: getFgaObject("user", userId),
         role: "can_write",
         object: `file:${fileId}`,
       });
@@ -870,18 +872,18 @@ export const softDeleteFile = async (req, res, next) => {
         fgaClient.write({
           deleteFile: [
             {
-              user: `user:${userId}`,
+              user: getFgaObject("user", userId),
               role: "reader",
-              object: `file:${id}`,
+              object: getFgaObject("file", id),
             },
           ],
         }),
         fgaClient.write({
           deletes: [
             {
-              user: `user:${userId}`,
+              user: getFgaObject("user", userId),
               role: "writer",
-              object: `file:${id}`,
+              object: getFgaObject("file", id),
             },
           ],
         }),
@@ -933,20 +935,21 @@ export const deleteFile = async (req, res, next) => {
       if (!fileToDelete) {
         return res.status(404).json({ message: "File not found!" });
       }
-
+      const object = getFgaObject("file", id);
+      const user = getFgaObject("user", userId);
       await fgaClient.write(
         {
           deletes: [
-            { user: `user:${userId}`, role: "owner", object: `file:${id}` },
+            { user, role: "owner", object },
             {
-              user: `user:${userId}`,
+              user,
               relation: "writer",
-              object: `file:${id}`,
+              object,
             },
             {
-              user: `user:${userId}`,
+              user,
               relation: "reader",
-              object: `file:${id}`,
+              object,
             },
           ],
         },
@@ -1024,8 +1027,9 @@ export const toggleFilePublic = async (req, res, next) => {
     const isRestricted = access === "restricted";
 
     if (isRestricted) {
-      const object = `${type === "folder" ? "folder" : "file"}:${itemId}`;
-      const tuples = await fgaClient.read({ tuple_key: { object } });
+      const tuples = await fgaClient.read({
+        tuple_key: { object: getFgaObject(type, itemId) },
+      });
 
       const toDelete = tuples.tuples.filter(
         (t) => t.key.role !== "owner" && t.key.role !== "parent",
@@ -1035,7 +1039,13 @@ export const toggleFilePublic = async (req, res, next) => {
         await Promise.allSettled(
           toDelete.map((t) =>
             fgaClient.write({
-              deletes: [{ user: t.key.user, role: t.key.role, object }],
+              deletes: [
+                {
+                  user: t.key.user,
+                  role: t.key.role,
+                  object: getFgaObject(type, itemId),
+                },
+              ],
             }),
           ),
         );
@@ -1182,7 +1192,7 @@ export const giveAccessById = async (req, res, next) => {
         {
           writes: [
             {
-              user: `user:${userId}`,
+              user: getFgaObject("user", userId),
               relation: role,
               object,
             },
@@ -1198,7 +1208,7 @@ export const giveAccessById = async (req, res, next) => {
 
     const findDirectPermission = async (object, userId) => {
       const result = await fgaClient.read({
-        user: `user:${userId}`,
+        user: getFgaObject("user", userId),
         object,
       });
 
@@ -1206,7 +1216,7 @@ export const giveAccessById = async (req, res, next) => {
 
       const tuple = tuples.find(
         (t) =>
-          t.key?.user === `user:${userId}` &&
+          t.key?.user === getFgaObject("user", userId) &&
           ["reader", "writer"].includes(t.key?.relation),
       );
 
@@ -1222,7 +1232,7 @@ export const giveAccessById = async (req, res, next) => {
       let currentId = resourceId;
 
       while (currentId) {
-        const currentObject = getObject(currentType, currentId);
+        const currentObject = getFgaObject(currentType, currentId);
 
         const directPermission = await findDirectPermission(
           currentObject,
@@ -1281,16 +1291,16 @@ export const giveAccessById = async (req, res, next) => {
           userId,
         });
 
-        let targetObject;
+        let targetFgaObject;
         let previousRole = null;
         let inherited = false;
 
         if (existingPermissionSource) {
-          targetObject = existingPermissionSource.object;
+          targetFgaObject = existingPermissionSource.object;
           previousRole = existingPermissionSource.role;
           inherited = !existingPermissionSource.isCurrentObject;
         } else {
-          targetObject = getObject(type, id);
+          targetFgaObject = getFgaObject(type, id);
         }
 
         if (inherited) {
@@ -1303,14 +1313,6 @@ export const giveAccessById = async (req, res, next) => {
             .lean();
 
           if (rootOwner) {
-            // This used to call res.status(400).json(...) directly from
-            // inside a Promise.all'd map callback. That doesn't stop the
-            // request — the other users in usersArray kept being
-            // processed, and the code below still called res.json()
-            // again once Promise.all settled, which crashes with
-            // "Cannot set headers after they are sent". Throwing instead
-            // lets the try/catch below handle it exactly once, same as
-            // the other validation errors in this loop.
             throw new Error(
               "Cannot change an inherited permission from the root directory",
             );
@@ -1325,21 +1327,17 @@ export const giveAccessById = async (req, res, next) => {
           await fgaClient.write({
             deletes: [
               {
-                user: `user:${userId}`,
+                user: getFgaObject("user", userId),
                 relation: previousRole,
-                object: targetObject,
+                object: targetFgaObject,
               },
             ],
           });
         }
 
-        await writeRole(targetObject, userId, user.role);
+        await writeRole(targetFgaObject, userId, user.role);
 
         if (!existingPermissionSource) {
-          // First time this user has gotten access to this item — record
-          // it for a Google-style "sharedWithMeTime". Upsert +
-          // setOnInsert so this can never reset an existing record, only
-          // create it once.
           await SharedAccess.updateOne(
             { itemId: id, itemType: type, userId },
             { $setOnInsert: { sharedWithMeTime: new Date() } },
@@ -1369,11 +1367,6 @@ export const giveAccessById = async (req, res, next) => {
       }),
     );
 
-    // NOTE: this passes item.userId (the item's owner) as the "current
-    // user" for resolveRole, same as your original code — worth double
-    // checking that's actually what you want back in the response,
-    // rather than the requesting user (e.g. req.user._id), since that
-    // decides whose capabilities/sharedWithMeTime come back here.
     const finalResult = await resolveRole(
       item,
       type,
@@ -1426,7 +1419,8 @@ export const revokeAccessById = async (req, res, next) => {
 
     const userId = permissionId;
     const objectType = type === "folder" ? "folder" : "file";
-    const object = `${objectType}:${id}`;
+    const object = getFgaObject(objectType, id);
+    const user = getFgaObject("user", userId);
 
     const Model = type === "folder" ? Directory : File;
 
@@ -1443,7 +1437,7 @@ export const revokeAccessById = async (req, res, next) => {
 
     const existing = await fgaClient.read({
       tuple_key: {
-        user: `user:${userId}`,
+        user,
         object,
       },
     });
@@ -1451,7 +1445,7 @@ export const revokeAccessById = async (req, res, next) => {
     const deletes = existing.tuples
       .filter(
         (tuple) =>
-          tuple.key.user === `user:${userId}` &&
+          tuple.key.user === user &&
           tuple.key.object === object &&
           allowedRelations.includes(tuple.key.relation),
       )
@@ -1488,7 +1482,7 @@ export const fetchItemPermissions = async (req, res, next) => {
       return res.status(404).json({ message: "Id missing" });
     }
 
-    const object = `${type === "folder" ? "folder" : "file"}:${id}`;
+    const object = getFgaObject(type, id);
 
     let allTuples = [];
     let continuationToken = undefined;
@@ -1712,7 +1706,7 @@ export const updateFileViewTime = async (req, res, next) => {
       {
         upsert: true,
         returnDocument: "after",
-      }
+      },
     );
 
     return res.status(200).json({

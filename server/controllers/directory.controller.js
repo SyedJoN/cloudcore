@@ -1,9 +1,4 @@
-import { rm } from "fs/promises";
-import crypto from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "path";
-import { fileURLToPath } from "url";
+import path from "path"
 import Directory from "../models/directory.model.js";
 import File from "../models/file.model.js";
 import { fgaClient } from "../services/openFGAService.js";
@@ -19,7 +14,6 @@ import { sanitizeText } from "../utils/sanitizeText.js";
 import { updateParentDirSize } from "../utils/updateDirSize.js";
 import { formatSize } from "../utils/formatSize.js";
 import { getDirectoryPath } from "../utils/updatePath.js";
-import { deleteFile } from "../services/s3/delete.js";
 import { deleteFileArray } from "../services/s3/deleteArray.js";
 import Ownership from "../models/ownership.model.js";
 import {
@@ -31,8 +25,6 @@ import {
   updateOwnerStorage,
   updateResourceOwnership,
 } from "../utils/ownershipHelpers.js";
-import mongoose from "mongoose";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { ZipArchive } from "archiver";
 import { getFile } from "../services/s3/getFile.js";
 import Subscription from "../models/subscription.model.js";
@@ -49,9 +41,8 @@ import copyS3File from "../services/s3/copy.js";
 import { getDriveClient } from "../services/googleDriveClient.js";
 import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
+import { getFgaObject } from "../utils/getFgaObject.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const getObject = (resourceType, resourceId) => `${resourceType}:${resourceId}`;
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -64,7 +55,7 @@ async function getSharedWithMeTime({ itemId, itemType, userId }) {
 }
 
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
-  const object = getObject(type, item._id);
+  const object = getFgaObject(type, item._id);
   const permissionMap = new Map();
 
   // Direct permissions
@@ -261,7 +252,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 
 async function listObjects(userId, type) {
   const canRead = await fgaClient.listObjects({
-    user: `user:${userId.toString()}`,
+    user: getFgaObject('user', userId),
     relation: "can_read",
     type,
   });
@@ -309,9 +300,9 @@ export const getDirectory = async (req, res, next) => {
           {
             writes: [
               {
-                user: `user:${userId}`,
+                user: getFgaObject('user', userId),
                 relation,
-                object: `folder:${parentDir._id}`,
+                object: getFgaObject("folder", parentDir._id),
               },
             ],
           },
@@ -389,9 +380,9 @@ export const getDirectory = async (req, res, next) => {
 
     // checking if user can view this currentDirectory
     const canRead = await fgaClient.check({
-      user: `user:${userId}`,
+      user: getFgaObject('user', userId),
       relation: "can_read",
-      object: `folder:${parentDir._id}`,
+      object: getFgaObject("folder", parentDir._id),
     });
 
     if (!canRead.allowed)
@@ -868,9 +859,9 @@ export const addDirectory = async (req, res, next) => {
     const isOwner = parentDirectory.userId.toString() === userId.toString();
     if (!isOwner) {
       const canWrite = await fgaClient.check({
-        user: `user:${userId}`,
+        user: getFgaObject('user', userId),
         relation: "can_write",
-        object: `folder:${parentDirId}`,
+        object: getFgaObject("folder", parentDirId),
       });
       if (!canWrite.allowed)
         return res
@@ -888,14 +879,14 @@ export const addDirectory = async (req, res, next) => {
     await fgaClient.write({
       writes: [
         {
-          user: `user:${userId}`,
+          user: getFgaObject('user', userId),
           relation: "owner",
-          object: `folder:${addedDirectory._id}`,
+          object: getFgaObject("folder", addedDirectory._id),
         },
         {
-          user: `folder:${parentDirId}`,
+          user: getFgaObject("folder", parentDirId),
           relation: "parent",
-          object: `folder:${addedDirectory._id}`,
+          object: getFgaObject("folder", addedDirectory._id),
         },
       ],
     });
@@ -927,9 +918,9 @@ export const editDirectory = async (req, res, next) => {
     return res.status(404).json({ message: "Dirname is required" });
   }
   const isEditor = await fgaClient.check({
-    user: `user:${req.user._id.toString()}`,
+    user: getFgaObject('user', userId),
     relation: "can_write",
-    object: `folder:${id}`,
+    object: getFgaObject("folder", id),
   });
   if (!isEditor.allowed) {
     return res.status(403).json({ message: "Unauthorized" });
@@ -1009,6 +1000,7 @@ export const softDeleteDirectory = async (req, res, next) => {
       deleted: { directories: allDirIds.length, files: allFileIds.length },
     });
   } catch (error) {
+    next(error);
     console.dir(error.errInfo, { depth: null });
   }
 };
@@ -1025,19 +1017,19 @@ export const deleteDirectory = async (req, res, next) => {
       return res.status(404).json({ message: "Directory not found" });
     }
 
-    const queue = [{ _id: id, parentDirId: currentDirectory.parentDirId }];
+    const queue = [currentDirectory._id];
     const directories = [];
     const files = [];
 
     // BFS traversal
     while (queue.length) {
-      const { _id: dirId } = queue.shift();
+      const currentId = queue.shift();
 
       const [childDirs, childFiles] = await Promise.all([
-        Directory.find({ parentDirId: dirId, userId })
+        Directory.find({ parentDirId: currentId, userId })
           .select("_id parentDirId")
           .lean(),
-        File.find({ parentDirId: dirId, userId })
+        File.find({ parentDirId: currentId, userId })
           .select("_id extension parentDirId")
           .lean(),
       ]);
@@ -1045,53 +1037,76 @@ export const deleteDirectory = async (req, res, next) => {
       directories.push(...childDirs);
       files.push(...childFiles);
 
-      queue.push(...childDirs);
+      queue.push(...childDirs.map((d) => d._id));
     }
 
     // Delete files from S3 Bucket
     await deleteFileArray(files);
 
-    const fileIds = files.map((f) => f._id);
     const allDirIds = [
-      { _id: id, parentDirId: currentDirectory.parentDirId },
+      { _id: currentDirectory._id, parentDirId: currentDirectory.parentDirId },
       ...directories,
     ];
+    const dirIds = allDirIds.map((d) => d._id);
+    const fileIds = files.map((f) => f._id);
 
     // Delete file metadata
     await Promise.all([
       fileIds.length
         ? File.deleteMany({ _id: { $in: fileIds } })
         : Promise.resolve(),
-      Directory.deleteMany({ _id: { $in: allDirIds.map((d) => d._id) } }),
+      Directory.deleteMany({ _id: { $in: dirIds } }),
     ]);
 
     const deletes = [
       ...files.flatMap((f) => [
-        { user: `user:${userId}`, relation: "owner", object: `file:${f._id}` },
-        { user: `user:${userId}`, relation: "editor", object: `file:${f._id}` },
-        { user: `user:${userId}`, relation: "viewer", object: `file:${f._id}` },
         {
-          user: `folder:${f.parentDirId}`,
+          user: getFgaObject('user', userId),
+          relation: "owner",
+          object: getFgaObject("file", f._id),
+        },
+        {
+          user: getFgaObject('user', userId),
+          relation: "writer",
+          object: getFgaObject("file", f._id),
+        },
+        {
+          user: getFgaObject('user', userId),
+          relation: "reader",
+          object: getFgaObject("file", f._id),
+        },
+        {
+          user: getFgaObject("folder", f.parentDirId),
           relation: "parent",
-          object: `file:${f._id}`,
+          object: getFgaObject("file", f._id),
         },
       ]),
 
       ...allDirIds.flatMap((dir) => [
         {
-          user: `user:${userId}`,
+          user: getFgaObject('user', userId),
           relation: "owner",
-          object: `folder:${dir._id}`,
+          object: getFgaObject("folder", dir._id),
         },
         {
-          user: `folder:${dir.parentDirId}`,
+          user: getFgaObject('user', userId),
+          relation: "writer",
+          object: getFgaObject("folder", dir._id),
+        },
+        {
+          user: getFgaObject('user', userId),
+          relation: "reader",
+          object: getFgaObject("folder", dir._id),
+        },
+        {
+          user: getFgaObject("folder", dir.parentDirId),
           relation: "parent",
-          object: `folder:${dir._id}`,
+          object: getFgaObject("folder", dir._id),
         },
       ]),
     ];
 
-    // batch deletes — FGA recommends max 100 per write
+    // FGA recommends max 100 per write
     const batchSize = 100;
     for (let i = 0; i < deletes.length; i += batchSize) {
       await fgaClient.write(
@@ -2202,21 +2217,21 @@ export const initiateFolderUpload = async (req, res, next) => {
 
       const fgaWrites = [
         {
-          user: `user:${userId.toString()}`,
+          user: getFgaObject('user', userId),
 
           relation: "owner",
 
-          object: `folder:${directory._id.toString()}`,
+          object: getFgaObject("folder", directory._id),
         },
       ];
 
       if (directory.parentDirId) {
         fgaWrites.push({
-          user: `folder:${directory.parentDirId.toString()}`,
+          user: getFgaObject('folder', directory.parentDirId),
 
           relation: "parent",
 
-          object: `folder:${directory._id.toString()}`,
+          object: getFgaObject('folder',directory._id),
         });
       }
 
@@ -2422,19 +2437,19 @@ export const completeFolderUpload = async (req, res, next) => {
       await fgaClient.write({
         writes: [
           {
-            user: `user:${userId.toString()}`,
+            user: getFgaObject('user', userId),
 
             relation: "owner",
 
-            object: `file:${uploadedFile._id.toString()}`,
+            object: getFgaObject('file', uploadedFile._id),
           },
 
           {
-            user: `folder:${uploadedFile.parentDirId.toString()}`,
+            user: getFgaObject('folder', uploadedFile.parentDirId),
 
             relation: "parent",
 
-            object: `file:${uploadedFile._id.toString()}`,
+            object: getFgaObject('file', uploadedFile._id),
           },
         ],
       });
@@ -2658,14 +2673,14 @@ export const copyItem = async (req, res, next) => {
     await fgaClient.write({
       writes: [
         {
-          user: `user:${userId.toString()}`,
+          user: getFgaObject('user', userId),
           relation: "owner",
-          object: `${type}:${copiedItem._id.toString()}`,
+          object: getFgaObject(type, copiedItem._id),
         },
         {
-          user: `folder:${copiedItem.parentDirId.toString()}`,
+          user: getFgaObject('folder', copiedItem.parentDirId),
           relation: "parent",
-          object: `${type}:${copiedItem._id.toString()}`,
+          object: getFgaObject(type, copiedItem._id),
         },
       ],
     });
@@ -2712,12 +2727,9 @@ export const moveItem = async (req, res, next) => {
 
     if (!itemToBeMoved) {
       return res.status(404).json({
-        message: `Invalid ${
-          item?.isDirectory ? "Folder" : "File"
-        } ID`,
+        message: `Invalid ${item?.isDirectory ? "Folder" : "File"} ID`,
       });
     }
-
 
     if (itemToBeMoved.parentDirId == null) {
       return res.status(400).json({
@@ -2728,7 +2740,6 @@ export const moveItem = async (req, res, next) => {
     const itemId = itemToBeMoved._id.toString();
     const oldParentId = itemToBeMoved.parentDirId.toString();
 
- 
     const destinationFolder = await Directory.findById(destinationId);
 
     if (!destinationFolder) {
@@ -2737,17 +2748,13 @@ export const moveItem = async (req, res, next) => {
       });
     }
 
-    const destinationFolderId =
-      destinationFolder._id.toString();
-
-
+    const destinationFolderId = destinationFolder._id.toString();
 
     if (oldParentId === destinationFolderId) {
       return res.status(400).json({
         message: `Item is already in ${destinationName}`,
       });
     }
-
 
     if (type === "folder") {
       if (itemId === destinationFolderId) {
@@ -2764,35 +2771,26 @@ export const moveItem = async (req, res, next) => {
 
       if (isDescendant) {
         return res.status(400).json({
-          message:
-            "A folder cannot be moved into one of its own subfolders",
+          message: "A folder cannot be moved into one of its own subfolders",
         });
       }
     }
 
-    const getFgaObject = () => {
-      return type === "folder"
-        ? `folder:${itemId}`
-        : `file:${itemId}`;
-    };
-
     const getParentTuple = (parentId) => ({
-      user: `folder:${parentId}`,
+      user: getFgaObject('folder', parentId),
       relation: "parent",
-      object: getFgaObject(),
+      object: getFgaObject(type, itemId),
     });
 
     const oldParentTuple = getParentTuple(oldParentId);
     const newParentTuple = getParentTuple(destinationFolderId);
 
-
     const oldPath = [...(itemToBeMoved.path || [])];
 
-    const newPath = [...oldPath];
+    const newPath = [...(destinationFolder.path || []), destinationFolder._id];
 
     if (newPath.length > 0) {
-      newPath[newPath.length - 1] =
-        destinationFolderId;
+      newPath[newPath.length - 1] = destinationFolderId;
     } else {
       newPath.push(destinationFolderId);
     }
@@ -2801,7 +2799,6 @@ export const moveItem = async (req, res, next) => {
       writes: [newParentTuple],
       deletes: [oldParentTuple],
     });
-
 
     if (type === "file") {
       itemToBeMoved.parentDirId = destinationFolderId;
@@ -2818,7 +2815,7 @@ export const moveItem = async (req, res, next) => {
           },
           {
             $set: {
-              lastOccurredAt: new Date(),
+              occuredAt: new Date(),
             },
           },
           {
@@ -2826,71 +2823,47 @@ export const moveItem = async (req, res, next) => {
           },
         );
       }
-    }
+    } else {
+      const [childFolders, childFiles] = await Promise.all([
+        Directory.find({
+          parentDirId: itemToBeMoved._id,
+        }),
 
-
-    else {
-   
-      const [childFolders, childFiles] =
-        await Promise.all([
-          Directory.find({
-            path: { $in: [itemToBeMoved._id] },
-          }),
-
-          File.find({
-            path: { $in: [itemToBeMoved._id] },
-          }),
-        ]);
-
-
+        File.find({
+          parentDirId: itemToBeMoved._id,
+        }),
+      ]);
 
       itemToBeMoved.parentDirId = destinationFolderId;
       itemToBeMoved.path = newPath;
 
       await itemToBeMoved.save();
 
+      const descendantFolderOperations = childFolders.map((childFolder) => {
+        const childPath = childFolder.path || [];
 
-      const descendantFolderOperations =
-        childFolders.map((childFolder) => {
-          const childPath = childFolder.path || [];
+        const relativePath = childPath.slice(oldPath.length + 1);
 
-          const relativePath = childPath.slice(
-            oldPath.length + 1,
-          );
+        childFolder.path = [...newPath, itemToBeMoved._id, ...relativePath];
 
-          childFolder.path = [
-            ...newPath,
-            itemToBeMoved._id,
-            ...relativePath,
-          ];
+        return childFolder.save();
+      });
 
-          return childFolder.save();
-        });
+      const descendantFileOperations = childFiles.map((childFile) => {
+        const childPath = childFile.path || [];
 
+        const relativePath = childPath.slice(oldPath.length + 1);
 
-      const descendantFileOperations =
-        childFiles.map((childFile) => {
-          const childPath = childFile.path || [];
+        childFile.path = [...newPath, itemToBeMoved._id, ...relativePath];
 
-          const relativePath = childPath.slice(
-            oldPath.length + 1,
-          );
-
-          childFile.path = [
-            ...newPath,
-            itemToBeMoved._id,
-            ...relativePath,
-          ];
-
-          return childFile.save();
-        });
+        return childFile.save();
+      });
 
       await Promise.all([
         ...descendantFolderOperations,
         ...descendantFileOperations,
       ]);
     }
-
 
     return res.status(200).json({
       message: `${

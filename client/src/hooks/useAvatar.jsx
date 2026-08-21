@@ -22,6 +22,7 @@ export function UseAvatar({ name, avatar, size = 36, fontSize = 18 }) {
       <span
         className="gd-avatar"
         style={{
+          minWidth: size,
           width: size,
           height: size,
           fontSize: fontSize,

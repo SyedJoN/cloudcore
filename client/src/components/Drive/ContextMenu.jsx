@@ -169,7 +169,6 @@ function ContextMenuContent({
   const isTrashRoute = route === "trash";
 
   const isFile = !item.isDirectory;
-  const isFolder = Boolean(item.isDirectory);
 
   /* 
      CAPABILITIES
@@ -543,7 +542,13 @@ function ContextMenuContent({
    CONTEXT MENU
  */
 
-export default function ContextMenu({ open, item, position, ...rest }) {
+export default function ContextMenu({
+  open,
+  item,
+  position,
+  setShowCreateMenu,
+  ...rest
+}) {
   const [mounted, setMounted] = useState(false);
 
   const [render, setRender] = useState({
@@ -556,7 +561,7 @@ export default function ContextMenu({ open, item, position, ...rest }) {
     if (!open || !item || !position) {
       return;
     }
-
+    setShowCreateMenu(false);
     const instanceKey = `${position.x},${position.y},${
       item?._id ?? ""
     },${item?.isDirectory ? "dir" : "file"}`;

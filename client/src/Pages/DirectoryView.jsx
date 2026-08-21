@@ -12,7 +12,6 @@ import {
   DetailsSidebar,
   RequestAccess,
   DriveEmptyState,
-  GoogleDriveCard,
   CreateDirectoryModal,
   RenameModal,
   SelectionBar,
@@ -48,25 +47,21 @@ import {
 } from "../Components/Drive/PendingGoogleDriveFile";
 import { uploadGoogleDriveFile } from "../Components/Drive/uploadGoogleDriveFile";
 import RecentView from "../Components/Drive/Recent/RecentView";
-import {
-  applyRecentFilters,
-  DEFAULT_RECENT_FILTERS,
-} from "../Components/Drive/Recent/ApplyRecentFilters";
+
 import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import DownloadTray from "../Components/Drive/DownloadTray";
 import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
 import { addDirectory } from "../../apis/directoryApi";
-import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
 import {
-  ArrowDownCircleIcon,
   ArrowDownIcon,
-  ArrowUpCircleIcon,
   ArrowUpIcon,
 } from "@heroicons/react/24/solid";
 import SortButton from "../Components/ListRow/SortButton";
 import MoveModal from "../Components/Modals/MoveModal";
+import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
+import CreateMenu from "../Components/Drive/CreateMenu";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -127,6 +122,10 @@ export default function DirectoryView({ route }) {
   const [allUsers, setAllUsers] = useState([]);
   const [downloadQueue, setDownloadQueue] = useState([]);
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
+  const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [showDrivePicker, setShowDrivePicker] = useState(false);
+
   const dirContext =
     location.state?.dirContext ||
     (isTrashRoute
@@ -490,7 +489,9 @@ export default function DirectoryView({ route }) {
       await updateFileViewTime(id);
       setFilesList((prev) =>
         prev.map((item) =>
-          item._id === id ? { ...item, viewedByMeTime: new Date().toISOString() } : item,
+          item._id === id
+            ? { ...item, viewedByMeTime: new Date().toISOString() }
+            : item,
         ),
       );
     } catch (err) {
@@ -694,7 +695,11 @@ export default function DirectoryView({ route }) {
       setFilesList((prev) =>
         prev.map((item) =>
           (item.id ?? item._id) === renameId
-            ? { ...item, name: renameValue, modifiedByMeTime: new Date().toISOString() }
+            ? {
+                ...item,
+                name: renameValue,
+                modifiedByMeTime: new Date().toISOString(),
+              }
             : item,
         ),
       );
@@ -783,7 +788,7 @@ export default function DirectoryView({ route }) {
 
     try {
       const response = await fetch(
-        `http://localhost:4000/directory/${fileId}/download`,
+        `${BASE_URL}/directory/${fileId}/download`,
         {
           credentials: "include",
           signal: controller.signal,
@@ -894,7 +899,7 @@ export default function DirectoryView({ route }) {
   function handleDownload(item) {
     try {
       if (isGoogleDrive && isGoogleDriveRoute) {
-        const url = `http://localhost:4000/auth/google-drive/download?fileId=${item.id}`;
+        const url = `${BASE_URL}/auth/google-drive/download?fileId=${item.id}`;
         const a = document.createElement("a");
         a.href = url;
         a.target = "_blank";
@@ -905,7 +910,7 @@ export default function DirectoryView({ route }) {
         return;
       }
       // local S3 file
-      window.location.href = `http://localhost:4000/file/${item._id}?action=download`;
+      window.location.href = `${BASE_URL}/file/${item._id}?action=download`;
     } catch (err) {
       showError(err.message);
     }
@@ -917,8 +922,7 @@ export default function DirectoryView({ route }) {
     try {
       const itemId = item._id ?? item.id;
       const type = getResourceType(item);
-      const isGoogleDrive = type.startsWith("google-drive");
-
+      
       const restricted = access === "restricted";
       const userRole = DRIVE_ROLES[role] ?? "reader";
 
@@ -1228,6 +1232,31 @@ export default function DirectoryView({ route }) {
   if (needsAccess) {
     return <RequestAccess dirId={dirId} />;
   }
+  let CREATE_MENU_WIDTH = 180;
+  const handleCreateNewMenu = useCallback((e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const spaceLeft = e.clientX;
+    const spaceRight = window.innerWidth - e.clientX;
+
+    let left = false;
+    let x = e.clientX;
+
+    if (spaceRight >= CREATE_MENU_WIDTH) {
+      left = false;
+      x = e.clientX;
+    } else if (spaceLeft >= CREATE_MENU_WIDTH) {
+      left = true;
+      x = e.clientX - CREATE_MENU_WIDTH;
+    } else {
+      left = spaceLeft > spaceRight;
+      x = left ? 0 : e.clientX;
+    }
+
+    setShowCreateMenu(true);
+    setCreateMenuPos({ x, y: e.clientY });
+  }, []);
 
   return (
     <div className="directory-view">
@@ -1242,6 +1271,32 @@ export default function DirectoryView({ route }) {
           }}
         />
       )}
+      {showDrivePicker && (
+        <GDrivePicker
+          enqueueItem={enqueueItem}
+          setItemProgress={setItemProgress}
+          completeItem={completeItem}
+          handleCancelUpload={handleCancelUpload}
+          setDbFileId={setDbFileId}
+          refreshCurrentDirectory={refreshCurrentDirectory}
+          onClose={() => setShowDrivePicker(false)}
+          open={showDrivePicker}
+          setOpen={setShowDrivePicker}
+          showError={showError}
+        />
+      )}
+      <CreateMenu
+        menuRef={mainRef}
+        open={showCreateMenu}
+        setOpen={setOpen}
+        position={createMenuPos}
+        onClose={() => setShowCreateMenu(false)}
+        onCreateFolder={() => setShowCreateDir(true)}
+        onUploadFiles={() => fileInputRef.current?.click()}
+        onUploadFolders={() => folderInputRef.current?.click()}
+        onUploadFromDrive={() => setShowDrivePicker(true)}
+        disabled={isUploading}
+      />
 
       <DriveHeader
         searchQuery={searchQuery}
@@ -1266,7 +1321,6 @@ export default function DirectoryView({ route }) {
             onUploadFolders={() => folderInputRef.current?.click()}
           />
         )}
-
         <div className="gd-main-container">
           <main
             style={{ userSelect: "none" }}
@@ -1275,7 +1329,7 @@ export default function DirectoryView({ route }) {
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
-            onContextMenu={(e) => e.preventDefault()}
+            onContextMenu={(e) => handleCreateNewMenu(e)}
             onMouseLeave={handleMainMouseUp}
           >
             <DriveToolbar
@@ -1547,6 +1601,7 @@ export default function DirectoryView({ route }) {
       <ContextMenu
         open={open}
         openLeft={openLeft}
+        setShowCreateMenu={setShowCreateMenu}
         item={contextItem}
         position={contextPos}
         route={route}

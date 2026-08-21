@@ -18,7 +18,7 @@ import {
   ShareIcon as ShareIconSolid,
   TrashIcon as TrashIconSolid,
   StarIcon as StarIconSolid,
-  ClockIcon as ClockIconSolid
+  ClockIcon as ClockIconSolid,
 } from "@heroicons/react/24/solid";
 
 import {
@@ -93,7 +93,7 @@ const NAV_ITEMS = [
   },
 ];
 
-function NewMenu({
+export function NewMenu({
   anchorRef,
   onClose,
   onCreateFolder,
@@ -126,17 +126,21 @@ function NewMenu({
   useEffect(() => {
     function handleClick(e) {
       if (
-        !e.target.closest(".gd-menu") &&
-        !anchorRef.current?.contains(e.target)
+        menuRef.current?.contains(e.target) ||
+        anchorRef.current?.contains(e.target)
       ) {
-        onClose();
+        return;
       }
+
+      onClose();
     }
 
-    document.addEventListener("click", handleClick, true);
+    document.addEventListener("mousedown", handleClick);
 
-    return () => document.removeEventListener("click", handleClick, true);
-  }, [anchorRef, onClose]);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [onClose]);
 
   if (!rect) return null;
 
@@ -193,8 +197,7 @@ function NewMenu({
   );
 }
 
-function GDrivePicker({
-  onClose,
+export function GDrivePicker({
   open,
   setOpen,
   showError,
@@ -205,22 +208,22 @@ function GDrivePicker({
   handleCancelUpload,
   setDbFileId,
 }) {
+  if (!open || typeof document === "undefined") {
+    return null;
+  }
+
   return createPortal(
-    <>
-      {open && (
-        <GoogleDriveBrowser
-          enqueueItem={enqueueItem}
-          setItemProgress={setItemProgress}
-          completeItem={completeItem}
-          handleCancelUpload={handleCancelUpload}
-          setDbFileId={setDbFileId}
-          onUploadComplete={refreshCurrentDirectory}
-          open={open}
-          setOpen={setOpen}
-          showError={showError}
-        />
-      )}
-    </>,
+    <GoogleDriveBrowser
+      enqueueItem={enqueueItem}
+      setItemProgress={setItemProgress}
+      completeItem={completeItem}
+      handleCancelUpload={handleCancelUpload}
+      setDbFileId={setDbFileId}
+      onUploadComplete={refreshCurrentDirectory}
+      open={open}
+      setOpen={setOpen}
+      showError={showError}
+    />,
     document.body,
   );
 }
@@ -297,15 +300,6 @@ export default function DriveSidebar({
 
       {/* Nav */}
       <nav className="gd-nav-section">
-        {/* {isGoogleDrive && (
-          <button
-            className={`gd-nav-item ${dirContext === "google-drive" ? "active" : ""}`}
-            onClick={() => navigate("/google-drive")}
-          >
-            <IconDrive size={20} /> Google Drive
-          </button>
-        )} */}
-
         {NAV_ITEMS.map(({ key, label, path, Icon, IconSolid, isActive }) => {
           const active = isActive({ dirContext, dirId });
           const DisplayIcon = active ? IconSolid : Icon;

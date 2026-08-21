@@ -684,30 +684,7 @@ export default function ShareModal({
                 >
                   {selectedUsers.map((u) => (
                     <div key={u._id ?? u.id} className="gd-invite-chip">
-                      {u.avatar || u.photoLink ? (
-                        <img
-                          src={u.avatar || u.photoLink}
-                          alt={u.name || u.displayName}
-                          style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: "50%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <span
-                          className="gd-avatar"
-                          style={{
-                            width: 20,
-                            height: 20,
-                            fontSize: 18,
-                            background: "#1a73e8",
-                          }}
-                        >
-                          {u.name?.charAt(0)?.toUpperCase()}
-                        </span>
-                      )}
+                      <UseAvatar avatar={u.avatar || u.photoLink} name={u.name || u.displayName} size={20} fontSize={12} /> 
                       <span>
                         {(u.email ?? u.emailAddress) ||
                           (u.displayName ?? u.name)}
@@ -936,30 +913,7 @@ export default function ShareModal({
                   >
                     {selectedUsers.map((u) => (
                       <div key={u._id ?? u.id} className="gd-invite-chip">
-                        {u.avatar ? (
-                          <img
-                            src={u.avatar}
-                            alt={u.name}
-                            style={{
-                              width: 20,
-                              height: 20,
-                              borderRadius: "50%",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <span
-                            className="gd-avatar"
-                            style={{
-                              width: 20,
-                              height: 20,
-                              fontSize: 18,
-                              background: "#1a73e8",
-                            }}
-                          >
-                            {u.name?.charAt(0)?.toUpperCase()}
-                          </span>
-                        )}
+                      <UseAvatar avatar={u.avatar || u.photoLink} name={u.name || u.displayName} size={20} fontSize={12} /> 
                         <span>{u.email || u.name}</span>
                         <button
                           type="button"

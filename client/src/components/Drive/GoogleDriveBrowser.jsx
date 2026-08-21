@@ -26,8 +26,6 @@ function GoogleDriveBrowser({
   const { dirId } = useParams();
   const { isGoogleDrive } = useGDrive();
 
-  if (!open) return null;
-
   return (
     <DrivePicker
       client-id={import.meta.env.VITE_GOOGLE_CLIENT_ID}
