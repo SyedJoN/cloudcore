@@ -944,8 +944,8 @@ export default function ShareModal({
                           .filter((user) => {
                             const owners =
                               item.owners?.map((o) => o.emailAddress) || [];
-
-                            return !owners.includes(user.email);
+                            
+                            return ![...owners, ...peopleWithAccess.map((p)=> p.emailAddress)].includes(user.email)
                           })
 
                           .map((user) => (

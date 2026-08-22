@@ -46,6 +46,7 @@ export const updateSharedAccess = async ({
 
   const itemId = String(item?._id ?? item?.id);
 
+
   /*
    * Apply grants / role changes.
    */

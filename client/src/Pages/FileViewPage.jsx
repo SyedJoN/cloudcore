@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import FileViewer from "../Components/File/FileViewer";
 import {
   getFileByMetaId,
@@ -17,16 +17,15 @@ import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES } from "../../Utils/displayUtils";
 import { updateItemState } from "../../Utils/updateItemState";
+import { toggleItemStar } from "../../apis/resourceApi";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
-export default function FileViewPage() {
-  const { user, setUser, refreshUser } = useAuth();
-  const { dirId } = useParams();
-  const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
-    useGDrive();
+export default function FileViewPage({ route = null }) {
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const { fileId } = useParams();
+
   const [item, setItem] = useState(null);
   const [error, setError] = useState(null);
   const [shareItem, setShareItem] = useState(null);
@@ -38,8 +37,6 @@ export default function FileViewPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [peopleWithAccess, setPeopleWithAccess] = useState([]);
-  const [directoriesList, setDirectoriesList] = useState([]);
-  const [filesList, setFilesList] = useState([]);
   const [prevPermissions, setPrevPermissions] = useState([]);
   const [linkAccess, setLinkAccess] = useState("");
   const [linkRole, setLinkRole] = useState("");
@@ -50,6 +47,15 @@ export default function FileViewPage() {
   const navigate = useNavigate();
   const extRef = useRef(null);
 
+  useEffect(() => {
+    setIsStarred((prev) => {
+      const updated = { ...prev };
+      item?.forEach((i) => {
+        updated[i._id] = i.isStarred;
+      });
+      return updated;
+    });
+  }, [item]);
 
   function openRename(item) {
     setRenameType(item.isDirectory ? "directory" : "file");
@@ -75,207 +81,155 @@ export default function FileViewPage() {
       const cleanName = renameValue.replace(/\.[^/.]+$/, "");
       const newName = `${cleanName}${extRef.current}`;
       setShowRename(false);
-      setItem((prev) => ({ ...prev, name: newName }));
+      setItem((prev) => prev.map((prev) => ({ ...prev, name: newName })));
     } catch (err) {
       setError(err.message);
     }
   }
 
-const handleToggleResourcePublic = async (
-  item,
-  role,
-  access,
-) => {
-  setIsShareLoading(true);
+  const handleToggleResourcePublic = async (item, role, access) => {
+    setIsShareLoading(true);
 
-  try {
-    const itemId = item._id ?? item.id;
-    const type = getResourceType(item);
-    const isGoogleDrive = type.startsWith(
-      "google-drive",
-    );
+    try {
+      const itemId = item._id ?? item.id;
+      const type = getResourceType(item);
+      const isGoogleDrive = type.startsWith("google-drive");
 
-    const restricted = access === "restricted";
-    const userRole =
-      DRIVE_ROLES[role] ?? "reader";
+      const restricted = access === "restricted";
+      const userRole = DRIVE_ROLES[role] ?? "reader";
 
-    let permission = null;
+      let permission = null;
 
-    if (isGoogleDrive) {
-      if (restricted) {
-        await revokeFileAccess(
-          "google",
-          itemId,
-        );
-      } else {
-        const { data } =
-          await toggleDriveFilePermission(
-            itemId,
-            userRole,
-          );
+      await toggleFilePublic(itemId, userRole, access, type);
 
-        permission = data.permission;
-      }
-    } else {
-      await toggleFilePublic(
-        itemId,
-        userRole,
-        access,
-        type,
-      );
+      const update = (list) =>
+        list.map((resource) => {
+          if (String(resource._id ?? resource.id) !== String(itemId)) {
+            return resource;
+          }
+
+          const permissions = resource.permissions ?? [];
+
+          const updatedPermissions = restricted
+            ? permissions.filter((p) => p?.type !== "anyone")
+            : [
+                ...permissions.filter((p) => p?.type !== "anyone"),
+                {
+                  ...(permission ?? {}),
+                  type: "anyone",
+                  role: userRole,
+                },
+              ];
+
+          return {
+            ...resource,
+            isPublic: restricted ? false : true,
+            publicRole: restricted ? null : userRole,
+            permissions: updatedPermissions,
+          };
+        });
+
+      setItem((prev) => update(prev));
+      setLinkAccess(restricted ? "restricted" : "anyone");
+      setLinkRole(restricted ? "reader" : userRole);
+
+      toast({
+        message: "Public Access updated",
+        type: "success",
+      });
+    } catch (error) {
+      toast({
+        message: error?.message || "Something went wrong!",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
     }
+  };
 
-    const permissions =
-      item.permissions ?? [];
+  const handleSharedRoleUpdate = async (item, type, message) => {
+    setIsShareLoading(true);
 
-    const updatedPermissions = restricted
-      ? permissions.filter(
-          (p) => p?.type !== "anyone",
-        )
-      : [
-          ...permissions.filter(
-            (p) => p?.type !== "anyone",
-          ),
-          {
-            ...(permission ?? {}),
-            type: "anyone",
-            role: userRole,
-          },
-        ];
+    try {
+      const allPermissions = item?.permissions ?? [];
+      const mergedPermissions = allPermissions.map((permission) => {
+        const changedPermission = peopleWithAccess.find(
+          (person) => String(person.id) === String(permission.id),
+        );
 
-
-    const update = (list) =>
-      list.map((resource) => {
-        if (
-          String(
-            resource._id ?? resource.id,
-          ) !== String(itemId)
-        ) {
-          return resource;
+        if (!changedPermission) {
+          return permission;
         }
 
         return {
-          ...resource,
-          permissions: updatedPermissions,
-          isPublic: !restricted,
-          publicRole: restricted
-            ? undefined
-            : userRole,
+          ...permission,
+          role: changedPermission.role,
         };
       });
-
-    updateItemState(setItem, itemId, {
-      permissions: updatedPermissions,
-      isPublic: !restricted,
-      publicRole: restricted
-        ? undefined
-        : userRole,
-    });
-
-
-    setLinkAccess(
-      restricted ? "restricted" : "anyone",
-    );
-
-    setLinkRole(
-      restricted ? "reader" : userRole,
-    );
-
-    toast({
-      message: "Public Access updated",
-      type: "success",
-    });
-  } catch (error) {
-    toast({
-      message:
-        error?.message ||
-        "Something went wrong!",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-};
-
-
-const handleSharedRoleUpdate = async (
-  item,
-  type,
-  message,
-) => {
-  setIsShareLoading(true);
-
-  try {
-    const result = await updateSharedAccess({
-      item,
-      type,
-      peopleWithAccess,
-      prevPermissions,
-      message,
-      grantAccessById,
-      revokeFileAccess,
-    });
-
-    if (!result.changed) {
-      setShareItem(null);
-      return;
-    }
-
-    const itemId = String(
-      item._id ?? item.id,
-    );
-
-  
-
-
-    setItem((currentItem) => {
-      if (!currentItem) {
-        return currentItem;
-      }
-
-      if (
-        String(currentItem._id) !== itemId
-      ) {
-        return currentItem;
-      }
-
-      const nonUserPermissions = (
-        currentItem.permissions ?? []
-      ).filter(
+      const newPermissions = mergedPermissions.filter(
         (permission) =>
-          permission.type !== "user",
+          permission?.type !== "anyone" && permission?.role !== "owner",
       );
 
-      return {
-        ...currentItem,
-        permissions: [
-          ...nonUserPermissions,
-          ...result.permissions,
-        ],
-      };
-    });
+      const previousEditablePermissions = (item?.permissions ?? []).filter(
+        (permission) =>
+          permission?.type !== "anyone" && permission?.role !== "owner",
+      );
 
-    setPeopleWithAccess(result.permissions);
-    setPrevPermissions(result.permissions);
-    setShareItem(null);
+      const result = await updateSharedAccess({
+        item,
+        type,
+        peopleWithAccess: newPermissions,
+        prevPermissions: previousEditablePermissions,
+        message,
+        grantAccessById,
+        revokeFileAccess,
+      });
 
-    toast({
-      message: "Access updated",
-      type: "success",
-    });
-  } catch (error) {
-    toast({
-      message:
-        error?.message ||
-        "Something went wrong!",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-};
+      if (!result.changed) {
+        setShareItem(null);
+        return;
+      }
 
+      const updatedPeopleWithAccess = peopleWithAccess
+        .map((p) => {
+          const isRemoved = p.role === "remove";
+          if (isRemoved) {
+            return null;
+          }
+          return p;
+        })
+        .filter(Boolean);
 
+      const update = (list) =>
+        list.map((resource) => {
+          const resourceId = String(resource?._id ?? resource?.id);
+          if (resourceId !== String(result.itemId)) {
+            return resource;
+          }
+          return {
+            ...resource,
+            permissions: updatedPeopleWithAccess,
+          };
+        });
+      setItem((prev) => update(prev));
+      setPeopleWithAccess(updatedPeopleWithAccess);
+      setPrevPermissions(updatedPeopleWithAccess);
+      setShareItem(null);
+
+      toast({
+        message: "Access updated",
+        type: "success",
+      });
+    } catch (error) {
+      toast({
+        message: error?.message || "Something went wrong!",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
 
   useEffect(() => {
     refreshUser();
@@ -313,17 +267,13 @@ const handleSharedRoleUpdate = async (
     try {
       const data = await getFileByMetaId(fileId);
       console.log("filedata", data);
-
-      setItem(data);
+      setItem([data]);
     } catch (error) {
       setError(error.message || "Failed to load file");
       console.log(error);
     }
   };
 
-  useEffect(()=> {
-    console.log('item', item)
-  }, [shareItem])
   if (error)
     return (
       <div
@@ -341,7 +291,7 @@ const handleSharedRoleUpdate = async (
       </div>
     );
 
-  if (!item)
+  if (!item) {
     return (
       <div
         style={{
@@ -354,22 +304,32 @@ const handleSharedRoleUpdate = async (
         <div className="fv-spinner" />
       </div>
     );
+  }
 
-  const handleShareItem = async (item, role, access) => {
+  async function handleToggleStar(item) {
     try {
-      setIsShareLoading(true);
-      const { _id } = item;
-      const result = await toggleFilePublic(_id, role, access);
-      console.log(result);
-    } catch (error) {
-      throw new Error(error || "Something went wrong!");
-    } finally {
-      setIsShareLoading(false);
-    }
-  };
+      await Promise.all(
+        item.map((i) => {
+          const type = item.isDirectory ? "folder" : "file";
+          setIsStarred((prev) => ({
+            ...prev,
+            [i._id]: !prev[i._id],
+          }));
+          return toggleItemStar(i._id, type);
+        }),
+      );
+      setItem((prev) => prev.map((i) => ({ ...i, isStarred: !i.isStarred })));
 
+      toast({
+        message: `${item[0].name} ${item[0].isStarred ? "removed from" : "added to"} starred`,
+        type: "success",
+      });
+    } catch (error) {
+      setError(error.message);
+    }
+  }
   async function handleMoveToTrash(item) {
-    console.log("item", item);
+
     try {
       const url = item.isDirectory
         ? `/directory/soft-delete/${item._id}`
@@ -390,20 +350,28 @@ const handleSharedRoleUpdate = async (
   return (
     <>
       <FileViewer
-        key={item._id}
+        key={item[0]._id}
         isStarred={isStarred}
         shareItem={shareItem}
-        item={item}
+        item={item[0]}
         onClose={() => window.close()}
         meta={true}
         isGDrive={false}
         onRename={(item) => {
           openRename(item);
         }}
-        onShare={(item) => setShareItem(item)}
-        onSoftDelete={(item) => handleMoveToTrash(item)}
+        onShare={
+          route === "direct"
+            ? () => setShareItem(item[0])
+            : (item) => setShareItem(item)
+        }
+        onTrash={() => handleMoveToTrash(item[0])}
+        onStar={() => handleToggleStar(item)}
         onDownload={() =>
-          window.open(`${BASE_URL}/file/${item._id}?action=download`, "_blank")
+          window.open(
+            `${BASE_URL}/file/${item[0]._id}?action=download`,
+            "_blank",
+          )
         }
       />
       {shareItem && (
@@ -415,8 +383,6 @@ const handleSharedRoleUpdate = async (
           setShareItem={setShareItem}
           isShareLoading={isShareLoading}
           setIsShareLoading={setIsShareLoading}
-          setDirectoriesList={setDirectoriesList}
-          setFilesList={setFilesList}
           selectedUsers={selectedUsers}
           setSelectedUsers={setSelectedUsers}
           peopleWithAccess={peopleWithAccess}

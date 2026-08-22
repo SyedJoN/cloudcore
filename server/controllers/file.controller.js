@@ -512,22 +512,22 @@ export const getFileMetaById = async (req, res, next) => {
       .lean();
 
     const isOwner = file.userId?._id?.toString?.() === userId?.toString?.();
-    const {  owners,
-          capabilities,
-          permissions,
-          viewedByMeTime,
-          modifiedByMeTime, } = await resolveRole(
-      file,
-      "file",
-      userId,
-      parentDir,
-    );
+    const {
+      owners,
+      capabilities,
+      permissions,
+      viewedByMeTime,
+      modifiedByMeTime,
+    } = await resolveRole(file, "file", userId, parentDir);
 
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
         ...file,
+        owners,
         capabilities,
         permissions,
+         viewedByMeTime,
+      modifiedByMeTime,
       });
     }
 
@@ -1396,6 +1396,7 @@ export const revokeAccessById = async (req, res, next) => {
       });
     }
 
+
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
 
@@ -1441,6 +1442,8 @@ export const revokeAccessById = async (req, res, next) => {
         object,
       },
     });
+ 
+    console.dir(existing, { depth: null });
 
     const deletes = existing.tuples
       .filter(
@@ -1454,14 +1457,13 @@ export const revokeAccessById = async (req, res, next) => {
         relation: tuple.key.relation,
         object: tuple.key.object,
       }));
-
     // Already removed
     if (!deletes.length) {
       return res.status(200).json({
         message: "Access already revoked",
       });
     }
-
+ 
     await fgaClient.write({
       deletes,
     });

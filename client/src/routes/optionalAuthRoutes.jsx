@@ -12,7 +12,7 @@ export const optionalAuthRoutes = [
       },
       {
         path: "/file/:fileId",
-        element: <FileViewPage />,
+        element: <FileViewPage route='direct'/>,
       },
     ],
   },
