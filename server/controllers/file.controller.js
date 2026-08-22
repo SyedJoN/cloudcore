@@ -1396,7 +1396,7 @@ export const revokeAccessById = async (req, res, next) => {
       });
     }
 
-
+    // Google Drive permission
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
 
@@ -1418,54 +1418,43 @@ export const revokeAccessById = async (req, res, next) => {
       });
     }
 
-    const userId = permissionId;
+  
     const objectType = type === "folder" ? "folder" : "file";
+    const user = getFgaObject("user", permissionId);
     const object = getFgaObject(objectType, id);
-    const user = getFgaObject("user", userId);
 
-    const Model = type === "folder" ? Directory : File;
 
-    const item = await Model.findById(id).select("_id").lean();
+    const relations =
+      relation === "remove"
+        ? ["reader", "writer"]
+        : [relation];
 
-    if (!item) {
-      return res.status(404).json({
-        message: "Item not found",
+   
+    const tuples = [];
+
+    for (const rel of relations) {
+      const result = await fgaClient.read({
+        user,
+        relation: rel,
+        object,
       });
+
+      tuples.push(...result.tuples);
     }
 
-    const allowedRelations =
-      relation === "remove" ? ["reader", "writer"] : [relation];
-
-    const existing = await fgaClient.read({
-      tuple_key: {
-        user,
-        object,
-      },
-    });
- 
-    console.dir(existing, { depth: null });
-
-    const deletes = existing.tuples
-      .filter(
-        (tuple) =>
-          tuple.key.user === user &&
-          tuple.key.object === object &&
-          allowedRelations.includes(tuple.key.relation),
-      )
-      .map((tuple) => ({
-        user: tuple.key.user,
-        relation: tuple.key.relation,
-        object: tuple.key.object,
-      }));
-    // Already removed
-    if (!deletes.length) {
+  
+    if (!tuples.length) {
       return res.status(200).json({
         message: "Access already revoked",
       });
     }
- 
+
     await fgaClient.write({
-      deletes,
+      deletes: tuples.map(({ key }) => ({
+        user: key.user,
+        relation: key.relation,
+        object: key.object,
+      })),
     });
 
     return res.status(200).json({
@@ -1475,6 +1464,8 @@ export const revokeAccessById = async (req, res, next) => {
     next(error);
   }
 };
+
+
 export const fetchItemPermissions = async (req, res, next) => {
   try {
     const { id } = req.params;
