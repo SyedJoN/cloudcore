@@ -45,7 +45,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
           px-4 py-2
           text-sm
           text-(--text-secondary)
-          hover:bg-[#f1f3f4]
+          hover:bg-(--surface-container-dark)
           cursor-pointer
         "
       >
@@ -70,7 +70,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
             <>
               {sortLabels[sortConfig.key]}
 
-              <div className="ml-[4px] flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-blue-light)">
+              <div className="ml-1 flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-blue-light)">
                 {sortConfig.direction === "asc" ? (
                   <ArrowUpIcon className="h-5 w-5 text-[#06062f]" />
                 ) : (

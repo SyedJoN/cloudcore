@@ -67,7 +67,6 @@ export default function ShareModal({
   const { user } = useAuth();
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
-  const [personRole, setPersonRole] = useState({});
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [message, setMessage] = useState("");
   const [showInvitePanel, setShowInvitePanel] = useState(false);
@@ -77,11 +76,9 @@ export default function ShareModal({
   const [inviteInput, setInviteInput] = useState("");
   const [activePerson, setActivePerson] = useState(null);
   const [showAccessDropdown, setShowAccessDropdown] = useState(false);
-  const [updatedPerson, setUpdatedPerson] = useState([]);
+
   const [isConfirmation, setIsConfirmation] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
-  const [isOwnerPending, setIsOwnerPending] = useState({});
-  const [hasImgError, setHasImgError] = useState(false);
 
   const inviteRoleRef = useRef(null);
   const linkRoleRef = useRef(null);
@@ -101,7 +98,7 @@ export default function ShareModal({
 
   const canChangeRole = capabilities?.canChangeRole ?? true;
   const canShare = capabilities.canShare === true;
-  const canRename = capabilities.canRename === true;
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -201,9 +198,9 @@ export default function ShareModal({
     }
   }
 
-  useEffect(() => {
-    console.log("suggestions", suggestions);
-  }, [suggestions]);
+  const isOnlyPublic =
+    item.isPublic &&
+    !item.permissions.some((p) => p.emailAddress === user.email);
 
   async function handleSend(e) {
     e.preventDefault();
@@ -619,17 +616,16 @@ export default function ShareModal({
   if (!canShare) {
     return (
       <>
-        <div className="gd-modal-overlay confirmation-tab">
-          {isConfirmation && (
-            <ConfirmationModal
-              title="Discard unsaved changes?"
-              action_1="Cancel"
-              action_2="Discard"
-              onAction_1={() => setIsConfirmation(false)}
-              onAction_2={() => setShareItem(null)}
-            />
-          )}
-        </div>
+        {isConfirmation && (
+          <ConfirmationModal
+            title="Discard unsaved changes?"
+            action_1="Cancel"
+            action_2="Discard"
+            onAction_1={() => setIsConfirmation(false)}
+            onAction_2={() => setShareItem(null)}
+          />
+        )}
+
         <div
           key={item}
           className="gd-modal-overlay"
@@ -684,7 +680,12 @@ export default function ShareModal({
                 >
                   {selectedUsers.map((u) => (
                     <div key={u._id ?? u.id} className="gd-invite-chip">
-                      <UseAvatar avatar={u.avatar || u.photoLink} name={u.name || u.displayName} size={20} fontSize={12} /> 
+                      <UseAvatar
+                        avatar={u.avatar || u.photoLink}
+                        name={u.name || u.displayName}
+                        size={20}
+                        fontSize={12}
+                      />
                       <span>
                         {(u.email ?? u.emailAddress) ||
                           (u.displayName ?? u.name)}
@@ -859,15 +860,13 @@ export default function ShareModal({
     return (
       <>
         {isConfirmation && (
-          <div className="gd-modal-confirmation">
-            <ConfirmationModal
-              title="Discard unsaved changes?"
-              action_1="Cancel"
-              action_2="Discard"
-              onAction_1={() => setIsConfirmation(false)}
-              onAction_2={() => setShareItem(null)}
-            />
-          </div>
+          <ConfirmationModal
+            title="Discard unsaved changes?"
+            action_1="Cancel"
+            action_2="Discard"
+            onAction_1={() => setIsConfirmation(false)}
+            onAction_2={() => setShareItem(null)}
+          />
         )}
         <div
           ref={shareModalOverlayRef}
@@ -913,7 +912,12 @@ export default function ShareModal({
                   >
                     {selectedUsers.map((u) => (
                       <div key={u._id ?? u.id} className="gd-invite-chip">
-                      <UseAvatar avatar={u.avatar || u.photoLink} name={u.name || u.displayName} size={20} fontSize={12} /> 
+                        <UseAvatar
+                          avatar={u.avatar || u.photoLink}
+                          name={u.name || u.displayName}
+                          size={20}
+                          fontSize={12}
+                        />
                         <span>{u.email || u.name}</span>
                         <button
                           type="button"
@@ -943,9 +947,21 @@ export default function ShareModal({
                           .filter((user) => user?.email)
                           .filter((user) => {
                             const owners =
-                              item.owners?.map((o) => o.emailAddress) || [];
-                            
-                            return ![...owners, ...peopleWithAccess.map((p)=> p.emailAddress)].includes(user.email)
+                              item.owners?.map((o) =>
+                                o.emailAddress?.toLowerCase(),
+                              ) || [];
+
+                            const accessEmails = peopleWithAccess.map((p) =>
+                              p.emailAddress?.toLowerCase(),
+                            );
+
+                            if (isOnlyPublic) {
+                              return owners.includes(user.email?.toLowerCase());
+                            }
+
+                            return [...owners, ...accessEmails].includes(
+                              user.email?.toLowerCase(),
+                            );
                           })
 
                           .map((user) => (
@@ -1079,13 +1095,26 @@ export default function ShareModal({
                   >
                     {suggestions
                       .filter((user) => {
-                        const addedPeople = peopleWithAccess.some(
-                          (p) => p.emailAddress === user.email,
+                        const owners =
+                          item.owners?.map((o) =>
+                            o.emailAddress?.toLowerCase(),
+                          ) || [];
+
+                        const isOwner = owners.includes(
+                          user.email?.toLowerCase(),
                         );
-                        if (addedPeople) {
-                          return false;
+
+                        if (isOnlyPublic) {
+                          return isOwner;
                         }
-                        return true;
+
+                        const addedPeople = peopleWithAccess.some(
+                          (p) =>
+                            p.emailAddress?.toLowerCase() ===
+                            user.email?.toLowerCase(),
+                        );
+
+                        return !addedPeople;
                       })
                       .map((user) => (
                         <div
@@ -1267,7 +1296,9 @@ export default function ShareModal({
                 <div className="gd-share-section-label">General access</div>
 
                 <div className="gd-share-link-section">
-                  <div className="gd-share-link-row">
+                  <div
+                    className={`gd-share-link-row ${isOnlyPublic ? "disabled" : ""}`}
+                  >
                     <div
                       className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
                     >
@@ -1284,7 +1315,8 @@ export default function ShareModal({
                         ref={accessDropdownRef}
                         style={{ position: "relative" }}
                       >
-                        <div
+                        <button
+                          disabled={isOnlyPublic}
                           className="gd-share-access-btn"
                           onClick={() =>
                             setShowAccessDropdown(!showAccessDropdown)
@@ -1297,7 +1329,7 @@ export default function ShareModal({
                               : "Restricted"}
                           </span>
                           <IconChevronDown size={14} />
-                        </div>
+                        </button>
 
                         {showAccessDropdown && (
                           <div className="gd-share-access-dropdown">
@@ -1337,6 +1369,7 @@ export default function ShareModal({
                         <div className="gd-share-link-role-wrap">
                           <button
                             ref={linkRoleRef}
+                            disabled={isOnlyPublic}
                             className="gd-share-role-btn"
                             onClick={() =>
                               setOpenDropdown(
@@ -1344,7 +1377,8 @@ export default function ShareModal({
                               )
                             }
                           >
-                            {ROLE_LABEL[linkRole]} <IconChevronDown size={14} />
+                            {ROLE_LABEL[linkRole]}{" "}
+                            {!isOnlyPublic && <IconChevronDown size={14} />}
                           </button>
 
                           <RoleDropdown

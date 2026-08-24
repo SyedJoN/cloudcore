@@ -1,9 +1,9 @@
 export function getLastActivityTime(item) {
-  const modified = item.modifiedTime
-    ? new Date(item.modifiedTime).getTime()
+  const modified = item.modifiedByMeTime
+    ? new Date(item.modifiedByMeTime)?.getTime()
     : 0;
   const viewed = item.viewedByMeTime
-    ? new Date(item.viewedByMeTime).getTime()
+    ? new Date(item.viewedByMeTime)?.getTime()
     : 0;
   const ts = Math.max(modified, viewed);
   return ts > 0 ? ts : null;
@@ -56,7 +56,9 @@ const FIXED_ORDER = [
 export function groupItemsByRecency(items) {
   const buckets = new Map();
 
-  const sorted = [...items]
+  const sorted = [...items].sort(
+    (a, b) => (getLastActivityTime(b) ?? 0) - (getLastActivityTime(a) ?? 0),
+  );
 
   for (const item of sorted) {
     const bucket = getRecencyBucket(getLastActivityTime(item));

@@ -45,6 +45,25 @@ async function getSharedWithMeTime({ itemId, itemType, userId }) {
   return record?.sharedWithMeTime || null;
 }
 
+async function listSharedObjects(type, userId) {
+  const [sharedResult, readerResult] = await Promise.all([
+    fgaClient.listObjects({
+      user: `user:${userId}`,
+      relation: "shared_reader",
+      type,
+    }),
+    fgaClient.listObjects({
+      user: `user:${userId}`,
+      relation: "can_read",
+      type,
+    }),
+  ]);
+
+  const combined = [...sharedResult.objects, ...readerResult.objects];
+
+  return [...new Set(combined)].map((o) => o.split(":").pop()).filter(Boolean);
+}
+
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const object = getFgaObject(type, item._id);
   const permissionMap = new Map();
@@ -302,6 +321,7 @@ export const generateSignedUploadUrl = async (req, res, next) => {
       message: "File too large",
     });
   }
+
   try {
     const parentDir = await Directory.findOne({
       _id: parentDirId,
@@ -526,13 +546,12 @@ export const getFileMetaById = async (req, res, next) => {
         owners,
         capabilities,
         permissions,
-         viewedByMeTime,
-      modifiedByMeTime,
+        viewedByMeTime,
+        modifiedByMeTime,
       });
     }
 
-    const isPublicallyAccessible = parentDir?.isPublic;
-    file?.isPublic;
+    const isPublicallyAccessible = parentDir?.isPublic || file?.isPublic;
 
     if (!isPublicallyAccessible) {
       if (!userId) {
@@ -542,17 +561,16 @@ export const getFileMetaById = async (req, res, next) => {
         });
       }
 
-      const canRead = await Promise.all(
-        fgaClient.check({
-          user: getFgaObject("user", userId),
-          role: "can_read",
-          object: getFgaObject("file", id),
-        }),
-      );
+      const canRead = await fgaClient.check({
+        user: getFgaObject("user", userId),
+        relation: "can_read",
+        object: getFgaObject("file", id),
+      });
 
       if (!canRead.allowed) {
         return res.status(403).json({ message: "Access denied" });
       }
+
       await FileActivity.findOneAndUpdate(
         {
           file: file._id,
@@ -560,7 +578,7 @@ export const getFileMetaById = async (req, res, next) => {
           type: "view",
         },
         {
-          $set: { lastOccurredAt: new Date() },
+          $set: { occuredAt: new Date() },
         },
         {
           upsert: true,
@@ -580,17 +598,38 @@ export const getFileMetaById = async (req, res, next) => {
       const [canRead, canWrite] = await Promise.all([
         fgaClient.check({
           user: getFgaObject("user", userId),
-          role: "can_read",
+          relation: "can_read",
           object: getFgaObject("file", id),
         }),
         fgaClient.check({
           user: getFgaObject("user", userId),
-          role: "can_write",
+          relation: "can_write",
           object: getFgaObject("file", id),
         }),
       ]);
 
-      if (canRead.checked || canWrite.checked) {
+      if (canRead.allowed || canWrite.allowed) {
+        const relation = file.publicRole || "reader";
+
+        try {
+          await fgaClient.write(
+            {
+              writes: [
+                {
+                  user: `user:${userId}`,
+                  relation:
+                    relation === "reader" ? "shared_reader" : "shared_writer",
+                  object: getFgaObject("file", file._id),
+                },
+              ],
+            },
+            {
+              transaction: {
+                disabled: true,
+              },
+            },
+          );
+        } catch (error) {}
         await FileActivity.findOneAndUpdate(
           {
             file: file._id,
@@ -598,7 +637,7 @@ export const getFileMetaById = async (req, res, next) => {
             type: "view",
           },
           {
-            $set: { lastOccurredAt: new Date() },
+            $set: { occuredAt: new Date() },
           },
           {
             upsert: true,
@@ -614,20 +653,7 @@ export const getFileMetaById = async (req, res, next) => {
         });
       }
     }
-    await FileActivity.findOneAndUpdate(
-      {
-        file: file._id,
-        user: userId,
-        type: "view",
-      },
-      {
-        $set: { lastOccurredAt: new Date() },
-      },
-      {
-        upsert: true,
-      },
-    );
-    await file.save();
+    return res.status(403).json({ message: "Access denied" });
   } catch (error) {
     next(error);
   }
@@ -638,15 +664,7 @@ export const getRecentFiles = async (req, res, next) => {
     const userId = req.user?._id;
     if (!userId) return res.status(403).json({ message: "Access denied" });
 
-    const allowedFiles = await fgaClient.listObjects({
-      user: getFgaObject("user", userId),
-      relation: "can_read",
-      type: "file",
-    });
-
-    const sharedFileIds = allowedFiles.objects
-      .map((obj) => obj.split(":")[1])
-      .filter(Boolean);
+    const sharedFileIds = await listSharedObjects("file", userId);
 
     const [ownFiles, sharedFiles] = await Promise.all([
       File.find({ userId, isDeleted: false })
@@ -709,18 +727,42 @@ export const getRecentFiles = async (req, res, next) => {
 
     const allFiles = [...ownFilesWithRoles, ...sharedFilesWithRoles];
 
-    const getActivityTime = (file) => {
-      const viewed = file.viewedByMeTime
-        ? new Date(file.viewedByMeTime).getTime()
-        : 0;
-      const modified = file.updatedAt ? new Date(file.updatedAt).getTime() : 0;
-      return Math.max(viewed, modified);
-    };
+    const getActivityTime = async (file) => {
+      const [viewActivity, modifiedActivity] = await Promise.all([
+        FileActivity.findOne({
+          file: file._id,
+          user: userId,
+          type: "view",
+        })
+          .sort({ occuredAt: -1 })
+          .lean(),
 
-    allFiles.sort((a, b) => getActivityTime(b) - getActivityTime(a));
+        FileActivity.findOne({
+          file: file._id,
+          user: userId,
+          type: { $in: ["rename", "move"] },
+        })
+          .sort({ occuredAt: -1 })
+          .lean(),
+      ]);
+
+      const viewedByMeTime = viewActivity?.occuredAt?.getTime() || null;
+      const modifiedByMeTime = modifiedActivity?.occuredAt?.getTime() || null;
+     
+      return Math.max(viewedByMeTime, modifiedByMeTime);
+    };
+    const filesWithActivity = await Promise.all(
+      allFiles.map(async (file) => ({
+        file,
+        activityTime: await getActivityTime(file),
+      })),
+    );
+    filesWithActivity.sort((a, b) => b.activityTime - a.activityTime);
 
     const RECENT_LIMIT = 100;
-    const recentFiles = allFiles.slice(0, RECENT_LIMIT);
+    const recentFiles = filesWithActivity
+      .slice(0, RECENT_LIMIT)
+      .map((f) => f.file);
 
     return res.status(200).json({ files: recentFiles });
   } catch (error) {
@@ -790,37 +832,21 @@ export const updateFile = async (req, res, next) => {
       const finalName = safeBase + ext;
       const isOwner = file.userId?.toString() === userId?.toString();
 
+      const canRename = await fgaClient.check({
+        user: getFgaObject("user", userId),
+        relation: "can_rename",
+        object: getFgaObject("file", fileId),
+      });
+
+      if (!canRename.allowed) {
+        return res.status(403).json({ message: "You don't have permission to rename this file" });
+      }
+
       if (req.user?.role === "superuser" || isOwner) {
         return await performRename(file, finalName, res, userId);
       }
-
-      const canWrite = await fgaClient.check({
-        user: getFgaObject("user", userId),
-        role: "can_write",
-        object: `file:${fileId}`,
-      });
-
-      if (canWrite.allowed) {
-        return await performRename(file, finalName, res, userId);
-      }
-
-      const parentDir = file.parentDirId
-        ? await Directory.findById(file.parentDirId).lean()
-        : null;
-
-      const publicRole = file.isPublic
-        ? file.publicRole || "viewer"
-        : parentDir?.isPublic
-          ? parentDir?.publicRole || "viewer"
-          : null;
-
-      if (publicRole === "editor") {
-        return await performRename(file, finalName, res, userId);
-      }
-
-      return res.status(403).json({
-        message: "You don't have permission to rename this file",
-      });
+    
+      return await performRename(file, finalName, res, userId);
     } catch (error) {
       next(error);
     }
@@ -841,7 +867,7 @@ const performRename = async (file, fileName, res, userId) => {
       type: "rename",
     },
     {
-      $set: { lastOccurredAt: new Date() },
+      $set: { occuredAt: new Date() },
     },
     {
       upsert: true,
@@ -862,6 +888,15 @@ export const softDeleteFile = async (req, res, next) => {
     if (!file) return res.status(404).json({ message: "File not found!" });
 
     const isOwner = file.userId.toString() === userId.toString();
+
+    const canTrash = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_trash",
+      object: getFgaObject("file", id),
+    });
+    if (!canTrash.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
 
     if (isOwner) {
       file.isDeleted = true;
@@ -937,6 +972,16 @@ export const deleteFile = async (req, res, next) => {
       }
       const object = getFgaObject("file", id);
       const user = getFgaObject("user", userId);
+
+      const canDelete = await fgaClient.check({
+        user,
+        relation: "can_delete",
+        object,
+      });
+      if (!canDelete.allowed) {
+        return res.status(403).json({ message: "Unauthorized!" });
+      }
+
       await fgaClient.write(
         {
           deletes: [
@@ -1010,6 +1055,7 @@ export const toggleFilePublic = async (req, res, next) => {
     const userId = req.user?._id;
     const { itemId, role } = req.params;
     const { access, type } = req.query;
+
     const resource = type === "folder" ? Directory : File;
 
     if (!userId) return res.status(403).json({ message: "User not logged in" });
@@ -1023,51 +1069,72 @@ export const toggleFilePublic = async (req, res, next) => {
       return res.status(404).json({
         message: `${type === "file" ? "File" : "Directory"} not found`,
       });
-
+    const canShare = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_share",
+      object: getFgaObject(type, itemId),
+    });
+    if (!canShare.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
+    const object = getFgaObject(type, itemId);
     const isRestricted = access === "restricted";
 
     if (isRestricted) {
-      const tuples = await fgaClient.read({
-        tuple_key: { object: getFgaObject(type, itemId) },
-      });
-
+      const tuples = await fgaClient.read({ object });
       const toDelete = tuples.tuples.filter(
-        (t) => t.key.role !== "owner" && t.key.role !== "parent",
+        (t) =>
+          (t.key.user === "user:*" &&
+            ["link_reader", "link_writer"].includes(t.key.relation)) ||
+          ["shared_reader", "shared_writer"].includes(t.key.relation),
       );
 
       if (toDelete.length) {
-        await Promise.allSettled(
-          toDelete.map((t) =>
-            fgaClient.write({
-              deletes: [
-                {
-                  user: t.key.user,
-                  role: t.key.role,
-                  object: getFgaObject(type, itemId),
-                },
-              ],
-            }),
-          ),
-        );
+        try {
+          await fgaClient.write({
+            deletes: toDelete.map((t) => ({
+              user: t.key.user,
+              relation: t.key.relation,
+              object: t.key.object,
+            })),
+          });
+        } catch {}
       }
 
       item.isPublic = false;
       item.publicRole = undefined;
     } else {
+      const newRelation = role === "reader" ? "link_reader" : "link_writer";
+      const oldRelation = role === "reader" ? "link_writer" : "link_reader";
+
+      try {
+        await fgaClient.write({
+          deletes: [{ user: "user:*", relation: oldRelation, object }],
+        });
+      } catch {}
+
+      try {
+        await fgaClient.write({
+          writes: [{ user: "user:*", relation: newRelation, object }],
+        });
+      } catch {}
+
       item.isPublic = true;
       item.publicRole = role;
     }
 
     await item.save();
+
     const { permissions } = await resolveRole(
       item,
       type,
       userId,
       item.parentDirId,
     );
+
     return res.status(201).json({
       message: `${type === "file" ? "File" : "Directory"} made ${item.isPublic ? "public" : "private"} successfully`,
-      permissions: permissions,
+      permissions,
     });
   } catch (error) {
     next(error);
@@ -1114,7 +1181,7 @@ export const giveAccessById = async (req, res, next) => {
           );
 
           if (existing) {
-            const response = await drive.permissions.update({
+            const response = drive.permissions.update({
               fileId: id,
               permissionId: existing.id,
               requestBody: {
@@ -1389,7 +1456,7 @@ export const revokeAccessById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { targetId: permissionId, type, relation } = req.body;
-
+    const userId = req.user?._id;
     if (!permissionId) {
       return res.status(400).json({
         message: "Target permission is required",
@@ -1418,18 +1485,21 @@ export const revokeAccessById = async (req, res, next) => {
       });
     }
 
-  
     const objectType = type === "folder" ? "folder" : "file";
     const user = getFgaObject("user", permissionId);
     const object = getFgaObject(objectType, id);
 
+    const canShare = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_share",
+      object,
+    });
+    if (!canShare.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
 
-    const relations =
-      relation === "remove"
-        ? ["reader", "writer"]
-        : [relation];
+    const relations = relation === "remove" ? ["reader", "writer"] : [relation];
 
-   
     const tuples = [];
 
     for (const rel of relations) {
@@ -1442,7 +1512,6 @@ export const revokeAccessById = async (req, res, next) => {
       tuples.push(...result.tuples);
     }
 
-  
     if (!tuples.length) {
       return res.status(200).json({
         message: "Access already revoked",
@@ -1465,7 +1534,6 @@ export const revokeAccessById = async (req, res, next) => {
   }
 };
 
-
 export const fetchItemPermissions = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1481,10 +1549,7 @@ export const fetchItemPermissions = async (req, res, next) => {
     let continuationToken = undefined;
 
     do {
-      const response = await fgaClient.read(
-        { tuple_key: { object } },
-        { continuationToken },
-      );
+      const response = await fgaClient.read({ object }, { continuationToken });
       allTuples = allTuples.concat(response.tuples);
       continuationToken = response.continuation_token;
     } while (continuationToken);
@@ -1693,7 +1758,7 @@ export const updateFileViewTime = async (req, res, next) => {
       },
       {
         $set: {
-          lastOccurredAt: new Date(),
+          occuredAt: new Date(),
         },
       },
       {

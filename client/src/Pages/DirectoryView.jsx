@@ -54,14 +54,12 @@ import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import DownloadTray from "../Components/Drive/DownloadTray";
 import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
 import { addDirectory } from "../../apis/directoryApi";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-} from "@heroicons/react/24/solid";
+import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/solid";
 import SortButton from "../Components/ListRow/SortButton";
 import MoveModal from "../Components/Modals/MoveModal";
 import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
 import CreateMenu from "../Components/Drive/CreateMenu";
+import ConfirmationModal from "../Components/Modals/ConfirmationModal";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -88,9 +86,8 @@ export default function DirectoryView({ route }) {
     [],
   );
 
-  const isHomeRoute = route === "home";
-  const isSharedRoute =
-    route === "shared" || params.get("usp") === "drive_link";
+  const isHomeRoute = route === "home" || params.get("usp") === "drive_link";
+  const isSharedRoute = route === "shared";
   const isTrashRoute = route === "trash";
   const isGoogleDriveRoute = route === "google-drive";
   const isRecentRoute = route === "recent";
@@ -125,7 +122,46 @@ export default function DirectoryView({ route }) {
   const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [sortConfig, setSortConfig] = useState({
+    key: "name",
+    direction: "asc",
+    folders: "top",
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    message: "",
+    resolve: null,
+  });
 
+  const showConfirmModal = (message) => {
+    return new Promise((resolve) => {
+      setConfirmModal({
+        open: true,
+        message,
+        resolve,
+      });
+    });
+  };
+
+  const handleConfirm = () => {
+    confirmModal.resolve?.(true);
+
+    setConfirmModal({
+      open: false,
+      message: "",
+      resolve: null,
+    });
+  };
+
+  const handleCancel = () => {
+    confirmModal.resolve?.(false);
+
+    setConfirmModal({
+      open: false,
+      message: "",
+      resolve: null,
+    });
+  };
   const dirContext =
     location.state?.dirContext ||
     (isTrashRoute
@@ -787,13 +823,10 @@ export default function DirectoryView({ route }) {
     }));
 
     try {
-      const response = await fetch(
-        `${BASE_URL}/directory/${fileId}/download`,
-        {
-          credentials: "include",
-          signal: controller.signal,
-        },
-      );
+      const response = await fetch(`${BASE_URL}/directory/${fileId}/download`, {
+        credentials: "include",
+        signal: controller.signal,
+      });
 
       if (!response.ok) {
         throw new Error("Download failed");
@@ -922,11 +955,13 @@ export default function DirectoryView({ route }) {
     try {
       const itemId = item._id ?? item.id;
       const type = getResourceType(item);
-      
+
       const restricted = access === "restricted";
       const userRole = DRIVE_ROLES[role] ?? "reader";
 
       let permission = null;
+      let myRole;
+      let publicRole;
 
       if (isGoogleDriveRoute) {
         if (restricted) {
@@ -937,35 +972,76 @@ export default function DirectoryView({ route }) {
           permission = data.permission;
         }
       } else {
+        myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
+        publicRole = DRIVE_ROLES[role] || role;
+
+        console.log({ myRole, publicRole });
+        if (
+          publicRole &&
+          (publicRole === "reader" || access === "restricted") &&
+          myRole &&
+          myRole === "reader"
+        ) {
+          const confirmed = await showConfirmModal(
+            "You will not be able to share. Are you sure?",
+          );
+          if (!confirmed) {
+            const prevRole = item.permissions.find(
+              (p) => p.type === "anyone",
+            )?.role;
+            console.log('prevRole', prevRole);
+           setLinkRole(prevRole)
+           setLinkAccess('anyone')
+       
+            return;
+          }
+        }
+
+        console.log("myRole", myRole);
+        console.log("myRole", linkAccess);
+        if (access === "restricted" && myRole === undefined) {
+          const confirmed = await showConfirmModal(
+            "You will no longer have access. Are you sure?",
+          );
+          if (!confirmed) return;
+        }
         await toggleFilePublic(itemId, userRole, access, type);
       }
 
       const update = (list) =>
-        list.map((resource) => {
-          if (String(resource._id ?? resource.id) !== String(itemId)) {
-            return resource;
-          }
+        linkAccess === "restricted" && myRole === "reader"
+          ? list.filter(
+              (resource) => (resource.id ?? resource._id) !== item._id,
+            )
+          : list.map((resource) => {
+              if (String(resource._id ?? resource.id) !== String(itemId)) {
+                return resource;
+              }
 
-          const permissions = resource.permissions ?? [];
+              const permissions = resource.permissions ?? [];
 
-          const updatedPermissions = restricted
-            ? permissions.filter((p) => p?.type !== "anyone")
-            : [
-                ...permissions.filter((p) => p?.type !== "anyone"),
-                {
-                  ...(permission ?? {}),
-                  type: "anyone",
-                  role: userRole,
+              const updatedPermissions = restricted
+                ? permissions.filter((p) => p?.type !== "anyone")
+                : [
+                    ...permissions.filter((p) => p?.type !== "anyone"),
+                    {
+                      ...(permission ?? {}),
+                      type: "anyone",
+                      role: userRole,
+                    },
+                  ];
+
+              return {
+                ...resource,
+                capabilities: {
+                  ...resource.capabilities,
+                  canShare: publicRole !== "reader" || myRole !== "reader",
                 },
-              ];
-
-          return {
-            ...resource,
-            isPublic: restricted ? false : true,
-            publicRole: restricted ? null : userRole,
-            permissions: updatedPermissions,
-          };
-        });
+                isPublic: restricted ? false : true,
+                publicRole: restricted ? null : userRole,
+                permissions: updatedPermissions,
+              };
+            });
 
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
@@ -1024,6 +1100,61 @@ export default function DirectoryView({ route }) {
           permission?.type !== "anyone" && permission?.role !== "owner",
       );
 
+      const myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
+
+      const publicRole = linkRole;
+
+      console.log({ myRole, publicRole });
+      if (
+        publicRole &&
+        publicRole === "reader" &&
+        myRole &&
+        myRole === "reader"
+      ) {
+        const confirmed = await showConfirmModal(
+          "You will not be able to share. Are you sure?",
+        );
+        if (!confirmed) {
+          const prevRole = item.permissions.find(
+            (p) => p.emailAddress === user.email,
+          )?.role;
+          console.log("prevRole", prevRole);
+          setPeopleWithAccess((prev) =>
+            prev.map((p) =>
+              p.emailAddress === user.email
+                ? {
+                    ...p,
+                    role: prevRole,
+                  }
+                : p,
+            ),
+          );
+        }
+        return;
+      }
+      if (linkAccess === "restricted" && myRole === "remove") {
+        const confirmed = await showConfirmModal(
+          "You will no longer have access. Are you sure?",
+        );
+        if (!confirmed) {
+          const prevRole = item.permissions.find(
+            (p) => p.emailAddress === user.email,
+          )?.role;
+          console.log("prevRole", prevRole);
+          setPeopleWithAccess((prev) =>
+            prev.map((p) =>
+              p.emailAddress === user.email
+                ? {
+                    ...p,
+                    role: prevRole,
+                  }
+                : p,
+            ),
+          );
+          return;
+        }
+      }
+
       const result = await updateSharedAccess({
         item,
         type,
@@ -1050,21 +1181,36 @@ export default function DirectoryView({ route }) {
           if (isRemoved) {
             return null;
           }
+          const isPublic = p.type === "anyone";
+          if (isPublic) {
+            return {
+              ...p,
+              role: linkRole,
+            };
+          }
           return p;
         })
         .filter(Boolean);
 
       const update = (list) =>
-        list.map((resource) => {
-          const resourceId = String(resource?._id ?? resource?.id);
-          if (resourceId !== String(result.itemId)) {
-            return resource;
-          }
-          return {
-            ...resource,
-            permissions: updatedPeopleWithAccess,
-          };
-        });
+        linkAccess === "restricted" && myRole === "remove"
+          ? list.filter(
+              (resource) => (resource.id ?? resource._id) !== item._id,
+            )
+          : list.map((resource) => {
+              const resourceId = String(resource?._id ?? resource?.id);
+              if (resourceId !== String(result.itemId)) {
+                return resource;
+              }
+              return {
+                ...resource,
+                permissions: updatedPeopleWithAccess,
+                capabilities: {
+                  ...resource.capabilities,
+                  canShare: publicRole !== "reader" || myRole !== "reader",
+                },
+              };
+            });
 
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
@@ -1139,11 +1285,6 @@ export default function DirectoryView({ route }) {
       );
     }
   }
-  const [sortConfig, setSortConfig] = useState({
-    key: "name",
-    direction: "asc",
-    folders: "top",
-  });
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -1271,6 +1412,17 @@ export default function DirectoryView({ route }) {
           }}
         />
       )}
+      {confirmModal.open && (
+        <ConfirmationModal
+          open={confirmModal.open}
+          title={confirmModal.message}
+          action_1="Yes"
+          action_2="No"
+          onAction_1={handleConfirm}
+          onAction_2={handleCancel}
+        />
+      )}
+
       {showDrivePicker && (
         <GDrivePicker
           enqueueItem={enqueueItem}

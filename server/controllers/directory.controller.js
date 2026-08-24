@@ -1,4 +1,4 @@
-import path from "path"
+import path from "path";
 import Directory from "../models/directory.model.js";
 import File from "../models/file.model.js";
 import { fgaClient } from "../services/openFGAService.js";
@@ -42,7 +42,6 @@ import { getDriveClient } from "../services/googleDriveClient.js";
 import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
-
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -110,7 +109,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       photoLink: permission.photoLink,
     }));
 
-  // Current user's effective role, factoring in public access
   const currentUserId = getIdString(userId);
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
@@ -249,10 +247,28 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     modifiedByMeTime,
   };
 };
+async function listSharedObjects(type, userId) {
+  const [sharedResult, readerResult] = await Promise.all([
+    fgaClient.listObjects({
+      user: `user:${userId}`,
+      relation: "shared_reader",
+      type,
+    }),
+    fgaClient.listObjects({
+      user: `user:${userId}`,
+      relation: "can_read",
+      type,
+    }),
+  ]);
 
-async function listObjects(userId, type) {
+  const combined = [...sharedResult.objects, ...readerResult.objects];
+
+  return [...new Set(combined)].map((o) => o.split(":").pop()).filter(Boolean);
+}
+
+async function listObjects(type, userId) {
   const canRead = await fgaClient.listObjects({
-    user: getFgaObject('user', userId),
+    user: getFgaObject("user", userId),
     relation: "can_read",
     type,
   });
@@ -296,12 +312,14 @@ export const getDirectory = async (req, res, next) => {
         parentDir.userId.toString() !== userId.toString()
       ) {
         const relation = parentDir.publicRole || "reader";
+
         await fgaClient.write(
           {
             writes: [
               {
-                user: getFgaObject('user', userId),
-                relation,
+                user: `user:${userId}`,
+                relation:
+                  relation === "reader" ? "shared_reader" : "shared_writer",
                 object: getFgaObject("folder", parentDir._id),
               },
             ],
@@ -380,7 +398,7 @@ export const getDirectory = async (req, res, next) => {
 
     // checking if user can view this currentDirectory
     const canRead = await fgaClient.check({
-      user: getFgaObject('user', userId),
+      user: getFgaObject("user", userId),
       relation: "can_read",
       object: getFgaObject("folder", parentDir._id),
     });
@@ -393,8 +411,8 @@ export const getDirectory = async (req, res, next) => {
       });
 
     const [allowedFileIds, allowedFolderIds] = await Promise.all([
-      listObjects(userId, "file"),
-      listObjects(userId, "folder"),
+      listObjects("file", userId),
+      listObjects("folder", userId),
     ]);
 
     const [files, directories] = await Promise.all([
@@ -567,23 +585,18 @@ export const getSharedWithMe = async (req, res, next) => {
       });
     }
 
-    // =========================================================
-    // GET EVERYTHING THE USER CAN ACCESS
-    // =========================================================
-
     const [allowedFileIds, allowedFolderIds] = await Promise.all([
-      listObjects(userId, "file"),
-      listObjects(userId, "folder"),
+      listSharedObjects("file", userId),
+      listSharedObjects("folder", userId),
     ]);
 
-    // Normalize IDs once.
+    if (!allowedFolderIds.length || !allowedFileIds.length) {
+      return res.status(404).json({ files: [], directories: [] });
+    }
+
     const allowedFolderIdSet = new Set(
       allowedFolderIds.map((id) => String(id)),
     );
-
-    // =========================================================
-    // FETCH FILES + DIRECTORIES
-    // =========================================================
 
     const [files, directories] = await Promise.all([
       allowedFileIds.length
@@ -699,8 +712,8 @@ export const getStarredItems = async (req, res, next) => {
     if (!userId) return res.status(403).json({ message: "Access denied" });
 
     const [allowedFileIds, allowedFolderIds] = await Promise.all([
-      listObjects(userId, "file"),
-      listObjects(userId, "folder"),
+      listSharedObjects("file", userId),
+      listSharedObjects("folder", userId),
     ]);
 
     const [sharedFiles, sharedDirectories, files, directories] =
@@ -859,7 +872,7 @@ export const addDirectory = async (req, res, next) => {
     const isOwner = parentDirectory.userId.toString() === userId.toString();
     if (!isOwner) {
       const canWrite = await fgaClient.check({
-        user: getFgaObject('user', userId),
+        user: getFgaObject("user", userId),
         relation: "can_write",
         object: getFgaObject("folder", parentDirId),
       });
@@ -879,7 +892,7 @@ export const addDirectory = async (req, res, next) => {
     await fgaClient.write({
       writes: [
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "owner",
           object: getFgaObject("folder", addedDirectory._id),
         },
@@ -917,12 +930,12 @@ export const editDirectory = async (req, res, next) => {
   if (!newDirName) {
     return res.status(404).json({ message: "Dirname is required" });
   }
-  const isEditor = await fgaClient.check({
-    user: getFgaObject('user', userId),
-    relation: "can_write",
+  const canRename = await fgaClient.check({
+    user: getFgaObject("user", userId),
+    relation: "can_rename",
     object: getFgaObject("folder", id),
   });
-  if (!isEditor.allowed) {
+  if (!canRename.allowed) {
     return res.status(403).json({ message: "Unauthorized" });
   }
   try {
@@ -955,7 +968,16 @@ export const softDeleteDirectory = async (req, res, next) => {
 
     if (!currentDirectory)
       return res.status(404).json({ message: "Directory not found" });
-    const isOwner = currentDirectory.userId.toString() === userId.toString();
+
+    const canTrash = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_trash",
+      object: getFgaObject("folder", id),
+    });
+
+    if (!canTrash.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
 
     const queue = [currentDirectory._id];
     const allDirIds = [id];
@@ -1016,7 +1038,15 @@ export const deleteDirectory = async (req, res, next) => {
     if (!currentDirectory) {
       return res.status(404).json({ message: "Directory not found" });
     }
+    const canDelete = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_delete",
+      object: getFgaObject("folder", id),
+    });
 
+    if (!canDelete.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
     const queue = [currentDirectory._id];
     const directories = [];
     const files = [];
@@ -1061,17 +1091,17 @@ export const deleteDirectory = async (req, res, next) => {
     const deletes = [
       ...files.flatMap((f) => [
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "owner",
           object: getFgaObject("file", f._id),
         },
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "writer",
           object: getFgaObject("file", f._id),
         },
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "reader",
           object: getFgaObject("file", f._id),
         },
@@ -1084,17 +1114,17 @@ export const deleteDirectory = async (req, res, next) => {
 
       ...allDirIds.flatMap((dir) => [
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "owner",
           object: getFgaObject("folder", dir._id),
         },
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "writer",
           object: getFgaObject("folder", dir._id),
         },
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "reader",
           object: getFgaObject("folder", dir._id),
         },
@@ -1348,7 +1378,7 @@ export const sendOwnershipMail = async (req, res, next) => {
       let result;
 
       if (existingPermission) {
-        result = await drive.permissions.update({
+        result = drive.permissions.update({
           fileId: itemId,
           permissionId: existingPermission.id,
           requestBody: {
@@ -2217,7 +2247,7 @@ export const initiateFolderUpload = async (req, res, next) => {
 
       const fgaWrites = [
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
 
           relation: "owner",
 
@@ -2227,11 +2257,11 @@ export const initiateFolderUpload = async (req, res, next) => {
 
       if (directory.parentDirId) {
         fgaWrites.push({
-          user: getFgaObject('folder', directory.parentDirId),
+          user: getFgaObject("folder", directory.parentDirId),
 
           relation: "parent",
 
-          object: getFgaObject('folder',directory._id),
+          object: getFgaObject("folder", directory._id),
         });
       }
 
@@ -2437,19 +2467,19 @@ export const completeFolderUpload = async (req, res, next) => {
       await fgaClient.write({
         writes: [
           {
-            user: getFgaObject('user', userId),
+            user: getFgaObject("user", userId),
 
             relation: "owner",
 
-            object: getFgaObject('file', uploadedFile._id),
+            object: getFgaObject("file", uploadedFile._id),
           },
 
           {
-            user: getFgaObject('folder', uploadedFile.parentDirId),
+            user: getFgaObject("folder", uploadedFile.parentDirId),
 
             relation: "parent",
 
-            object: getFgaObject('file', uploadedFile._id),
+            object: getFgaObject("file", uploadedFile._id),
           },
         ],
       });
@@ -2526,7 +2556,7 @@ export const copyItem = async (req, res, next) => {
             "id,name,mimeType,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
         });
 
-        const permissions = await drive.permissions.list({
+        const permissions = drive.permissions.list({
           fileId: copiedFile.data.id,
           fields:
             "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
@@ -2635,6 +2665,15 @@ export const copyItem = async (req, res, next) => {
     }
 
     // LOCAL
+    const canCopy = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_copy",
+      object: getFgaObject(type, item._id),
+    });
+
+    if (!canCopy.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
     const Model = type === "folder" ? Directory : File;
 
     const dbItem = await Model.findById(itemId).lean();
@@ -2673,12 +2712,12 @@ export const copyItem = async (req, res, next) => {
     await fgaClient.write({
       writes: [
         {
-          user: getFgaObject('user', userId),
+          user: getFgaObject("user", userId),
           relation: "owner",
           object: getFgaObject(type, copiedItem._id),
         },
         {
-          user: getFgaObject('folder', copiedItem.parentDirId),
+          user: getFgaObject("folder", copiedItem.parentDirId),
           relation: "parent",
           object: getFgaObject(type, copiedItem._id),
         },
@@ -2736,7 +2775,15 @@ export const moveItem = async (req, res, next) => {
         message: "Root items cannot be moved",
       });
     }
+    const canMove = await fgaClient.check({
+      user: getFgaObject("user", userId),
+      relation: "can_move",
+      object: getFgaObject(type, item._id),
+    });
 
+    if (!canMove.allowed) {
+      return res.status(403).json({ message: "Unauthorized!" });
+    }
     const itemId = itemToBeMoved._id.toString();
     const oldParentId = itemToBeMoved.parentDirId.toString();
 
@@ -2777,7 +2824,7 @@ export const moveItem = async (req, res, next) => {
     }
 
     const getParentTuple = (parentId) => ({
-      user: getFgaObject('folder', parentId),
+      user: getFgaObject("folder", parentId),
       relation: "parent",
       object: getFgaObject(type, itemId),
     });

@@ -486,9 +486,9 @@ export default function FileViewer({
               : ""}
           </span>
 
-          {item?.updatedAt && (
+          {item?.createdAt && (
             <span className="fv-info-item">
-              Modified{" "}
+              Created{" "}
               {new Date(item.updatedAt).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -497,7 +497,7 @@ export default function FileViewer({
             </span>
           )}
 
-          {item?.modifiedTime && (
+          {item?.updatedAt && (
             <span className="fv-info-item">
               Modified{" "}
               {new Date(item.modifiedTime).toLocaleDateString("en-US", {

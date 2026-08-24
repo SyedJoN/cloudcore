@@ -129,16 +129,19 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  padding: 4px 6px;
   background: none;
   border-radius: var(--radius-sm);
   font-size: 14px;
   font-family: var();
   color: var(--text-primary);
-  cursor: pointer;
+
   white-space: nowrap;
   transition: background var(--transition);
   height: 32px;
+}
+.gd-share-role-btn:not(:disabled) {
+    cursor: pointer;
 }
 .gd-share-role-btn:hover {
   background: rgba(32, 33, 36, 0.06);
@@ -354,7 +357,10 @@
   margin: 12px 0 0;
 }
 .gd-share-link-section {
-  padding: 8px 24px 20px;
+  padding: 8px 24px;
+}
+.gd-share-link-section:hover {
+  background: rgba(140, 140, 140, 0.15);
 }
 .gd-share-link-row {
   display: flex;
@@ -422,7 +428,7 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 12px 24px 16px;
+  padding: 24px 16px;
   gap: normal 16px;
 }
 .gd-toggle-switch {
@@ -681,9 +687,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  cursor: pointer;
   padding: 4px 0px;
   border-radius: 4px;
+}
+.gd-share-access-btn:not(:disabled) {
+  cursor: pointer;
 }
 .gd-share-access-btn span {
   font-size: 14px;

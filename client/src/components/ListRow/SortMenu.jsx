@@ -4,16 +4,17 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
   return (
     <button
       type="button"
-            onClick={()=>{onClick();setOpen(false)}}
-
+      onClick={() => {
+        onClick();
+        setOpen(false);
+      }}
       className="
         flex h-9 w-full items-center
-        rounded-md
         px-3
         text-left
         text-sm
-        text-[#202124]
-        hover:bg-[#f1f3f4]
+        text-(--text-primary)
+        hover:bg-(--surface-container-dark)
         cursor-pointer
       "
     >
@@ -22,7 +23,7 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
         {checked && (
           <svg
             viewBox="0 0 24 24"
-            className="h-[18px] w-[18px] text-[#1a73e8]"
+            className="h-4.5 w-4.5 text-[#1a73e8]"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
@@ -43,34 +44,22 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
   const isName = sortConfig.key === "name";
 
   return (
-    <div
-      className="w-[260px]
-        overflow-hidden
-        rounded-xl
-        border border-[#dadce0]
-        bg-white
-        py-2
-        shadow-[0_4px_12px_rgba(60,64,67,0.20)]
-        cursor-default
-      "
-    >
+    <div className="w-65 overflow-hidden bg-(--surface-container) py-2 shadow-(--shadow-1) cursor-default">
       {/* Title */}
       <div className="px-4 pb-2 pt-2 cursor-default">
-        <h3 className="text-[16px] font-medium text-[#202124]">
-          Sort
-        </h3>
+        <h3 className="text-[16px] font-medium text-(--text-primary)">Sort</h3>
       </div>
 
       {/* Sort by */}
       <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-[#5f6368] cursor-default">
+        <p className="text-xs font-medium text-(--text-secondary) cursor-default">
           Sort by
         </p>
       </div>
 
-      <div className="px-2">
+      <div>
         <SortOption
-        setOpen={setOpen}
+          setOpen={setOpen}
           checked={sortConfig.key === "name"}
           onClick={() => onSortChange({ key: "name" })}
         >
@@ -78,8 +67,7 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
         </SortOption>
 
         <SortOption
-        setOpen={setOpen}
-
+          setOpen={setOpen}
           checked={sortConfig.key === "modifiedTime"}
           onClick={() =>
             onSortChange({
@@ -95,15 +83,14 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
 
       {/* Direction */}
       <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-[#5f6368]">
+        <p className="text-xs font-medium text-(--text-primary)">
           Sort direction
         </p>
       </div>
 
-      <div className="px-2">
+      <div>
         <SortOption
-        setOpen={setOpen}
-
+          setOpen={setOpen}
           checked={sortConfig.direction === "asc"}
           onClick={() =>
             onSortChange({
@@ -115,8 +102,7 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
         </SortOption>
 
         <SortOption
-        setOpen={setOpen}
-
+          setOpen={setOpen}
           checked={sortConfig.direction === "desc"}
           onClick={() =>
             onSortChange({
@@ -132,15 +118,12 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
 
       {/* Folders */}
       <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-[#5f6368]">
-          Folders
-        </p>
+        <p className="text-xs font-medium text-(--text-primary)">Folders</p>
       </div>
 
-      <div className="px-2">
+      <div>
         <SortOption
-        setOpen={setOpen}
-
+          setOpen={setOpen}
           checked={sortConfig.folders === "top"}
           onClick={() =>
             onSortChange({
@@ -152,8 +135,7 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
         </SortOption>
 
         <SortOption
-        setOpen={setOpen}
-
+          setOpen={setOpen}
           checked={sortConfig.folders === "mixed"}
           onClick={() =>
             onSortChange({

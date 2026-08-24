@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import {createPortal} from "react-dom"
 
 function ConfirmationModal({
   onAction_1,
@@ -36,8 +37,11 @@ function ConfirmationModal({
     onClose();
   };
 
-  return (
-    <div className="gd-modal-overlay" onClick={handleOverlayClick}>
+  return createPortal (
+    <div
+      className="gd-modal-overlay"
+      onClick={handleOverlayClick}
+    >
       <div className="gd-modal" onClick={handleContentClick}>
         <h2>{title}</h2>
 
@@ -60,8 +64,8 @@ function ConfirmationModal({
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>, document.body
+  )
 }
 
 export default ConfirmationModal;

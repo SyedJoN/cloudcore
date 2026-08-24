@@ -9,21 +9,14 @@ export const resolveObjectPermissions = async (objectName) => {
   do {
     const response = await fgaClient.read(
       {
-        tuple_key: {
-          object: objectName,
-        },
+        object: objectName,
       },
-      continuationToken
-        ? { continuationToken }
-        : undefined
+      continuationToken ? { continuationToken } : undefined,
     );
 
-    allTuples.push(
-      ...(response.tuples || [])
-    );
+    allTuples.push(...(response.tuples || []));
 
-    continuationToken =
-      response.continuation_token;
+    continuationToken = response.continuation_token;
   } while (continuationToken);
 
   const collaborators = allTuples
@@ -31,9 +24,7 @@ export const resolveObjectPermissions = async (objectName) => {
       (tuple) =>
         tuple.key.object === objectName &&
         tuple.key.user?.startsWith("user:") &&
-        ["owner", "reader", "writer"].includes(
-          tuple.key.relation
-        )
+        ["owner", "reader", "writer"].includes(tuple.key.relation),
     )
     .map((tuple) => ({
       userId: tuple.key.user.slice(5),
@@ -46,9 +37,7 @@ export const resolveObjectPermissions = async (objectName) => {
 
   const userIds = collaborators
     .map((c) => c.userId)
-    .filter((id) =>
-      mongoose.isValidObjectId(id)
-    );
+    .filter((id) => mongoose.isValidObjectId(id));
 
   if (!userIds.length) {
     return [];
@@ -65,18 +54,12 @@ export const resolveObjectPermissions = async (objectName) => {
   const relationMap = new Map();
 
   for (const collaborator of collaborators) {
-    relationMap.set(
-      collaborator.userId,
-      collaborator.relation
-    );
+    relationMap.set(collaborator.userId, collaborator.relation);
   }
 
   return users
     .map((user) => {
-      const relation =
-        relationMap.get(
-          user._id.toString()
-        );
+      const relation = relationMap.get(user._id.toString());
 
       if (!relation) {
         return null;
