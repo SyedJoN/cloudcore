@@ -727,7 +727,7 @@
   text-align: left;
 }
 
-.gd-share-access-option:hover {
+.gd-share-access-option:hover:not(:disabled) {
   background: var(--btn-bg-medium);
 }
 

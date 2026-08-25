@@ -60,6 +60,7 @@ import MoveModal from "../Components/Modals/MoveModal";
 import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
 import CreateMenu from "../Components/Drive/CreateMenu";
 import ConfirmationModal from "../Components/Modals/ConfirmationModal";
+import { ROLE_PRIORITY } from "../../../server/utils/permissions/getRolePriority";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -991,6 +992,27 @@ export default function DirectoryView({ route }) {
         myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
         incomingPublicRole = DRIVE_ROLES[role] || role;
 
+        let confirmCascade = false;
+
+        const dryRun = await toggleFilePublic(itemId, userRole, access, type);
+
+        if (dryRun?.needsConfirmation) {
+          const { ancestorName, ancestorRole } = dryRun.conflict;
+          const confirmed = await showConfirmModal(
+            `Changing this will also reduce "${ancestorName}"'s public access (currently ${ancestorRole}). Continue?`,
+          );
+
+           if (!confirmed) {
+            const currentPublicRole = publicPermission?.role;
+            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+            setLinkRole(currentPublicRole || "reader");
+            setPeopleWithAccess(prevPermissions);
+            return;
+          }
+
+          confirmCascade = true;
+        }
+
         if (
           ((incomingPublicRole === "reader" || access === "restricted") &&
             myRole &&
@@ -1029,7 +1051,7 @@ export default function DirectoryView({ route }) {
             return;
           }
         }
-        await toggleFilePublic(itemId, userRole, access, type);
+        await toggleFilePublic(itemId, userRole, access, type, confirmCascade);
       }
 
       const update = (list) =>
@@ -1076,12 +1098,11 @@ export default function DirectoryView({ route }) {
           if (p?.role === "remove" && incomingPublicRole === "writer") {
             return null;
           }
-          // Restricted = remove public/link permission completely
+
           if (access === "restricted" && p?.type === "anyone") {
             return null;
           }
 
-          // Anyone = update existing public permission
           if (access === "anyone" && p?.type === "anyone") {
             return {
               ...p,
@@ -1091,7 +1112,6 @@ export default function DirectoryView({ route }) {
             };
           }
 
-          // Keep normal users unchanged
           return p;
         })
         .filter(Boolean);
@@ -1110,7 +1130,6 @@ export default function DirectoryView({ route }) {
 
       setPeopleWithAccess(updatedPeopleWithAccess);
 
-      // Keep local modal state immediately correct
       setLinkAccess(restricted ? "restricted" : "anyone");
       setLinkRole(restricted ? "reader" : userRole);
 
@@ -1174,10 +1193,10 @@ export default function DirectoryView({ route }) {
           }
           setPeopleWithAccess(updatedPeopleWithAccess);
           setPrevPermissions(updatedPeopleWithAccess);
-          setShareItem((prev)=> ({
+          setShareItem((prev) => ({
             ...prev,
-            permissions: updatedPeopleWithAccess
-          }))
+            permissions: updatedPeopleWithAccess,
+          }));
         }
         toast({
           message,

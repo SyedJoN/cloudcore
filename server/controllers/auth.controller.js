@@ -741,13 +741,15 @@ export const fetchGoogleDriveFiles = async (req, res, next) => {
     const response = await drive.files.list({
       pageSize: 1000,
       fields:
-        "files(id,name,webViewLink,parents,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,lastModifyingUser,capabilities(canReadDrive, canEdit, canDelete, canShare, canCopy, canDownload, canRename, canAddChildren,canMoveItemWithinDrive),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner))",
+        "files(id,name,webViewLink,parents,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,lastModifyingUser,capabilities(canReadDrive, canEdit, canDelete, canShare, canCopy, canDownload, canRename, canAddChildren,canMoveItemWithinDrive, canDisableInheritedPermissions),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner))",
       orderBy: "createdTime desc",
     });
 
     const files = response.data.files || [];
 
     const FOLDER_MIME = "application/vnd.google-apps.folder";
+
+
 
     res.json({
       files: files.filter((file) => file.mimeType !== FOLDER_MIME),

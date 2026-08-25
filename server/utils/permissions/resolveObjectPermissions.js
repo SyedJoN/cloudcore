@@ -27,7 +27,7 @@ export const resolveObjectPermissions = async (objectName) => {
         ["owner", "reader", "writer"].includes(tuple.key.relation),
     )
     .map((tuple) => ({
-      userId: tuple.key.user.slice(5),
+      userId: tuple.key.user.slice(5) || "anyone",
       relation: tuple.key.relation,
     }));
 

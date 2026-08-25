@@ -53,11 +53,17 @@ async function getSharedWithMeTime({ itemId, itemType, userId }) {
   return record?.sharedWithMeTime || null;
 }
 
-const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
+const resolveRole = async (
+  item,
+  type,
+  userId,
+  parentDir,
+  isShared = false,
+) => {
   const object = getFgaObject(type, item._id);
+
   const permissionMap = new Map();
 
-  // Direct permissions
   const directPermissions = await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
@@ -70,19 +76,23 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     });
   }
 
-  // Inherited permissions
+
+  let inheritedPublicRole = null;
+  let inheritedPublicFrom = null;
+
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
     for (const ancestor of ancestors) {
+
       const inheritedPermissions = await resolveObjectPermissions(
         `folder:${ancestor._id}`,
       );
 
       for (const { user, relation } of inheritedPermissions) {
-        // An ancestor's owner only passes down writer access to
-        // descendants, not ownership of them.
-        const inheritedRelation = relation === "owner" ? "writer" : relation;
+    
+        const inheritedRelation =
+          relation === "owner" ? "writer" : relation;
 
         mergePermission({
           permissionMap,
@@ -93,36 +103,111 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
           isShared,
         });
       }
+
+
+      if (ancestor?.isPublic) {
+        const ancestorPublicRole =
+          ancestor.publicRole || "reader";
+
+        const ancestorPriority =
+          ROLE_PRIORITY[ancestorPublicRole] || 0;
+
+        const currentInheritedPriority =
+          inheritedPublicRole
+            ? ROLE_PRIORITY[inheritedPublicRole] || 0
+            : 0;
+
+       
+        if (ancestorPriority > currentInheritedPriority) {
+          inheritedPublicRole = ancestorPublicRole;
+          inheritedPublicFrom = ancestor;
+        }
+      }
+    }
+  }
+
+  const directPublicRole = item?.isPublic
+    ? item?.publicRole || "reader"
+    : null;
+
+
+  const directPublicPriority = directPublicRole
+    ? ROLE_PRIORITY[directPublicRole] || 0
+    : 0;
+
+  const inheritedPublicPriority = inheritedPublicRole
+    ? ROLE_PRIORITY[inheritedPublicRole] || 0
+    : 0;
+
+  const effectivePublicRole =
+    directPublicPriority >= inheritedPublicPriority
+      ? directPublicRole
+      : inheritedPublicRole;
+
+  const hasDirectPublicPermission =
+    Boolean(directPublicRole);
+
+  const hasInheritedPublicPermission =
+    Boolean(inheritedPublicRole);
+
+  const isPublic = Boolean(effectivePublicRole);
+
+
+  let publicSource = null;
+
+  if (effectivePublicRole) {
+    if (
+      directPublicPriority >= inheritedPublicPriority &&
+      directPublicRole
+    ) {
+      publicSource = "direct";
+    } else {
+      publicSource = "parent";
     }
   }
 
   const permissions = Array.from(permissionMap.values());
 
   const owners = permissions
-    .filter((permission) => permission.directRole === "owner")
+    .filter(
+      (permission) =>
+        permission.directRole === "owner",
+    )
     .map((permission) => ({
       displayName: permission.displayName,
       kind: "drive#user",
-      me: permission.id?.toString() === userId?.toString(),
+      me:
+        permission.id?.toString() ===
+        userId?.toString(),
       permissionId: permission.id,
       emailAddress: permission.emailAddress,
       photoLink: permission.photoLink,
     }));
 
   const currentUserId = getIdString(userId);
+
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
     : null;
 
-  const isPublic = Boolean(item?.isPublic);
-  const publicRole = isPublic ? item?.publicRole || "reader" : null;
+  const directRole =
+    currentUserPermission?.directRole || null;
 
-  const directRole = currentUserPermission?.directRole || null;
-  const inheritedRole = currentUserPermission?.inheritedRole || null;
+  const inheritedRole =
+    currentUserPermission?.inheritedRole || null;
 
-  const directPriority = directRole ? ROLE_PRIORITY[directRole] : 0;
-  const inheritedPriority = inheritedRole ? ROLE_PRIORITY[inheritedRole] : 0;
-  const publicPriority = publicRole ? ROLE_PRIORITY[publicRole] : 0;
+
+  const directPriority = directRole
+    ? ROLE_PRIORITY[directRole] || 0
+    : 0;
+
+  const inheritedPriority = inheritedRole
+    ? ROLE_PRIORITY[inheritedRole] || 0
+    : 0;
+
+  const publicPriority = effectivePublicRole
+    ? ROLE_PRIORITY[effectivePublicRole] || 0
+    : 0;
 
   const highestPriority = Math.max(
     directPriority,
@@ -131,28 +216,44 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   );
 
   let currentRole = null;
-  let roleSource = null; // "direct" || "inherited" || "public"
+  let roleSource = null;
 
   if (highestPriority > 0) {
-    if (publicPriority === highestPriority) {
-      currentRole = publicRole;
+    
+    if (
+      publicPriority === highestPriority &&
+      effectivePublicRole
+    ) {
+      currentRole = effectivePublicRole;
       roleSource = "public";
-    } else if (directPriority >= inheritedPriority) {
+    } else if (
+      directPriority >= inheritedPriority &&
+      directRole
+    ) {
       currentRole = directRole;
       roleSource = "direct";
-    } else {
+    } else if (inheritedRole) {
       currentRole = inheritedRole;
       roleSource = "inherited";
     }
   }
 
-  const isPublicEffective = Boolean(
-    currentRole && publicRole && publicPriority === highestPriority,
+  const isPublicEffective =
+    Boolean(
+      effectivePublicRole &&
+        publicPriority === highestPriority,
+    );
+
+ 
+  const parentId = getIdString(
+    parentDir?.parentDirId,
   );
 
-  const parentId = getIdString(parentDir?.parentDirId);
-  const isRootDirectory = Boolean(parentDir?._id) && !parentId;
-  const isRootLevelFile = type === "file" && isRootDirectory;
+  const isRootDirectory =
+    Boolean(parentDir?._id) && !parentId;
+
+  const isRootLevelFile =
+    type === "file" && isRootDirectory;
 
   const currentUserCapabilities = getCapabilities(
     currentRole,
@@ -160,11 +261,10 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
   );
 
-  // if (isPublicEffective && !directRole && !inheritedRole) {
-  //   currentUserCapabilities.canChangeRole = false;
-  // }
-
-  const [viewActivity, modifiedActivity] = await Promise.all([
+  const [
+    viewActivity,
+    modifiedActivity,
+  ] = await Promise.all([
     FileActivity.findOne({
       file: item._id,
       user: userId,
@@ -174,76 +274,170 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     FileActivity.findOne({
       file: item._id,
       user: userId,
-      type: { $in: ["rename", "move"] },
+      type: {
+        $in: ["rename", "move"],
+      },
     })
-      .sort({ occuredAt: -1 })
+      .sort({
+        occuredAt: -1,
+      })
       .lean(),
   ]);
 
-  const viewedByMeTime = viewActivity?.occuredAt || null;
-  const modifiedByMeTime = modifiedActivity?.occuredAt || null;
+  const viewedByMeTime =
+    viewActivity?.occuredAt || null;
+
+  const modifiedByMeTime =
+    modifiedActivity?.occuredAt || null;
+
 
   let sharedWithMeTime = null;
 
   if (roleSource === "direct") {
-    sharedWithMeTime = await getSharedWithMeTime({
-      itemId: item._id,
-      itemType: type,
-      userId: currentUserId,
-    });
+    sharedWithMeTime =
+      await getSharedWithMeTime({
+        itemId: item._id,
+        itemType: type,
+        userId: currentUserId,
+      });
   } else if (
     roleSource === "inherited" &&
     currentUserPermission?.inheritedFrom?.id
   ) {
-    sharedWithMeTime = await getSharedWithMeTime({
-      itemId: currentUserPermission.inheritedFrom.id,
-      itemType: "folder",
-      userId: currentUserId,
-    });
+    sharedWithMeTime =
+      await getSharedWithMeTime({
+        itemId:
+          currentUserPermission.inheritedFrom.id,
+        itemType: "folder",
+        userId: currentUserId,
+      });
   }
-let publicCapabilities
+
+  let publicCapabilities = null;
+
   if (isPublic) {
     publicCapabilities = getCapabilities(
-      publicRole,
+      effectivePublicRole,
       type,
       isRootLevelFile,
     );
-    // publicCapabilities.canChangeRole = false;
+
+    const permissionDetails = [];
+
+    if (directPublicRole) {
+      permissionDetails.push({
+        permissionType: "file",
+        role: directPublicRole,
+        inherited: false,
+        inheritedFrom: null,
+      });
+    }
+
+
+    if (inheritedPublicRole) {
+      permissionDetails.push({
+        permissionType: "folder",
+        role: inheritedPublicRole,
+        inherited: true,
+        inheritedFrom: inheritedPublicFrom
+          ? {
+              id: getIdString(
+                inheritedPublicFrom._id,
+              ),
+              name: inheritedPublicFrom.name,
+              type: "folder",
+            }
+          : null,
+      });
+    }
 
     permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
-      role: publicRole,
+
+      
+      role: effectivePublicRole,
+
+     
+      inherited:
+        publicSource === "parent",
+
+      source: publicSource,
+
+     
+      permissionDetails,
+
+      inheritedFrom:
+        inheritedPublicFrom
+          ? {
+              id: getIdString(
+                inheritedPublicFrom._id,
+              ),
+              name: inheritedPublicFrom.name,
+              type: "folder",
+            }
+          : null,
+
+      hasDirectPermission:
+        hasDirectPublicPermission,
+
+      hasInheritedPermission:
+        hasInheritedPublicPermission,
     });
   }
 
-  const ownership = await Ownership.findOne({ itemId: item?._id })
-    .sort({ createdAt: -1 })
+  const ownership = await Ownership.findOne({
+    itemId: item?._id,
+  })
+    .sort({
+      createdAt: -1,
+    })
     .lean();
 
-  const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
+  const ownerId = ownership?.toUser
+    ? getIdString(ownership.toUser)
+    : null;
 
-  const updatedPermissions = permissions.map((permission) => {
-    const permissionId = getIdString(permission.id);
 
-    if (ownership?.status === "pending" && permissionId === ownerId) {
-      return { ...permission, pendingOwner: true };
-    }
+  const updatedPermissions =
+    permissions.map((permission) => {
+      const permissionId =
+        getIdString(permission.id);
 
-    return permission;
-  });
+      if (
+        ownership?.status === "pending" &&
+        permissionId === ownerId
+      ) {
+        return {
+          ...permission,
+          pendingOwner: true,
+        };
+      }
+
+      return permission;
+    });
 
   return {
-    capabilities: isPublicEffective ? publicCapabilities : currentUserCapabilities,
+    capabilities: isPublicEffective
+      ? publicCapabilities
+      : currentUserCapabilities,
+
     permissions: updatedPermissions,
+
     owners,
+
     isRootLevelFile,
     isRootDirectory,
+
     sharedWithMeTime,
+
     viewedByMeTime,
+
     modifiedByMeTime,
+
   };
 };
+
 async function listSharedObjects(type, userId) {
   const [sharedResult, readerResult] = await Promise.all([
     fgaClient.listObjects({
@@ -330,6 +524,12 @@ export const getDirectory = async (req, res, next) => {
       }
 
       const { files: _, directories: __, ...parentDirData } = parentDir;
+      const actualParent = parentDir.parentDirId
+  ? await Directory.findById(parentDir.parentDirId)
+      .select("_id name parentDirId isPublic publicRole")
+      .lean()
+  : null;
+
 
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
@@ -358,6 +558,7 @@ export const getDirectory = async (req, res, next) => {
               "folder",
               userId,
               parentDir,
+              
             );
             return {
               ...d,
@@ -372,7 +573,7 @@ export const getDirectory = async (req, res, next) => {
         parentDir,
         "folder",
         userId,
-        parentDir,
+        actualParent,
       );
       const parentDirWithRole = {
         ...parentDirData,
@@ -760,6 +961,7 @@ export const getStarredItems = async (req, res, next) => {
           file,
           "file",
           userId,
+          file.parentDirId
         );
         return {
           ...file,
@@ -777,6 +979,7 @@ export const getStarredItems = async (req, res, next) => {
           dir,
           "folder",
           userId,
+          dir.parentDirId
         );
         return {
           ...dir,
@@ -811,6 +1014,7 @@ export const getStarredItems = async (req, res, next) => {
           dir,
           "folder",
           userId,
+          dir.parentDirId,
         );
         return {
           ...dir,

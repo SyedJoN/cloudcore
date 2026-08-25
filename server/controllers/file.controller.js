@@ -66,9 +66,9 @@ async function listSharedObjects(type, userId) {
 
 const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const object = getFgaObject(type, item._id);
+
   const permissionMap = new Map();
 
-  // Direct permissions
   const directPermissions = await resolveObjectPermissions(object);
 
   for (const { user, relation } of directPermissions) {
@@ -81,7 +81,9 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     });
   }
 
-  // Inherited permissions
+  let inheritedPublicRole = null;
+  let inheritedPublicFrom = null;
+
   if (parentDir?._id) {
     const ancestors = await getAncestorDirectories(parentDir);
 
@@ -91,8 +93,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       );
 
       for (const { user, relation } of inheritedPermissions) {
-        // An ancestor's owner only passes down writer access to
-        // descendants, not ownership of them.
         const inheritedRelation = relation === "owner" ? "writer" : relation;
 
         mergePermission({
@@ -104,6 +104,52 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
           isShared,
         });
       }
+
+      if (ancestor?.isPublic) {
+        const ancestorPublicRole = ancestor.publicRole || "reader";
+
+        const ancestorPriority = ROLE_PRIORITY[ancestorPublicRole] || 0;
+
+        const currentInheritedPriority = inheritedPublicRole
+          ? ROLE_PRIORITY[inheritedPublicRole] || 0
+          : 0;
+
+        if (ancestorPriority > currentInheritedPriority) {
+          inheritedPublicRole = ancestorPublicRole;
+          inheritedPublicFrom = ancestor;
+        }
+      }
+    }
+  }
+
+  const directPublicRole = item?.isPublic ? item?.publicRole || "reader" : null;
+
+  const directPublicPriority = directPublicRole
+    ? ROLE_PRIORITY[directPublicRole] || 0
+    : 0;
+
+  const inheritedPublicPriority = inheritedPublicRole
+    ? ROLE_PRIORITY[inheritedPublicRole] || 0
+    : 0;
+
+  const effectivePublicRole =
+    directPublicPriority >= inheritedPublicPriority
+      ? directPublicRole
+      : inheritedPublicRole;
+
+  const hasDirectPublicPermission = Boolean(directPublicRole);
+
+  const hasInheritedPublicPermission = Boolean(inheritedPublicRole);
+
+  const isPublic = Boolean(effectivePublicRole);
+
+  let publicSource = null;
+
+  if (effectivePublicRole) {
+    if (directPublicPriority >= inheritedPublicPriority && directPublicRole) {
+      publicSource = "direct";
+    } else {
+      publicSource = "parent";
     }
   }
 
@@ -121,19 +167,24 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     }));
 
   const currentUserId = getIdString(userId);
+
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
     : null;
 
-  const isPublic = Boolean(item?.isPublic);
-  const publicRole = isPublic ? item?.publicRole || "reader" : null;
-
   const directRole = currentUserPermission?.directRole || null;
+
   const inheritedRole = currentUserPermission?.inheritedRole || null;
 
-  const directPriority = directRole ? ROLE_PRIORITY[directRole] : 0;
-  const inheritedPriority = inheritedRole ? ROLE_PRIORITY[inheritedRole] : 0;
-  const publicPriority = publicRole ? ROLE_PRIORITY[publicRole] : 0;
+  const directPriority = directRole ? ROLE_PRIORITY[directRole] || 0 : 0;
+
+  const inheritedPriority = inheritedRole
+    ? ROLE_PRIORITY[inheritedRole] || 0
+    : 0;
+
+  const publicPriority = effectivePublicRole
+    ? ROLE_PRIORITY[effectivePublicRole] || 0
+    : 0;
 
   const highestPriority = Math.max(
     directPriority,
@@ -142,27 +193,29 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   );
 
   let currentRole = null;
-  let roleSource = null; // "direct" || "inherited" || "public"
+  let roleSource = null;
 
   if (highestPriority > 0) {
-    if (publicPriority === highestPriority) {
-      currentRole = publicRole;
+    if (publicPriority === highestPriority && effectivePublicRole) {
+      currentRole = effectivePublicRole;
       roleSource = "public";
-    } else if (directPriority >= inheritedPriority) {
+    } else if (directPriority >= inheritedPriority && directRole) {
       currentRole = directRole;
       roleSource = "direct";
-    } else {
+    } else if (inheritedRole) {
       currentRole = inheritedRole;
       roleSource = "inherited";
     }
   }
 
   const isPublicEffective = Boolean(
-    currentRole && publicRole && publicPriority === highestPriority,
+    effectivePublicRole && publicPriority === highestPriority,
   );
 
   const parentId = getIdString(parentDir?.parentDirId);
+
   const isRootDirectory = Boolean(parentDir?._id) && !parentId;
+
   const isRootLevelFile = type === "file" && isRootDirectory;
 
   const currentUserCapabilities = getCapabilities(
@@ -170,10 +223,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     type,
     isRootLevelFile,
   );
-
-  // if (isPublicEffective && !directRole && !inheritedRole) {
-  //   currentUserCapabilities.canChangeRole = false;
-  // }
 
   const [viewActivity, modifiedActivity] = await Promise.all([
     FileActivity.findOne({
@@ -185,13 +234,18 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     FileActivity.findOne({
       file: item._id,
       user: userId,
-      type: { $in: ["rename", "move"] },
+      type: {
+        $in: ["rename", "move"],
+      },
     })
-      .sort({ occuredAt: -1 })
+      .sort({
+        occuredAt: -1,
+      })
       .lean(),
   ]);
 
   const viewedByMeTime = viewActivity?.occuredAt || null;
+
   const modifiedByMeTime = modifiedActivity?.occuredAt || null;
 
   let sharedWithMeTime = null;
@@ -212,25 +266,74 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       userId: currentUserId,
     });
   }
-let publicCapabilities;
+
+  let publicCapabilities = null;
+
   if (isPublic) {
     publicCapabilities = getCapabilities(
-      publicRole,
+      effectivePublicRole,
       type,
       isRootLevelFile,
     );
-    // publicCapabilities.canChangeRole = false;
+
+    const permissionDetails = [];
+
+    if (directPublicRole) {
+      permissionDetails.push({
+        permissionType: "file",
+        role: directPublicRole,
+        inherited: false,
+        inheritedFrom: null,
+      });
+    }
+
+    if (inheritedPublicRole) {
+      permissionDetails.push({
+        permissionType: "folder",
+        role: inheritedPublicRole,
+        inherited: true,
+        inheritedFrom: inheritedPublicFrom
+          ? {
+              id: getIdString(inheritedPublicFrom._id),
+              name: inheritedPublicFrom.name,
+              type: "folder",
+            }
+          : null,
+      });
+    }
 
     permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
-      role: publicRole,
 
+      role: effectivePublicRole,
+
+      inherited: publicSource === "parent",
+
+      source: publicSource,
+
+      permissionDetails,
+
+      inheritedFrom: inheritedPublicFrom
+        ? {
+            id: getIdString(inheritedPublicFrom._id),
+            name: inheritedPublicFrom.name,
+            type: "folder",
+          }
+        : null,
+
+      hasDirectPermission: hasDirectPublicPermission,
+
+      hasInheritedPermission: hasInheritedPublicPermission,
     });
   }
 
-  const ownership = await Ownership.findOne({ itemId: item?._id })
-    .sort({ createdAt: -1 })
+  const ownership = await Ownership.findOne({
+    itemId: item?._id,
+  })
+    .sort({
+      createdAt: -1,
+    })
     .lean();
 
   const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
@@ -239,20 +342,31 @@ let publicCapabilities;
     const permissionId = getIdString(permission.id);
 
     if (ownership?.status === "pending" && permissionId === ownerId) {
-      return { ...permission, pendingOwner: true };
+      return {
+        ...permission,
+        pendingOwner: true,
+      };
     }
 
     return permission;
   });
 
   return {
-    capabilities: isPublicEffective ? publicCapabilities : currentUserCapabilities,
+    capabilities: isPublicEffective
+      ? publicCapabilities
+      : currentUserCapabilities,
+
     permissions: updatedPermissions,
+
     owners,
+
     isRootLevelFile,
     isRootDirectory,
+
     sharedWithMeTime,
+
     viewedByMeTime,
+
     modifiedByMeTime,
   };
 };
@@ -745,7 +859,7 @@ export const getRecentFiles = async (req, res, next) => {
 
       const viewedByMeTime = viewActivity?.occuredAt?.getTime() || null;
       const modifiedByMeTime = modifiedActivity?.occuredAt?.getTime() || null;
-     
+
       return Math.max(viewedByMeTime, modifiedByMeTime);
     };
     const filesWithActivity = await Promise.all(
@@ -836,13 +950,15 @@ export const updateFile = async (req, res, next) => {
       });
 
       if (!canRename.allowed) {
-        return res.status(403).json({ message: "You don't have permission to rename this file" });
+        return res
+          .status(403)
+          .json({ message: "You don't have permission to rename this file" });
       }
 
       if (req.user?.role === "superuser" || isOwner) {
         return await performRename(file, finalName, res, userId);
       }
-    
+
       return await performRename(file, finalName, res, userId);
     } catch (error) {
       next(error);
@@ -1047,11 +1163,46 @@ export const restoreFile = async (req, res, next) => {
   }
 };
 
+
+async function setFolderPublicAccess(folderId, newRole) {
+  const object = getFgaObject("folder", folderId);
+  const folder = await Directory.findById(folderId);
+  if (!folder) return;
+
+  if (!newRole) {
+    try {
+      await fgaClient.write({
+        deletes: [
+          { user: "user:*", relation: "link_reader", object },
+          { user: "user:*", relation: "link_writer", object },
+        ],
+      });
+    } catch {}
+    folder.isPublic = false;
+    folder.publicRole = undefined;
+  } else {
+    const oldRelation = newRole === "reader" ? "link_writer" : "link_reader";
+    const newRelation = newRole === "reader" ? "link_reader" : "link_writer";
+
+    try {
+      await fgaClient.write({ deletes: [{ user: "user:*", relation: oldRelation, object }] });
+    } catch {}
+    try {
+      await fgaClient.write({ writes: [{ user: "user:*", relation: newRelation, object }] });
+    } catch {}
+
+    folder.isPublic = true;
+    folder.publicRole = newRole;
+  }
+
+  await folder.save();
+}
+
 export const toggleFilePublic = async (req, res, next) => {
   try {
     const userId = req.user?._id;
     const { itemId, role } = req.params;
-    const { access, type } = req.query;
+    const { access, type, confirmCascade } = req.query;
 
     const resource = type === "folder" ? Directory : File;
 
@@ -1066,6 +1217,7 @@ export const toggleFilePublic = async (req, res, next) => {
       return res.status(404).json({
         message: `${type === "file" ? "File" : "Directory"} not found`,
       });
+
     const canShare = await fgaClient.check({
       user: getFgaObject("user", userId),
       relation: "can_share",
@@ -1074,8 +1226,32 @@ export const toggleFilePublic = async (req, res, next) => {
     if (!canShare.allowed) {
       return res.status(403).json({ message: "Unauthorized!" });
     }
+
     const object = getFgaObject(type, itemId);
     const isRestricted = access === "restricted";
+    const incomingPriority = isRestricted ? 0 : ROLE_PRIORITY[role];
+
+    const ancestors = await getAncestorDirectories(item);
+    const conflicting = ancestors
+      .filter((a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority)
+      .sort((a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole])[0];
+
+    // conflict exists but not confirmed yet — report it, change nothing
+    if (conflicting && confirmCascade !== "true") {
+      return res.status(200).json({
+        needsConfirmation: true,
+        conflict: {
+          ancestorId: conflicting._id,
+          ancestorName: conflicting.name,
+          ancestorRole: conflicting.publicRole,
+        },
+      });
+    }
+
+    // confirmed — cascade the ancestor too
+    if (conflicting && confirmCascade === "true") {
+      await setFolderPublicAccess(conflicting._id, isRestricted ? null : role);
+    }
 
     if (isRestricted) {
       const tuples = await fgaClient.read({ object });
@@ -1137,7 +1313,6 @@ export const toggleFilePublic = async (req, res, next) => {
     next(error);
   }
 };
-
 export const giveAccessById = async (req, res, next) => {
   try {
     const { usersArray, message, type } = req.body;
@@ -1184,12 +1359,12 @@ export const giveAccessById = async (req, res, next) => {
               requestBody: {
                 role: user.role,
               },
-              fields: "id,type,role,emailAddress,displayName",
+              fields: "id,type,role,emailAddress,displayName, photoLink",
             });
 
             return {
               ...response.data,
-              avatar: user.avatar || response.data.photoLink || null,
+              avatar: user.avatar || response.data?.photoLink || null,
             };
           }
 
@@ -1472,6 +1647,30 @@ export const revokeAccessById = async (req, res, next) => {
       }
 
       const drive = getDriveClient(drive_access_token);
+      const file = await drive.files.get({
+        fileId: id,
+        fields: "*",
+      });
+
+      const publicPermission = file.data.permissions?.find(
+        (permission) => permission.type === "anyone",
+      );
+
+      const hasInheritedPublicPermission =
+        publicPermission?.permissionDetails?.some(
+          (detail) => detail.inherited === true,
+        );
+
+      const canDisableInheritedPermissions =
+        file.data.capabilities?.canDisableInheritedPermissions === true;
+
+      if (hasInheritedPublicPermission && !canDisableInheritedPermissions) {
+        return res.status(403).json({
+          message:
+            "Public permission cannot be removed because this file has an inherited public permission and the current user cannot disable inherited permissions.",
+          code: "INHERITED_PERMISSION_NOT_REMOVABLE",
+        });
+      }
 
       await drive.permissions.delete({
         fileId: id,

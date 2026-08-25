@@ -35,9 +35,9 @@ export async function getFileByMetaId(fileId) {
   return data;
 }
 
-export async function toggleFilePublic(itemId, role, access, type) {
+export async function toggleFilePublic(itemId, role, access, type, confirmCascade = false) {
   const { data } = await axiosWithCreds.patch(
-    `/file/${itemId}/public/${role}?access=${access}&type=${type}`,
+    `/file/${itemId}/public/${role}?access=${access}&type=${type}&confirmCascade=${confirmCascade}`,
   );
 
   return data;

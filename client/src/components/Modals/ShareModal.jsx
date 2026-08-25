@@ -98,7 +98,8 @@ export default function ShareModal({
 
   const canChangeRole = capabilities?.canChangeRole ?? true;
   const canShare = capabilities.canShare === true;
-
+  const canDisableInheritedPermissions =
+    capabilities?.canDisableInheritedPermissions === true;
   const { toast } = useToast();
 
   useEffect(() => {
@@ -117,7 +118,7 @@ export default function ShareModal({
     if (linkPermission) {
       setLinkRole(linkPermission?.role);
     } else {
-      setLinkRole('reader')
+      setLinkRole("reader");
     }
   }, [item]);
 
