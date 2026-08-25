@@ -16,7 +16,7 @@ export const updateSharedAccess = async ({
    */
 
   const personsToGrant = currentPermissions.filter(
-    (person) => person?.role !== "remove",
+    (person) => person?.role !== "remove" && person.role !== "owner",
   );
 
   const personsToRemove = currentPermissions.filter(
@@ -54,6 +54,7 @@ export const updateSharedAccess = async ({
   let response;
   let access;
   if (personsToGrant.length) {
+    
    response = await grantAccessById(
       type,
       itemId,
@@ -84,6 +85,6 @@ export const updateSharedAccess = async ({
     changed: true,
     itemId,
     access,
-    finalPermissions: type.startsWith('google') ? response : response.permissions
+    finalPermissions: type.startsWith('google') ? response : response?.permissions || []
   };
 };

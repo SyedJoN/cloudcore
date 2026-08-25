@@ -104,7 +104,7 @@ export default function ShareModal({
   useEffect(() => {
     const permissions = item?.permissions ?? [];
 
-    const linkPermission = permissions.find(
+    const linkPermission = permissions.some(
       (person) => person?.type === "anyone",
     );
 
@@ -116,6 +116,8 @@ export default function ShareModal({
 
     if (linkPermission) {
       setLinkRole(linkPermission?.role);
+    } else {
+      setLinkRole('reader')
     }
   }, [item]);
 

@@ -228,6 +228,9 @@ export default function DirectoryView({ route }) {
     }
   }
   useEffect(() => {
+    console.log("item", shareItem);
+  }, [shareItem]);
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ownership = params.get("ownership");
 
@@ -951,8 +954,21 @@ export default function DirectoryView({ route }) {
 
   const handleToggleResourcePublic = async (item, role, access) => {
     setIsShareLoading(true);
-
     try {
+      const publicPermission = peopleWithAccess.find(
+        (p) => p.type === "anyone",
+      );
+      const currentAccess = publicPermission ? "anyone" : "restricted";
+      if (currentAccess === access) {
+        if (access === "restricted") return;
+
+        if (
+          (DRIVE_ROLES[publicPermission?.role] || publicPermission?.role) ===
+          (DRIVE_ROLES[role] || role)
+        )
+          return;
+      }
+
       const itemId = item._id ?? item.id;
       const type = getResourceType(item);
 
@@ -961,7 +977,7 @@ export default function DirectoryView({ route }) {
 
       let permission = null;
       let myRole;
-      let publicRole;
+      let incomingPublicRole;
 
       if (isGoogleDriveRoute) {
         if (restricted) {
@@ -973,37 +989,45 @@ export default function DirectoryView({ route }) {
         }
       } else {
         myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
-        publicRole = DRIVE_ROLES[role] || role;
+        incomingPublicRole = DRIVE_ROLES[role] || role;
 
-        console.log({ myRole, publicRole });
         if (
-          publicRole &&
-          (publicRole === "reader" || access === "restricted") &&
-          myRole &&
-          myRole === "reader"
+          ((incomingPublicRole === "reader" || access === "restricted") &&
+            myRole &&
+            myRole === "reader") ||
+          ((incomingPublicRole === "reader" ||
+            incomingPublicRole === "writer") &&
+            myRole === "remove")
         ) {
           const confirmed = await showConfirmModal(
             "You will not be able to share. Are you sure?",
           );
           if (!confirmed) {
-            const prevRole = item.permissions.find(
-              (p) => p.type === "anyone",
-            )?.role;
-            console.log('prevRole', prevRole);
-           setLinkRole(prevRole)
-           setLinkAccess('anyone')
-       
+            const currentPublicRole = publicPermission?.role;
+            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+            setLinkRole(currentPublicRole || "reader");
+            setPeopleWithAccess(prevPermissions);
             return;
           }
         }
-
-        console.log("myRole", myRole);
-        console.log("myRole", linkAccess);
-        if (access === "restricted" && myRole === undefined) {
+        if (
+          access === "restricted" &&
+          (myRole === undefined || myRole === "remove")
+        ) {
           const confirmed = await showConfirmModal(
             "You will no longer have access. Are you sure?",
           );
-          if (!confirmed) return;
+          if (!confirmed) {
+            const currentPublicRole = prevPermissions.find(
+              (p) => p.type === "anyone",
+            )?.role;
+
+            setLinkAccess("anyone");
+            setLinkRole(currentPublicRole);
+            setPeopleWithAccess(prevPermissions);
+
+            return;
+          }
         }
         await toggleFilePublic(itemId, userRole, access, type);
       }
@@ -1035,7 +1059,8 @@ export default function DirectoryView({ route }) {
                 ...resource,
                 capabilities: {
                   ...resource.capabilities,
-                  canShare: publicRole !== "reader" || myRole !== "reader",
+                  canShare:
+                    incomingPublicRole !== "reader" || myRole !== "reader",
                 },
                 isPublic: restricted ? false : true,
                 publicRole: restricted ? null : userRole,
@@ -1046,9 +1071,120 @@ export default function DirectoryView({ route }) {
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
 
+      const updatedPeopleWithAccess = peopleWithAccess
+        .map((p) => {
+          if (p?.role === "remove" && incomingPublicRole === "writer") {
+            return null;
+          }
+          // Restricted = remove public/link permission completely
+          if (access === "restricted" && p?.type === "anyone") {
+            return null;
+          }
+
+          // Anyone = update existing public permission
+          if (access === "anyone" && p?.type === "anyone") {
+            return {
+              ...p,
+              id: "anyoneWithLink",
+              type: "anyone",
+              role: DRIVE_ROLES[role] ?? role,
+            };
+          }
+
+          // Keep normal users unchanged
+          return p;
+        })
+        .filter(Boolean);
+
+      if (
+        access === "anyone" &&
+        !updatedPeopleWithAccess.some((p) => p?.type === "anyone")
+      ) {
+        updatedPeopleWithAccess.push({
+          id: "anyoneWithLink",
+          type: "anyone",
+          role: DRIVE_ROLES[role] ?? role,
+          allowFileDiscovery: false,
+        });
+      }
+
+      setPeopleWithAccess(updatedPeopleWithAccess);
+
       // Keep local modal state immediately correct
       setLinkAccess(restricted ? "restricted" : "anyone");
       setLinkRole(restricted ? "reader" : userRole);
+
+      if (myRole === "remove") {
+        const personsToRemove = peopleWithAccess.filter(
+          (person) => person?.role === "remove",
+        );
+        const type = item.isDirectory ? "folder" : "file";
+        const message = await Promise.all(
+          personsToRemove.map((person) =>
+            revokeFileAccess(type, itemId, person.id, person.role),
+          ),
+        );
+        if (incomingPublicRole === "reader") {
+          const update = (list) =>
+            access === "restricted"
+              ? list.filter(
+                  (resource) =>
+                    (resource.id ?? resource._id) !== (item._id ?? item.id),
+                )
+              : list.map((resource) => {
+                  const resourceId = String(resource?._id ?? resource?.id);
+                  if (resourceId !== String(item._id ?? item.id)) {
+                    return resource;
+                  }
+                  return {
+                    ...resource,
+                    capabilities: {
+                      ...resource.capabilities,
+                      canShare: false,
+                      canRename: false,
+                    },
+                    permissions: updatedPeopleWithAccess,
+                  };
+                });
+          if (type === "folder") {
+            setDirectoriesList((prev) => update(prev));
+          } else {
+            setFilesList((prev) => update(prev));
+          }
+          setPeopleWithAccess(updatedPeopleWithAccess);
+          setPrevPermissions(updatedPeopleWithAccess);
+          setShareItem(null);
+        }
+        if (incomingPublicRole === "writer") {
+          const update = (list) =>
+            list.map((resource) => {
+              const resourceId = String(resource?._id ?? resource?.id);
+              if (resourceId !== String(item._id ?? item.id)) {
+                return resource;
+              }
+              return {
+                ...resource,
+                permissions: updatedPeopleWithAccess,
+              };
+            });
+          if (type === "folder") {
+            setDirectoriesList((prev) => update(prev));
+          } else {
+            setFilesList((prev) => update(prev));
+          }
+          setPeopleWithAccess(updatedPeopleWithAccess);
+          setPrevPermissions(updatedPeopleWithAccess);
+          setShareItem((prev)=> ({
+            ...prev,
+            permissions: updatedPeopleWithAccess
+          }))
+        }
+        toast({
+          message,
+          type: "success",
+        });
+        return;
+      }
 
       toast({
         message: "Public Access updated",
@@ -1063,12 +1199,7 @@ export default function DirectoryView({ route }) {
       setIsShareLoading(false);
     }
   };
-  useEffect(() => {
-    console.log("combined", combinedItems);
-  }, [combinedItems]);
-  useEffect(() => {
-    console.log("peopleWithAccess", peopleWithAccess);
-  }, [peopleWithAccess]);
+
   const handleSharedRoleUpdate = async (item, type, message) => {
     setIsShareLoading(true);
 
@@ -1104,7 +1235,6 @@ export default function DirectoryView({ route }) {
 
       const publicRole = linkRole;
 
-      console.log({ myRole, publicRole });
       if (
         publicRole &&
         publicRole === "reader" &&
@@ -1115,42 +1245,16 @@ export default function DirectoryView({ route }) {
           "You will not be able to share. Are you sure?",
         );
         if (!confirmed) {
-          const prevRole = item.permissions.find(
-            (p) => p.emailAddress === user.email,
-          )?.role;
-          console.log("prevRole", prevRole);
-          setPeopleWithAccess((prev) =>
-            prev.map((p) =>
-              p.emailAddress === user.email
-                ? {
-                    ...p,
-                    role: prevRole,
-                  }
-                : p,
-            ),
-          );
+          setPeopleWithAccess(prevPermissions);
+          return;
         }
-        return;
       }
       if (linkAccess === "restricted" && myRole === "remove") {
         const confirmed = await showConfirmModal(
           "You will no longer have access. Are you sure?",
         );
         if (!confirmed) {
-          const prevRole = item.permissions.find(
-            (p) => p.emailAddress === user.email,
-          )?.role;
-          console.log("prevRole", prevRole);
-          setPeopleWithAccess((prev) =>
-            prev.map((p) =>
-              p.emailAddress === user.email
-                ? {
-                    ...p,
-                    role: prevRole,
-                  }
-                : p,
-            ),
-          );
+          setPeopleWithAccess(prevPermissions);
           return;
         }
       }
@@ -1204,17 +1308,17 @@ export default function DirectoryView({ route }) {
               }
               return {
                 ...resource,
-                permissions: updatedPeopleWithAccess,
                 capabilities: {
                   ...resource.capabilities,
                   canShare: publicRole !== "reader" || myRole !== "reader",
+                  canRename: publicRole !== "reader" || myRole !== "reader",
                 },
+                permissions: updatedPeopleWithAccess,
               };
             });
 
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
-
       setPeopleWithAccess(updatedPeopleWithAccess);
 
       setPrevPermissions(updatedPeopleWithAccess);

@@ -160,9 +160,9 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
   );
 
-  if (isPublicEffective && !directRole && !inheritedRole) {
-    currentUserCapabilities.canChangeRole = false;
-  }
+  // if (isPublicEffective && !directRole && !inheritedRole) {
+  //   currentUserCapabilities.canChangeRole = false;
+  // }
 
   const [viewActivity, modifiedActivity] = await Promise.all([
     FileActivity.findOne({
@@ -201,22 +201,19 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       userId: currentUserId,
     });
   }
-
+let publicCapabilities
   if (isPublic) {
-    const publicCapabilities = getCapabilities(
+    publicCapabilities = getCapabilities(
       publicRole,
       type,
       isRootLevelFile,
     );
-    publicCapabilities.canChangeRole = false;
+    // publicCapabilities.canChangeRole = false;
 
     permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
       role: publicRole,
-      capabilities: publicCapabilities,
-      inherited: false,
-      inheritedFrom: null,
     });
   }
 
@@ -237,7 +234,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   });
 
   return {
-    capabilities: currentUserCapabilities,
+    capabilities: isPublicEffective ? publicCapabilities : currentUserCapabilities,
     permissions: updatedPermissions,
     owners,
     isRootLevelFile,
@@ -1715,13 +1712,7 @@ export const downloadFolder = async (req, res, next) => {
   let cancelled = false;
 
   try {
-    const userId = req.user?._id;
 
-    if (!userId) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
 
     const { id } = req.params;
 
@@ -1733,10 +1724,8 @@ export const downloadFolder = async (req, res, next) => {
 
     const folder = await Directory.findOne({
       _id: id,
-      userId,
       isDeleted: false,
     }).lean();
-
     if (!folder) {
       return res.status(404).json({
         message: "Folder not found",
@@ -1801,7 +1790,6 @@ export const downloadFolder = async (req, res, next) => {
     archive.pipe(res);
 
     const directories = await Directory.find({
-      userId,
       isDeleted: false,
       path: folder._id,
     })
@@ -1817,7 +1805,6 @@ export const downloadFolder = async (req, res, next) => {
     }
 
     const files = await File.find({
-      userId,
       isDeleted: false,
       isUploading: false,
       path: folder._id,

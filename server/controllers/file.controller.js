@@ -120,7 +120,6 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       photoLink: permission.photoLink,
     }));
 
-  // Current user's effective role, factoring in public access
   const currentUserId = getIdString(userId);
   const currentUserPermission = currentUserId
     ? permissionMap.get(currentUserId)
@@ -172,9 +171,9 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     isRootLevelFile,
   );
 
-  if (isPublicEffective && !directRole && !inheritedRole) {
-    currentUserCapabilities.canChangeRole = false;
-  }
+  // if (isPublicEffective && !directRole && !inheritedRole) {
+  //   currentUserCapabilities.canChangeRole = false;
+  // }
 
   const [viewActivity, modifiedActivity] = await Promise.all([
     FileActivity.findOne({
@@ -213,22 +212,20 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
       userId: currentUserId,
     });
   }
-
+let publicCapabilities;
   if (isPublic) {
-    const publicCapabilities = getCapabilities(
+    publicCapabilities = getCapabilities(
       publicRole,
       type,
       isRootLevelFile,
     );
-    publicCapabilities.canChangeRole = false;
+    // publicCapabilities.canChangeRole = false;
 
     permissions.push({
       id: "anyoneWithLink",
       type: "anyone",
       role: publicRole,
-      capabilities: publicCapabilities,
-      inherited: false,
-      inheritedFrom: null,
+
     });
   }
 
@@ -249,7 +246,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   });
 
   return {
-    capabilities: currentUserCapabilities,
+    capabilities: isPublicEffective ? publicCapabilities : currentUserCapabilities,
     permissions: updatedPermissions,
     owners,
     isRootLevelFile,
@@ -1456,6 +1453,7 @@ export const revokeAccessById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { targetId: permissionId, type, relation } = req.body;
+
     const userId = req.user?._id;
     if (!permissionId) {
       return res.status(400).json({
