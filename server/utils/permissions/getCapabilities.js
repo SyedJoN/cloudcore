@@ -1,7 +1,7 @@
 import { ROLE_PRIORITY } from "./getRolePriority.js";
 
-export const getCapabilities = (role, type, isRootLevelFile=false) => {
-  const priority = ROLE_PRIORITY[role] || 0;
+export const getCapabilities = (role, type, isRootLevelFile=false, isSuperuser=false) => {
+  const priority = isSuperuser ? ROLE_PRIORITY['owner'] : ROLE_PRIORITY[role] || 0;
 
   const isReader =
     priority >= ROLE_PRIORITY.reader;

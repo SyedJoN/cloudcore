@@ -40,7 +40,7 @@ import { useDirectoryData } from "../Hooks/useDirectoryData";
 import { useUploadQueue } from "../Hooks/useUploadQueue";
 import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu";
 import { getResourceType } from "../../Utils/getResourceType";
-import { DRIVE_ROLES } from "../../Utils/displayUtils";
+import { DRIVE_ROLES, getFileType } from "../../Utils/displayUtils";
 import {
   clearPendingDriveFile,
   getPendingDriveFile,
@@ -61,6 +61,7 @@ import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
 import CreateMenu from "../Components/Drive/CreateMenu";
 import ConfirmationModal from "../Components/Modals/ConfirmationModal";
 import { ROLE_PRIORITY } from "../../../server/utils/permissions/getRolePriority";
+import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationModal";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -133,7 +134,23 @@ export default function DirectoryView({ route }) {
     message: "",
     resolve: null,
   });
+  const [cascadeModal, setCascadeModal] = useState(null); // { chain, resolve } | null
 
+  function showCascadeConfirm(chain) {
+    return new Promise((resolve) => {
+      setCascadeModal({ chain, resolve });
+    });
+  }
+
+  function handleCascadeCancel() {
+    cascadeModal?.resolve(false);
+    setCascadeModal(null);
+  }
+
+  function handleCascadeConfirm() {
+    cascadeModal?.resolve(true);
+    setCascadeModal(null);
+  }
   const showConfirmModal = (message) => {
     return new Promise((resolve) => {
       setConfirmModal({
@@ -984,9 +1001,38 @@ export default function DirectoryView({ route }) {
         if (restricted) {
           await revokeFileAccess("google", itemId, "anyoneWithLink");
         } else {
-          const { data } = await toggleDriveFilePermission(itemId, userRole);
+          const dryRun = await toggleDriveFilePermission(itemId, userRole);
 
-          permission = data.permission;
+          if (dryRun?.needsConfirmation) {
+            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
+
+            const chain = [
+              {
+                id: ancestorId,
+                name: ancestorName,
+                fromLabel: `Anyone with the link → ${ancestorRole}`,
+                toLabel: userRole,
+              },
+              {
+                id: itemId,
+                name: item.name,
+                fromLabel: `Anyone with the link → ${userRole}`,
+                toLabel: userRole,
+              },
+            ];
+
+            const confirmed = await showCascadeConfirm(chain);
+            if (!confirmed) return;
+
+            const data = await toggleDriveFilePermission(
+              itemId,
+              userRole,
+              true,
+            );
+            permission = data.permission;
+          } else {
+            permission = dryRun.permission;
+          }
         }
       } else {
         myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
@@ -997,12 +1043,33 @@ export default function DirectoryView({ route }) {
         const dryRun = await toggleFilePublic(itemId, userRole, access, type);
 
         if (dryRun?.needsConfirmation) {
-          const { ancestorName, ancestorRole } = dryRun.conflict;
-          const confirmed = await showConfirmModal(
-            `Changing this will also reduce "${ancestorName}"'s public access (currently ${ancestorRole}). Continue?`,
-          );
+          const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
+          const isRestricting = access === "restricted";
+          const iconType = item.isDirectory
+            ? null
+            : getFileType(item?.name || "");
 
-           if (!confirmed) {
+          const chain = [
+            {
+              id: ancestorId,
+              name: ancestorName,
+              fromLabel: `Anyone with the link → ${ancestorRole}`,
+              toLabel: isRestricting ? "Restricted" : DRIVE_ROLES[role] || role,
+              isDirectory: true,
+              iconType: null,
+            },
+            {
+              id: itemId,
+              name: item.name,
+              fromLabel: `Anyone with the link → ${DRIVE_ROLES[publicPermission?.role] || publicPermission?.role}`,
+              toLabel: isRestricting ? "Restricted" : DRIVE_ROLES[role] || role,
+              isDirectory: item.isDirectory,
+              iconType,
+            },
+          ];
+
+          const confirmed = await showCascadeConfirm(chain);
+          if (!confirmed) {
             const currentPublicRole = publicPermission?.role;
             setLinkAccess(currentPublicRole ? "anyone" : "restricted");
             setLinkRole(currentPublicRole || "reader");
@@ -1533,6 +1600,14 @@ export default function DirectoryView({ route }) {
             const url = await fetchPortalUrl();
             window.location.href = url;
           }}
+        />
+      )}
+      {cascadeModal && (
+        <CascadeConfirmationModal
+          chain={cascadeModal.chain}
+          onCancel={handleCascadeCancel}
+          onConfirm={handleCascadeConfirm}
+          isFetching={isShareLoading}
         />
       )}
       {confirmModal.open && (

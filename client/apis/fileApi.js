@@ -42,13 +42,13 @@ export async function toggleFilePublic(itemId, role, access, type, confirmCascad
 
   return data;
 }
-export async function toggleDriveFilePermission(fileId, role) {
-  const response = await axiosWithCreds.patch(
+export async function toggleDriveFilePermission(fileId, role, confirmCascade = false) {
+  const {data} = await axiosWithCreds.patch(
     `/file/google-drive/permissions/update`,
-    { fileId, role },
+    { fileId, role, confirmCascade },
   );
 
-  return response;
+  return data;
 }
 export async function grantAccessById(type, fileId, usersArray, message) {
   const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {

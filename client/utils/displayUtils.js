@@ -71,6 +71,7 @@ export const DRIVE_ROLES = {
 };
 export const ROLE_LABEL = {
   viewer: "Viewer",
+  owner: "Owner",
   reader: "Viewer",
   editor: "Editor",
   writer: "Editor",

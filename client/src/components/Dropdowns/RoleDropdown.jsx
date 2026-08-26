@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 
 import { ROLE_LABEL, DRIVE_ROLES } from "../../../Utils/displayUtils";
 
@@ -21,102 +27,61 @@ function RoleDropdownContent({
   showRemove = false,
   isChanged = false,
 }) {
-  const { animate, nodeRef, onTransitionEnd } = useTransitionClass(open);
-
-  const [position, setPosition] = useState(null);
-
-  const dropdownWidth = 220;
-
-  const updatePosition = useCallback(() => {
-    const anchor = anchorRef?.current;
-
-    if (!anchor) {
-      return;
-    }
-
-    const rect = anchor.getBoundingClientRect();
-
-    let left = rect.right - dropdownWidth;
-
-    // Don't go outside left side
-    if (left < 8) {
-      left = 8;
-    }
-
-    // Don't go outside right side
-    if (left + dropdownWidth > window.innerWidth - 8) {
-      left = window.innerWidth - dropdownWidth - 8;
-    }
-
-    setPosition({
-      top: rect.bottom + 4,
-      left,
-    });
-  }, [anchorRef]);
-
-  /*
-   * Calculate position before paint.
-   */
+  const [rect, setRect] = useState(null);
+  const menuRef = useRef(null);
+  const close =
+    (action) =>
+    (...args) => {
+      action?.(...args);
+      onClose();
+    };
+    
   useLayoutEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
-    updatePosition();
-  }, [open, updatePosition]);
+    const btn = anchorRef.current;
+    if (!btn) return;
 
-  /*
-   * Keep dropdown positioned while scrolling/resizing.
-   */
+    const r = btn.getBoundingClientRect();
+    const width = r.width + 150;
+
+    setRect({
+      left: r.right - (r.width + 150),
+      top: r.bottom,
+      width: r.width + 150,
+    });
+  }, [open, anchorRef]);
+
+
   useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleResize = () => updatePosition();
-    const handleScroll = () => updatePosition();
-
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", handleScroll, true);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", handleScroll, true);
-    };
-  }, [open, updatePosition]);
-
-  // Escape closes dropdown.
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        onClose?.();
+    function handleClick(e) {
+       if (
+        
+        anchorRef.current?.contains(e.target) || e.target.closest(".gd-share-person-role-btn") || !e.target.closest('.gd-share-role-select')
+      ) {
+        return;
       }
-    };
+      onClose();
+    }
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClick);
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClick);
     };
-  }, [open, onClose]);
+  }, [onClose]);
+  if (!rect || !open) return null;
 
   return (
     <div
-      ref={nodeRef}
-      className={`gd-role-dropdown ${animate ? "open" : ""}`}
-      onTransitionEnd={onTransitionEnd}
+      ref={menuRef}
+      className={`gd-role-dropdown origin-top-right animate-[sortDropdown_80ms_ease-out]`}
       style={{
         position: "fixed",
-        top: position?.top ?? 0,
-        left: position?.left ?? 0,
-        zIndex: 9999,
-        width: dropdownWidth,
-        visibility: position ? "visible" : "hidden",
-        pointerEvents: animate ? "auto" : "none",
+        left: rect.left,
+        top: rect.top + 4,
+        width: rect.width,
+        zIndex: 501,
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -128,7 +93,7 @@ function RoleDropdownContent({
             key={r}
             type="button"
             className="gd-role-option"
-            onClick={() => onChange?.(r)}
+            onClick={close(() => onChange?.(r))}
             style={{
               display: "flex",
               alignItems: "center",
@@ -148,11 +113,10 @@ function RoleDropdownContent({
           </button>
         );
       })}
-          {isOwner || showRemove && <div className="gd-context-divider" />}
+      {isOwner || (showRemove && <div className="gd-context-divider" />)}
 
       {isOwner && (
         <>
-
           <MouseTooltip
             disabled={isChanged}
             message="Disabled because other changes are pending"
@@ -161,9 +125,13 @@ function RoleDropdownContent({
               disabled={isChanged}
               type="button"
               className="gd-role-option remove"
-              onClick={() => (isOwnerPending ? onCancel?.() : onTransfer?.())}
+              onClick={close(() =>
+                isOwnerPending ? onCancel?.() : onTransfer?.(),
+              )}
             >
-              {isOwnerPending ? "Cancel ownership transfer" : "Transfer ownership"}
+              {isOwnerPending
+                ? "Cancel ownership transfer"
+                : "Transfer ownership"}
             </button>
           </MouseTooltip>
         </>
@@ -174,7 +142,7 @@ function RoleDropdownContent({
           type="button"
           className="gd-role-option remove"
           style={{ color: "#d93025" }}
-          onClick={() => onChange?.("remove")}
+          onClick={close(() => onChange?.("remove"))}
         >
           Remove access
         </button>
@@ -183,7 +151,7 @@ function RoleDropdownContent({
   );
 }
 
-export default function RoleDropdown({ open, anchorRef, containerRef, ...rest }) {
+export default function RoleDropdown({ open, anchorRef, ...rest }) {
   return (
     <Portal>
       <RoleDropdownContent open={open} anchorRef={anchorRef} {...rest} />

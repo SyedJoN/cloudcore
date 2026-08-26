@@ -150,17 +150,29 @@ function FileBrowser() {
                     </label>
 
                     <button
+                      key={user._id}
                       className="delete-btn"
                       onClick={() => handleDelete([...selectedFiles])}
-                      disabled={selectedFiles.size === 0}
+                      disabled={
+                        user.files &&
+                        user.files.every((file) => !selectedFiles.has(file._id))
+                      }
                     >
-                      Delete ({selectedFiles.size})
+                    Delete (
+  {
+    user.files?.filter((file) => selectedFiles.has(file._id)).length
+  }
+)
+
                     </button>
 
                     <button
                       className="clear-btn"
                       onClick={clearSelection}
-                      disabled={selectedFiles.size === 0}
+                      disabled={
+                        user.files &&
+                        user.files.every((file) => !selectedFiles.has(file._id))
+                      }
                     >
                       Clear
                     </button>

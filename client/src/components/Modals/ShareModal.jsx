@@ -40,7 +40,11 @@ import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
-
+export const ROLE_PRIORITY = {
+  reader: 1,
+  writer: 2,
+  owner: 3,
+};
 export default function ShareModal({
   item,
   setItem = null,
@@ -1018,7 +1022,6 @@ export default function ShareModal({
 
                     <RoleDropdown
                       open={openDropdown === "invite"}
-                      containerRef={shareModalOverlayRef}
                       anchorRef={inviteRoleRef}
                       current={inviteRole}
                       onChange={(r) => {
@@ -1152,7 +1155,7 @@ export default function ShareModal({
                   <div className="gd-share-section-label">
                     People with access
                   </div>
-                  <div
+                  {/* <div
                     onClick={() =>
                       setActivePerson(activePerson === "owner" ? null : "owner")
                     }
@@ -1186,16 +1189,15 @@ export default function ShareModal({
                         <span className="gd-share-owner-label">Owner</span>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
                 </>
 
                 {item.permissions?.length > 0 && (
                   <div className="gd-share-people-list">
-                    {peopleWithAccess
+                    {peopleWithAccess.sort((a,b)=> ROLE_PRIORITY[b.role] - ROLE_PRIORITY[a.role])
                       ?.map((person, idx) => {
                         if (
-                          person?.type === "anyone" ||
-                          person?.role === "owner"
+                          person?.type === "anyone"
                         )
                           return null;
                         if (!personRefs.current[idx])
@@ -1240,6 +1242,7 @@ export default function ShareModal({
                                         current: el,
                                       })
                                     }
+                                    disabled={person.role === "owner" || !canChangeRole}
                                     className="gd-share-person-role-btn"
                                     aria-disabled={!canChangeRole}
                                     onClick={(e) => {
@@ -1251,8 +1254,8 @@ export default function ShareModal({
                                     }}
                                     style={{
                                       opacity: !canChangeRole ? 0.5 : 1,
-                                      cursor: !canChangeRole
-                                        ? "not-allowed"
+                                      cursor: !canChangeRole || person.role === "owner"
+                                        ? "default"
                                         : "pointer",
                                       pointerEvents: !canChangeRole
                                         ? "none"
@@ -1260,7 +1263,7 @@ export default function ShareModal({
                                     }}
                                   >
                                     {ROLE_LABEL[person?.role]}{" "}
-                                    {canChangeRole && (
+                                    {canChangeRole && person.role !== "owner" && (
                                       <IconChevronDown size={12} />
                                     )}
                                   </button>
@@ -1335,7 +1338,7 @@ export default function ShareModal({
                         </button>
 
                         {showAccessDropdown && (
-                          <div className="gd-share-access-dropdown">
+                          <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
                             {["restricted", "anyone"].map((opt) => (
                               <button
                                 key={opt}

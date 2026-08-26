@@ -31,6 +31,9 @@
 .disabled {
   opacity: 0.6;
 }
+.picker-dialog-bg {
+  background-color: var(--surface-container);
+}
 /* ===================== APP SHELL ===================== */
 .directory-view {
   display: flex;
@@ -210,8 +213,9 @@
   gap: 4px;
 }
 .gd-btn {
-  padding: 8px 20px;
-  border-radius: var(--radius-lg);
+  padding: 10px 24px;
+  border-radius: var(--radius-full);
+  
   font-size: 14px;
   font-weight: 500;
   font-family: var();
@@ -226,20 +230,39 @@
 }
 .gd-btn-text {
   background: none;
-  color: #1a73e8;
+  color: var(--accent-blue);
   padding: 8px 12px;
 }
 .gd-btn-text:hover:not(.disabled) {
-  background: var(--accent-blue-light);
-  color: var(--text-primary);
+  background: var(--btn-bg-medium);
 }
 .gd-btn-primary {
-  background: #1a73e8;
-  color: white;
+  position: relative;
+  background: var(--accent-blue);
+  box-shadow: none;
+  color: var(--text-btn);
+;
+}
+.gd-btn-primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--surface-white);
+  border-radius: var(--radius-full);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.gd-btn-primary:hover:not(.disabled)::before {
+  background: var(--surface-white);
+  opacity: 0.05;
 }
 .gd-btn-primary:hover:not(.disabled) {
-  background: var(--accent-blue-hover);
   box-shadow: var(--shadow-1);
+  
+}
+.gd-btn-primary:active:not(.disabled) {
+  box-shadow: none;
 }
 .gd-new-btn {
   display: flex;
@@ -1740,7 +1763,6 @@ body.gd-overlay-open {
 
   .gd-list-header.five-columns,
   .gd-list-row.five-columns {
-    
     grid-template-columns: 7fr 7fr 3fr 2fr 7fr;
   }
 
@@ -1820,6 +1842,6 @@ body.gd-overlay-open {
     padding: 2px;
   }
   .list-row-action {
-    gap: 0
+    gap: 0;
   }
 }

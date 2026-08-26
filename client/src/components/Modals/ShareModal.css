@@ -122,65 +122,42 @@
 .gd-share-role-select {
   display: flex;
   position: relative;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
+.gd-share-person-role-btn:hover:not(:disabled) {
+  background: var(--btn-bg-medium);
+}
+
 
 .gd-share-role-btn {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 6px;
+  padding: 8px 16px;
   background: none;
   border-radius: var(--radius-sm);
   font-size: 14px;
-  font-family: var();
   color: var(--text-primary);
-
   white-space: nowrap;
   transition: background var(--transition);
-  height: 32px;
 }
 .gd-share-role-btn:not(:disabled) {
     cursor: pointer;
 }
-.gd-share-role-btn:hover {
-  background: rgba(32, 33, 36, 0.06);
+.gd-share-role-btn:hover:not(:disabled) {
+  background: var(--btn-bg-medium);
 }
 .gd-role-dropdown {
   position: fixed;
-
-  background: var(--surface-white);
+  background: var(--surface-container);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-2);
-
+  box-shadow: var(--shadow-dark);
   width: 220px;
   padding: 8px 0;
-
-  transform: scaleY(0.8);
-  transform-origin: top right;
-
-  opacity: 0;
-
-  z-index: 9999;
   overflow: hidden;
-
-  margin-top: 0;
-
-  transition:
-    transform 267ms cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 267ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  pointer-events: none;
 }
 
-.gd-role-dropdown.open {
-  overflow: visible;
-
-  transform: scaleY(1);
-  opacity: 1;
-
-  pointer-events: auto;
-}
 .gd-role-option {
   display: flex;
   position: relative;
@@ -321,17 +298,18 @@
 .gd-share-person-role-btn {
   display: flex;
   align-items: center;
+  padding: 8px 16px;
   gap: 4px;
   background: none;
   border: none;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 .gd-share-person-role-btn:disabled {
+  pointer-events: none;
   cursor: default;
   color: var(--text-tertiary, rgb(95, 99, 104));
 }
@@ -348,9 +326,7 @@
   flex-shrink: 0;
   cursor: default;
 }
-.gd-share-person-role-btn:hover:not(:disabled) {
-  background: rgba(32, 33, 36, 0.08);
-}
+
 .gd-share-divider {
   height: 1px;
   background: var(--border);
@@ -578,14 +554,11 @@
   z-index: 1;
   transform: scale(0.95);
   transform-origin: center top;
-  box-shadow:
-    0 3px 5px -1px rgba(0, 0, 0, 0.2),
-    0 6px 10px 0 rgba(0, 0, 0, 0.14),
-    0 1px 18px 0 rgba(0, 0, 0, 0.12);
+  box-shadow:var(--shadow-dark);
   transition:
     opacity 0.03s linear,
     transform 0.12s cubic-bezier(0, 0, 0.2, 1);
-  background: var(--surface-container-dark);
+  background: var(--surface-container);
   pointer-events: none;
 }
 .transition-grow {
@@ -705,9 +678,9 @@
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  background: var(--surface-container-dark);
+  background: var(--surface-container);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-dark);
   min-width: 220px;
   z-index: 200;
   padding: 6px 0;
@@ -751,6 +724,93 @@
   color: var(--text-secondary);
   font-size: 0.95rem;
   font-style: italic;
+}
+.gd-cascade-modal {
+  background: var(--surface-white);
+  border-radius: 16px;
+  padding: 24px 40px;
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  box-shadow: var(--shadow-dark)
+}
+
+.gd-cascade-title {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+}
+
+.gd-cascade-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0 0 20px;
+}
+.gd-cascade-link:hover {
+  text-decoration: underline;
+}
+
+.gd-cascade-chain {
+  margin-bottom: 24px;
+}
+
+.gd-cascade-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+  padding: 6px 0;
+}
+
+.gd-cascade-branch {
+  position: absolute;
+  left: -12px;
+  top: -6px;
+  width: 12px;
+  height: 24px;
+  border-left: 1.5px solid #dadce0;
+  border-bottom: 1.5px solid #dadce0;
+  border-bottom-left-radius: 6px;
+}
+
+.gd-cascade-icon {
+  color: #5f6368;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.gd-cascade-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gd-cascade-name {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.gd-cascade-roles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.gd-cascade-from {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+}
+
+.gd-cascade-arrow {
+  font-size: 14px;
+  color: #80868b;
+}
+
+.gd-cascade-to {
+  color: var(--text-primary);
 }
 @keyframes gdTooltipGrow {
   from {

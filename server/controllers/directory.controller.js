@@ -1136,7 +1136,7 @@ export const editDirectory = async (req, res, next) => {
     relation: "can_rename",
     object: getFgaObject("folder", id),
   });
-  if (!canRename.allowed) {
+  if (req.user.role !== "superuser" && !canRename.allowed) {
     return res.status(403).json({ message: "Unauthorized" });
   }
   try {
@@ -1176,7 +1176,7 @@ export const softDeleteDirectory = async (req, res, next) => {
       object: getFgaObject("folder", id),
     });
 
-    if (!canTrash.allowed) {
+    if (req.user.role !== "superuser" && !canTrash.allowed) {
       return res.status(403).json({ message: "Unauthorized!" });
     }
 
@@ -1245,7 +1245,7 @@ export const deleteDirectory = async (req, res, next) => {
       object: getFgaObject("folder", id),
     });
 
-    if (!canDelete.allowed) {
+    if (req.user.role !== "superuser" && !canDelete.allowed) {
       return res.status(403).json({ message: "Unauthorized!" });
     }
     const queue = [currentDirectory._id];

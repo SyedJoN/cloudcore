@@ -97,21 +97,20 @@
 }
 
 .clear-btn {
-  background: var(--surface-container-dark);
+  background: var(--btn-bg-medium);
   border: none;
+  opacity: 0.9;
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
 }
 
 .clear-btn:hover:not(:disabled) {
-  background: #d3d5d7;
+  opacity: 1;
 }
-.dark .clear-btn:hover:not(:disabled) {
-  background: #000;
-}
+
 .clear-btn:disabled {
-  background: var(--surface-container-dark-hover);
+  opacity: 0.6;
   cursor: not-allowed;
 }
 .empty-state {

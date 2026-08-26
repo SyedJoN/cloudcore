@@ -64,7 +64,14 @@ async function listSharedObjects(type, userId) {
   return [...new Set(combined)].map((o) => o.split(":").pop()).filter(Boolean);
 }
 
-const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
+const resolveRole = async (
+  item,
+  type,
+  userId,
+  parentDir,
+  isSuperuser = false,
+  isShared = false,
+) => {
   const object = getFgaObject(type, item._id);
 
   const permissionMap = new Map();
@@ -222,6 +229,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
     currentRole,
     type,
     isRootLevelFile,
+    isSuperuser
   );
 
   const [viewActivity, modifiedActivity] = await Promise.all([
@@ -649,7 +657,7 @@ export const getFileMetaById = async (req, res, next) => {
       permissions,
       viewedByMeTime,
       modifiedByMeTime,
-    } = await resolveRole(file, "file", userId, parentDir);
+    } = await resolveRole(file, "file", userId, parentDir, true);
 
     if (req.user?.role === "superuser" || isOwner) {
       return res.status(200).json({
@@ -949,7 +957,7 @@ export const updateFile = async (req, res, next) => {
         object: getFgaObject("file", fileId),
       });
 
-      if (!canRename.allowed) {
+      if (req.user.role !== "superuser" && !canRename.allowed) {
         return res
           .status(403)
           .json({ message: "You don't have permission to rename this file" });
@@ -1007,7 +1015,7 @@ export const softDeleteFile = async (req, res, next) => {
       relation: "can_trash",
       object: getFgaObject("file", id),
     });
-    if (!canTrash.allowed) {
+    if (req.user.role !== "superuser" && !canTrash.allowed) {
       return res.status(403).json({ message: "Unauthorized!" });
     }
 
@@ -1091,7 +1099,7 @@ export const deleteFile = async (req, res, next) => {
         relation: "can_delete",
         object,
       });
-      if (!canDelete.allowed) {
+      if (req.user.role !== "superuser" && !canDelete.allowed) {
         return res.status(403).json({ message: "Unauthorized!" });
       }
 
@@ -1163,7 +1171,6 @@ export const restoreFile = async (req, res, next) => {
   }
 };
 
-
 async function setFolderPublicAccess(folderId, newRole) {
   const object = getFgaObject("folder", folderId);
   const folder = await Directory.findById(folderId);
@@ -1185,10 +1192,14 @@ async function setFolderPublicAccess(folderId, newRole) {
     const newRelation = newRole === "reader" ? "link_reader" : "link_writer";
 
     try {
-      await fgaClient.write({ deletes: [{ user: "user:*", relation: oldRelation, object }] });
+      await fgaClient.write({
+        deletes: [{ user: "user:*", relation: oldRelation, object }],
+      });
     } catch {}
     try {
-      await fgaClient.write({ writes: [{ user: "user:*", relation: newRelation, object }] });
+      await fgaClient.write({
+        writes: [{ user: "user:*", relation: newRelation, object }],
+      });
     } catch {}
 
     folder.isPublic = true;
@@ -1197,6 +1208,15 @@ async function setFolderPublicAccess(folderId, newRole) {
 
   await folder.save();
 }
+
+const getAncestors = async (path) => {
+  const ancestors = await Directory.find({
+    _id: { $in: path },
+    name: { $not: /^root/ },
+  }).select("name isPublic publicRole");
+
+  return ancestors;
+};
 
 export const toggleFilePublic = async (req, res, next) => {
   try {
@@ -1231,12 +1251,16 @@ export const toggleFilePublic = async (req, res, next) => {
     const isRestricted = access === "restricted";
     const incomingPriority = isRestricted ? 0 : ROLE_PRIORITY[role];
 
-    const ancestors = await getAncestorDirectories(item);
+    const ancestors = await getAncestors(item.path);
+    console.log("ancestors", ancestors);
     const conflicting = ancestors
-      .filter((a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority)
-      .sort((a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole])[0];
-
-    // conflict exists but not confirmed yet — report it, change nothing
+      .filter(
+        (a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority,
+      )
+      .sort(
+        (a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole],
+      )[0];
+    console.log("conflicting", conflicting);
     if (conflicting && confirmCascade !== "true") {
       return res.status(200).json({
         needsConfirmation: true,
@@ -1839,6 +1863,79 @@ export const fetchUserWithFiles = async (req, res, next) => {
   }
 };
 
+async function getDriveAncestors(drive, fileId) {
+  const ancestors = [];
+  let currentId = fileId;
+
+  while (true) {
+    const { data: file } = await drive.files.get({
+      fileId: currentId,
+      fields: "id, name, parents",
+    });
+
+    if (!file.parents?.length) break;
+
+    const parentId = file.parents[0];
+
+    const { data: parent } = await drive.files.get({
+      fileId: parentId,
+      fields: "id, name",
+    });
+
+    const { data: permData } = await drive.permissions.list({
+      fileId: parentId,
+      fields: "permissions(id, type, role)",
+    });
+
+    const publicPermission = permData.permissions?.find(
+      (p) => p.type === "anyone",
+    );
+
+    ancestors.push({
+      _id: parent.id,
+      name: parent.name,
+      isPublic: Boolean(publicPermission),
+      publicRole: publicPermission?.role || null,
+    });
+
+    currentId = parentId;
+  }
+
+  return ancestors;
+}
+
+async function setDriveFolderPublicAccess(drive, folderId, newRole) {
+  const { data: permData } = await drive.permissions.list({
+    fileId: folderId,
+    fields: "permissions(id, type, role)",
+  });
+
+  const existing = permData.permissions?.find((p) => p.type === "anyone");
+
+  if (!newRole) {
+    if (existing) {
+      await drive.permissions.delete({
+        fileId: folderId,
+        permissionId: existing.id,
+      });
+    }
+    return;
+  }
+
+  if (existing) {
+    await drive.permissions.update({
+      fileId: folderId,
+      permissionId: existing.id,
+      requestBody: { role: newRole },
+    });
+  } else {
+    await drive.permissions.create({
+      fileId: folderId,
+      requestBody: { type: "anyone", role: newRole },
+    });
+  }
+}
+
 export const updateGoogleDrivePermission = async (req, res, next) => {
   try {
     const { drive_access_token } = req.signedCookies;
@@ -1849,7 +1946,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
       });
     }
 
-    const { fileId, role } = req.body;
+    const { fileId, role, confirmCascade } = req.body;
 
     if (!fileId || !role) {
       return res.status(400).json({
@@ -1859,6 +1956,33 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
 
     const drive = getDriveClient(drive_access_token);
 
+    const incomingPriority = ROLE_PRIORITY[role] || 0;
+
+    const ancestors = await getDriveAncestors(drive, fileId);
+
+    const conflicting = ancestors
+      .filter(
+        (a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority,
+      )
+      .sort(
+        (a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole],
+      )[0];
+
+    if (conflicting && confirmCascade !== true) {
+      return res.status(200).json({
+        needsConfirmation: true,
+        conflict: {
+          ancestorId: conflicting._id,
+          ancestorName: conflicting.name,
+          ancestorRole: conflicting.publicRole,
+        },
+      });
+    }
+
+    if (conflicting && confirmCascade === true) {
+      await setDriveFolderPublicAccess(drive, conflicting._id, role);
+    }
+
     const permissions = await drive.permissions.list({
       fileId,
       fields: "permissions(id,type,role,allowFileDiscovery)",
@@ -1867,35 +1991,6 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     const publicPermission = permissions.data.permissions.find(
       (p) => p.type === "anyone",
     );
-
-    const file = await drive.files.get({
-      fileId,
-      fields: "parents",
-    });
-
-    const parentId = file.data.parents?.[0];
-
-    if (parentId) {
-      const parentPermissions = await drive.permissions.list({
-        fileId: parentId,
-        fields: "permissions(id,type,role,allowFileDiscovery)",
-      });
-
-      const parentPublicPermission = parentPermissions.data.permissions.find(
-        (p) => p.type === "anyone",
-      );
-
-      if (
-        parentPublicPermission &&
-        parentPublicPermission.role === "writer" &&
-        role === "reader"
-      ) {
-        return res.status(400).json({
-          message:
-            "Parent folder has higher public access. Update parent permission first.",
-        });
-      }
-    }
 
     let response;
 
