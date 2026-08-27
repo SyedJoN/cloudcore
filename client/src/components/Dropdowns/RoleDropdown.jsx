@@ -33,6 +33,7 @@ function RoleDropdownContent({
     (action) =>
     (...args) => {
       action?.(...args);
+      console.log('hi')
       onClose();
     };
     
@@ -48,7 +49,7 @@ function RoleDropdownContent({
     setRect({
       left: r.right - (r.width + 150),
       top: r.bottom,
-      width: r.width + 150,
+      width,
     });
   }, [open, anchorRef]);
 
@@ -57,7 +58,7 @@ function RoleDropdownContent({
     function handleClick(e) {
        if (
         
-        anchorRef.current?.contains(e.target) || e.target.closest(".gd-share-person-role-btn") || !e.target.closest('.gd-share-role-select')
+        anchorRef.current?.contains(e.target) || e.target.closest(".gd-share-person-role-btn") || e.target.closest('.gd-share-role-btn') || e.target.closest('.gd-role-option')
       ) {
         return;
       }
@@ -101,7 +102,7 @@ function RoleDropdownContent({
               position: "relative",
             }}
           >
-            <span className="absolute left-3 top-2.75">
+            <span className="absolute left-3 top-3.1">
               {isSelected && (
                 <CheckIcon className="w-5 h-5 min-w-5 text-(--accent-blue)" />
               )}

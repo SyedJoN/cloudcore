@@ -119,6 +119,7 @@ export default function DirectoryView({ route }) {
   const [showDetails, setShowDetails] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
+  const [userRole, setUserRole] = useState([]);
   const [downloadQueue, setDownloadQueue] = useState([]);
   const [downloadProgressMap, setDownloadProgressMap] = useState({});
   const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
@@ -994,17 +995,53 @@ export default function DirectoryView({ route }) {
       const userRole = DRIVE_ROLES[role] ?? "reader";
 
       let permission = null;
+      let isMe;
       let myRole;
       let incomingPublicRole;
+      let updatedParentId;
 
       if (isGoogleDriveRoute) {
         if (restricted) {
-          await revokeFileAccess("google", itemId, "anyoneWithLink");
+          const dryRun = await revokeFileAccess(
+            "google",
+            itemId,
+            "anyoneWithLink",
+          );
+          if (dryRun?.needsConfirmation) {
+            const { ancestorId, ancestorName, previousRole } = dryRun.conflicts;
+            updatedParentId = ancestorId;
+            const chain = [
+              {
+                id: ancestorId,
+                name: ancestorName,
+                fromLabel: `Anyone with the link → ${previousRole}`,
+                toLabel: "restricted",
+              },
+              {
+                id: itemId,
+                name: item.name,
+                fromLabel: `Anyone with the link → ${userRole}`,
+                toLabel: "restricted",
+              },
+            ];
+
+            const confirmed = await showCascadeConfirm(chain);
+            if (!confirmed) return;
+
+            await revokeFileAccess(
+              "google",
+              itemId,
+              "anyoneWithLink",
+              null,
+              true,
+            );
+          }
         } else {
           const dryRun = await toggleDriveFilePermission(itemId, userRole);
 
           if (dryRun?.needsConfirmation) {
-            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
+            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflicts;
+            updatedParentId = ancestorId;
 
             const chain = [
               {
@@ -1035,7 +1072,14 @@ export default function DirectoryView({ route }) {
           }
         }
       } else {
-        myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
+        const incomingRole = peopleWithAccess.find(
+          (p) => p.emailAddress === user.email,
+        );
+
+        isMe = incomingRole
+          ? (incomingRole?.email ?? incomingRole.emailAddress) === user.email
+          : false;
+        const myRole = incomingRole?.role;
         incomingPublicRole = DRIVE_ROLES[role] || role;
 
         let confirmCascade = false;
@@ -1043,7 +1087,9 @@ export default function DirectoryView({ route }) {
         const dryRun = await toggleFilePublic(itemId, userRole, access, type);
 
         if (dryRun?.needsConfirmation) {
-          const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
+          const { ancestorId, ancestorName, ancestorRole } = dryRun.conflicts;
+          updatedParentId = ancestorId;
+
           const isRestricting = access === "restricted";
           const iconType = item.isDirectory
             ? null
@@ -1083,10 +1129,12 @@ export default function DirectoryView({ route }) {
         if (
           ((incomingPublicRole === "reader" || access === "restricted") &&
             myRole &&
-            myRole === "reader") ||
+            myRole === "reader" &&
+            isMe) ||
           ((incomingPublicRole === "reader" ||
             incomingPublicRole === "writer") &&
-            myRole === "remove")
+            myRole === "remove" &&
+            isMe)
         ) {
           const confirmed = await showConfirmModal(
             "You will not be able to share. Are you sure?",
@@ -1101,7 +1149,8 @@ export default function DirectoryView({ route }) {
         }
         if (
           access === "restricted" &&
-          (myRole === undefined || myRole === "remove")
+          (myRole === undefined || myRole === "remove") &&
+          isMe
         ) {
           const confirmed = await showConfirmModal(
             "You will no longer have access. Are you sure?",
@@ -1120,14 +1169,21 @@ export default function DirectoryView({ route }) {
         }
         await toggleFilePublic(itemId, userRole, access, type, confirmCascade);
       }
+      const parentChildIds = [
+        updatedParentId,
+        itemId,
+        ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
+      ].filter(Boolean);
 
       const update = (list) =>
-        linkAccess === "restricted" && myRole === "reader"
+        linkAccess === "restricted" && myRole === "reader" && isMe
           ? list.filter(
-              (resource) => (resource.id ?? resource._id) !== item._id,
+              (resource) =>
+                !parentChildIds.includes(String(resource.id ?? resource._id)),
             )
           : list.map((resource) => {
-              if (String(resource._id ?? resource.id) !== String(itemId)) {
+              const resourceId = String(resource._id ?? resource.id);
+              if (!parentChildIds.includes(resourceId)) {
                 return resource;
               }
 
@@ -1148,8 +1204,9 @@ export default function DirectoryView({ route }) {
                 ...resource,
                 capabilities: {
                   ...resource.capabilities,
-                  canShare:
-                    incomingPublicRole !== "reader" || myRole !== "reader",
+                  canShare: isMe
+                    ? incomingPublicRole !== "reader" || myRole !== "reader"
+                    : true,
                 },
                 isPublic: restricted ? false : true,
                 publicRole: restricted ? null : userRole,
@@ -1288,6 +1345,7 @@ export default function DirectoryView({ route }) {
 
   const handleSharedRoleUpdate = async (item, type, message) => {
     setIsShareLoading(true);
+    const itemId = item._id ?? item.id;
 
     try {
       const allPermissions = item?.permissions ?? [];
@@ -1317,35 +1375,29 @@ export default function DirectoryView({ route }) {
           permission?.type !== "anyone" && permission?.role !== "owner",
       );
 
-      const myRole = peopleWithAccess.find((p) => p.id === user.id)?.role;
+      const prevRole = previousEditablePermissions.find(
+        (p) => p.emailAddress === userRole.emailAddress,
+      )?.role;
 
+      const incomingRole = newPermissions.find(
+        (p) => p.emailAddress === userRole.emailAddress,
+      );
+
+      console.log("incomingROle", incomingRole);
+      const myRole = incomingRole?.role;
+
+      const isMe = incomingRole
+        ? (incomingRole?.emailAddress ?? incomingRole.emailAddress) ===
+          user.email
+        : false;
+      console.log("isMe", isMe);
       const publicRole = linkRole;
 
-      if (
-        publicRole &&
-        publicRole === "reader" &&
-        myRole &&
-        myRole === "reader"
-      ) {
-        const confirmed = await showConfirmModal(
-          "You will not be able to share. Are you sure?",
-        );
-        if (!confirmed) {
-          setPeopleWithAccess(prevPermissions);
-          return;
-        }
-      }
-      if (linkAccess === "restricted" && myRole === "remove") {
-        const confirmed = await showConfirmModal(
-          "You will no longer have access. Are you sure?",
-        );
-        if (!confirmed) {
-          setPeopleWithAccess(prevPermissions);
-          return;
-        }
-      }
+      let confirmCascade = false;
 
-      const result = await updateSharedAccess({
+      let updatedParentId;
+
+      const dryRun = await updateSharedAccess({
         item,
         type,
 
@@ -1358,11 +1410,102 @@ export default function DirectoryView({ route }) {
         grantAccessById,
 
         revokeFileAccess,
+
+        confirmCascade,
       });
 
-      if (!result?.changed) {
+      if (!dryRun?.changed) {
         setShareItem(null);
         return;
+      }
+
+      if (dryRun?.response?.needsConfirmation) {
+        const { ancestorId, ancestorName, previousRole, requestedRole } =
+          dryRun.response.conflicts;
+        updatedParentId = ancestorId;
+        const iconType = item.isDirectory
+          ? null
+          : getFileType(item?.name || "");
+
+        const chain = [
+          {
+            id: ancestorId,
+            name: ancestorName,
+            fromLabel: `${previousRole}`,
+            toLabel: ` → ${DRIVE_ROLES[requestedRole] || requestedRole || "remove"}`,
+            isDirectory: true,
+            iconType: null,
+          },
+          {
+            id: dryRun.itemId,
+            name: item.name,
+            fromLabel: `${DRIVE_ROLES[prevRole] || prevRole}`,
+            toLabel: ` → ${DRIVE_ROLES[myRole] || myRole}`,
+            isDirectory: item.isDirectory,
+            iconType,
+          },
+        ];
+        const publicPermission = peopleWithAccess.find(
+          (p) => p.type === "anyone",
+        );
+        const confirmed = await showCascadeConfirm(chain);
+        if (!confirmed) {
+          const currentPublicRole = publicPermission?.role;
+          setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+          setLinkRole(currentPublicRole || "reader");
+          setPeopleWithAccess(prevPermissions);
+          return;
+        }
+
+        confirmCascade = true;
+      }
+
+      if (
+        publicRole &&
+        publicRole === "reader" &&
+        myRole &&
+        myRole === "reader" &&
+        isMe
+      ) {
+        const confirmed = await showConfirmModal(
+          "You will not be able to share. Are you sure?",
+        );
+        if (!confirmed) {
+          setPeopleWithAccess(prevPermissions);
+          return;
+        }
+      }
+      if (linkAccess === "restricted" && myRole === "remove" && isMe) {
+        const confirmed = await showConfirmModal(
+          "You will no longer have access. Are you sure?",
+        );
+        if (!confirmed) {
+          setPeopleWithAccess(prevPermissions);
+          return;
+        }
+      }
+      if (confirmCascade) {
+        const result = await updateSharedAccess({
+          item,
+          type,
+
+          peopleWithAccess: newPermissions,
+
+          prevPermissions: previousEditablePermissions,
+
+          message,
+
+          grantAccessById,
+
+          revokeFileAccess,
+
+          confirmCascade,
+        });
+
+        if (!result?.changed) {
+          setShareItem(null);
+          return;
+        }
       }
 
       const updatedPeopleWithAccess = peopleWithAccess
@@ -1381,28 +1524,39 @@ export default function DirectoryView({ route }) {
           return p;
         })
         .filter(Boolean);
+      const parentChildIds = [
+        updatedParentId,
+        itemId,
+        ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
+      ].filter(Boolean);
+
+      console.log("parentChildids", parentChildIds);
 
       const update = (list) =>
-        linkAccess === "restricted" && myRole === "remove"
+        linkAccess === "restricted" && myRole === "remove" && isMe
           ? list.filter(
-              (resource) => (resource.id ?? resource._id) !== item._id,
+              (resource) =>
+                !parentChildIds.includes(String(resource.id ?? resource._id)),
             )
           : list.map((resource) => {
               const resourceId = String(resource?._id ?? resource?.id);
-              if (resourceId !== String(result.itemId)) {
+              if (!parentChildIds.includes(resourceId)) {
                 return resource;
               }
               return {
                 ...resource,
                 capabilities: {
                   ...resource.capabilities,
-                  canShare: publicRole !== "reader" || myRole !== "reader",
-                  canRename: publicRole !== "reader" || myRole !== "reader",
+                  canShare: isMe
+                    ? publicRole !== "reader" || myRole !== "reader"
+                    : true,
+                  canRename: isMe
+                    ? publicRole !== "reader" || myRole !== "reader"
+                    : true,
                 },
                 permissions: updatedPeopleWithAccess,
               };
             });
-
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
       setPeopleWithAccess(updatedPeopleWithAccess);
@@ -1800,7 +1954,6 @@ export default function DirectoryView({ route }) {
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
                     viewMode={viewMode}
-                    user={user}
                     dirId={dirId}
                     selectedItems={selectedItems}
                     onSelect={handleSelect}
@@ -2091,6 +2244,7 @@ export default function DirectoryView({ route }) {
           setPeopleWithAccess={setPeopleWithAccess}
           item={shareItem}
           allUsers={allUsers}
+          setUserRole={setUserRole}
           onUpdateRoleAfterSave={handleSharedRoleUpdate}
           onClose={handleToggleResourcePublic}
           setShareItem={setShareItem}

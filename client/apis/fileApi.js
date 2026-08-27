@@ -35,38 +35,62 @@ export async function getFileByMetaId(fileId) {
   return data;
 }
 
-export async function toggleFilePublic(itemId, role, access, type, confirmCascade = false) {
+export async function toggleFilePublic(
+  itemId,
+  role,
+  access,
+  type,
+  confirmCascade = false,
+) {
   const { data } = await axiosWithCreds.patch(
     `/file/${itemId}/public/${role}?access=${access}&type=${type}&confirmCascade=${confirmCascade}`,
   );
 
   return data;
 }
-export async function toggleDriveFilePermission(fileId, role, confirmCascade = false) {
-  const {data} = await axiosWithCreds.patch(
+export async function toggleDriveFilePermission(
+  fileId,
+  role,
+  confirmCascade = false,
+) {
+  const { data } = await axiosWithCreds.patch(
     `/file/google-drive/permissions/update`,
     { fileId, role, confirmCascade },
   );
 
   return data;
 }
-export async function grantAccessById(type, fileId, usersArray, message) {
+export async function grantAccessById(
+  type,
+  fileId,
+  usersArray,
+  message,
+  confirmCascade = false,
+) {
   const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {
     usersArray,
     message,
     type,
+    confirmCascade,
   });
   return data;
 }
 
-export async function revokeFileAccess(type, fileId, targetId, relation) {
+export async function revokeFileAccess(
+  type,
+  fileId,
+  targetId,
+  relation,
+  confirmCascade = false,
+) {
   const { data } = await axiosWithCreds.post(`/file/revoke-access/${fileId}`, {
     targetId,
     relation,
     type,
+    confirmCascade,
   });
 
-  return data.message;
+  return data;
 }
 
 export async function getRecentFiles() {

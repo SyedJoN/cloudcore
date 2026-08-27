@@ -6,6 +6,7 @@ export const updateSharedAccess = async ({
   message,
   grantAccessById,
   revokeFileAccess,
+  confirmCascade
 }) => {
   const previousPermissions = prevPermissions ?? [];
   const currentPermissions = peopleWithAccess ?? [];
@@ -60,6 +61,7 @@ export const updateSharedAccess = async ({
       itemId,
       personsToGrant,
       message,
+      confirmCascade
     );
   }
 
@@ -75,6 +77,7 @@ export const updateSharedAccess = async ({
           itemId,
           person.id,
           person.role,
+          confirmCascade
         ),
       ),
     );
@@ -85,6 +88,6 @@ export const updateSharedAccess = async ({
     changed: true,
     itemId,
     access,
-    finalPermissions: type.startsWith('google') ? response : response?.permissions || []
+    response: response.length ? response[0] : response
   };
 };

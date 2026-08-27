@@ -738,22 +738,96 @@ export const fetchGoogleDriveFiles = async (req, res, next) => {
 
     const drive = getDriveClient(drive_access_token);
 
-    const response = await drive.files.list({
-      pageSize: 1000,
-      fields:
-        "files(id,name,webViewLink,parents,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,lastModifyingUser,capabilities(canReadDrive, canEdit, canDelete, canShare, canCopy, canDownload, canRename, canAddChildren,canMoveItemWithinDrive, canDisableInheritedPermissions),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner))",
-      orderBy: "createdTime desc",
-    });
-
-    const files = response.data.files || [];
-
     const FOLDER_MIME = "application/vnd.google-apps.folder";
 
+    const allFiles = [];
+    let pageToken = null;
 
+    // Fetch all files/folders
+    do {
+      const response = await drive.files.list({
+        pageSize: 1000,
+        pageToken,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        fields:
+          "nextPageToken,files(id,name,webViewLink,parents,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,lastModifyingUser,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive,canDisableInheritedPermissions),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner))",
+        orderBy: "createdTime desc",
+      });
 
-    res.json({
-      files: files.filter((file) => file.mimeType !== FOLDER_MIME),
-      directories: files.filter((file) => file.mimeType === FOLDER_MIME),
+      allFiles.push(...(response.data.files || []));
+      pageToken = response.data.nextPageToken;
+    } while (pageToken);
+
+    const directories = allFiles.filter(
+      (file) => file.mimeType === FOLDER_MIME,
+    );
+
+    /**
+     * parentId -> children
+     */
+    const childrenMap = new Map();
+
+    for (const item of allFiles) {
+      for (const parentId of item.parents || []) {
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+
+        childrenMap.get(parentId).push(item);
+      }
+    }
+
+    /**
+     * Get all descendant IDs recursively.
+     *
+     * Includes:
+     * - direct children
+     * - grandchildren
+     * - deeper descendants
+     */
+    const getChildrenIds = (folderId) => {
+      const childrenIds = [];
+      const visited = new Set();
+
+      const walk = (parentId) => {
+        const children = childrenMap.get(parentId) || [];
+
+        for (const child of children) {
+          if (visited.has(child.id)) {
+            continue;
+          }
+
+          visited.add(child.id);
+
+          childrenIds.push(child.id);
+
+          // Continue only for folders
+          if (child.mimeType === FOLDER_MIME) {
+            walk(child.id);
+          }
+        }
+      };
+
+      walk(folderId);
+
+      return childrenIds;
+    };
+
+    const files = allFiles
+      .filter((file) => file.mimeType !== FOLDER_MIME)
+      .map((file) => ({
+        ...file,
+      }));
+
+    const folders = directories.map((folder) => ({
+      ...folder,
+      childrenIds: getChildrenIds(folder.id),
+    }));
+
+    return res.json({
+      files,
+      directories: folders,
     });
   } catch (error) {
     next(error);
@@ -925,8 +999,7 @@ export const downloadGoogleDriveFiles = async (req, res, next) => {
 
 export const createGoogleDriveUploadSession = async (req, res) => {
   try {
-    const accessToken =
-      req.signedCookies.drive_access_token;
+    const accessToken = req.signedCookies.drive_access_token;
 
     if (!accessToken) {
       return res.status(401).json({
@@ -934,12 +1007,7 @@ export const createGoogleDriveUploadSession = async (req, res) => {
       });
     }
 
-    const {
-      name,
-      size,
-      contentType,
-      parentDirId,
-    } = req.body;
+    const { name, size, contentType, parentDirId } = req.body;
 
     const metadata = {
       name,
@@ -959,8 +1027,7 @@ export const createGoogleDriveUploadSession = async (req, res) => {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json; charset=UTF-8",
-          "X-Upload-Content-Type":
-            contentType || "application/octet-stream",
+          "X-Upload-Content-Type": contentType || "application/octet-stream",
           "X-Upload-Content-Length": String(size),
         },
         body: JSON.stringify(metadata),
@@ -970,10 +1037,7 @@ export const createGoogleDriveUploadSession = async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
 
-      console.error(
-        "Google Drive session error:",
-        errorText,
-      );
+      console.error("Google Drive session error:", errorText);
 
       return res.status(response.status).json({
         message: "Failed to create Google Drive upload session",
@@ -981,13 +1045,11 @@ export const createGoogleDriveUploadSession = async (req, res) => {
       });
     }
 
-    const uploadUrl =
-      response.headers.get("location");
+    const uploadUrl = response.headers.get("location");
 
     if (!uploadUrl) {
       return res.status(500).json({
-        message:
-          "Google Drive did not return an upload URL",
+        message: "Google Drive did not return an upload URL",
       });
     }
 
@@ -995,15 +1057,10 @@ export const createGoogleDriveUploadSession = async (req, res) => {
       uploadUrl,
     });
   } catch (error) {
-    console.error(
-      "createGoogleDriveUploadSession:",
-      error,
-    );
+    console.error("createGoogleDriveUploadSession:", error);
 
     return res.status(500).json({
-      message:
-        error.message ||
-        "Failed to create Google Drive upload session",
+      message: error.message || "Failed to create Google Drive upload session",
     });
   }
 };

@@ -52,10 +52,10 @@ const MouseTooltip = ({ children, message, disabled = false }) => {
   return (
     <>
       <span
+      className="inline-flex w-full"
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={{ display: "inline-flex" }}
       >
         {children}
       </span>

@@ -229,7 +229,7 @@ const resolveRole = async (
     currentRole,
     type,
     isRootLevelFile,
-    isSuperuser
+    isSuperuser,
   );
 
   const [viewActivity, modifiedActivity] = await Promise.all([
@@ -1264,7 +1264,7 @@ export const toggleFilePublic = async (req, res, next) => {
     if (conflicting && confirmCascade !== "true") {
       return res.status(200).json({
         needsConfirmation: true,
-        conflict: {
+        conflicts: {
           ancestorId: conflicting._id,
           ancestorName: conflicting.name,
           ancestorRole: conflicting.publicRole,
@@ -1339,51 +1339,125 @@ export const toggleFilePublic = async (req, res, next) => {
 };
 export const giveAccessById = async (req, res, next) => {
   try {
-    const { usersArray, message, type } = req.body;
+    const { usersArray, message, type, confirmCascade } = req.body;
     const id = req.params.id;
 
     if (!Array.isArray(usersArray) || usersArray.length === 0) {
-      return res.status(400).json({
-        message: "No users provided",
-      });
+      return res.status(400).json({ message: "No users provided" });
     }
 
+    // Google Drive
     if (type === "google") {
       const { drive_access_token } = req.signedCookies;
 
       if (!drive_access_token) {
-        return res.status(401).json({
-          message: "Missing token",
-        });
+        return res.status(401).json({ message: "Missing token" });
       }
 
       const drive = getDriveClient(drive_access_token);
+      const ROLE_PRIORITY = { reader: 1, writer: 2 };
 
-      const { data } = await drive.permissions.list({
-        fileId: id,
-        fields: "permissions(id,type,role,emailAddress,displayName)",
-      });
+      // walk the FULL ancestor chain (file -> root), collecting every level
+      // that has a direct permission for this email — not just the nearest one
+      const findAllPermissionSources = async (fileId, email) => {
+        const chain = [];
+        let currentId = fileId;
+        let isFirst = true;
 
-      const existingPermissions = data.permissions || [];
+        while (currentId) {
+          const { data: permData } = await drive.permissions.list({
+            fileId: currentId,
+            fields: "permissions(id,type,role,emailAddress)",
+          });
 
-      const responses = await Promise.all(
-        usersArray.map(async (user) => {
-          const email = user.emailAddress || user.email;
-
-          const existing = existingPermissions.find(
+          const existing = permData.permissions?.find(
             (p) =>
               p.type === "user" &&
               p.emailAddress?.toLowerCase() === email?.toLowerCase(),
           );
 
+          const { data: fileMeta } = await drive.files.get({
+            fileId: currentId,
+            fields: "id, name, parents",
+          });
+
           if (existing) {
-            const response = drive.permissions.update({
-              fileId: id,
+            chain.push({
+              fileId: currentId,
+              name: fileMeta.name,
+              role: existing.role,
               permissionId: existing.id,
-              requestBody: {
-                role: user.role,
-              },
-              fields: "id,type,role,emailAddress,displayName, photoLink",
+              isCurrentFile: isFirst,
+            });
+          }
+
+          if (!fileMeta.parents?.length) break;
+          currentId = fileMeta.parents[0];
+          isFirst = false;
+        }
+
+        // chain is currently nearest -> farthest; reverse so it's root -> nearest,
+        // since we must fix the top of the chain before any level below it
+        return chain.reverse();
+      };
+
+      const usersWithSources = await Promise.all(
+        usersArray.map(async (user) => {
+          const email = user.emailAddress || user.email;
+          const chain = await findAllPermissionSources(id, email);
+          return { user, email, chain };
+        }),
+      );
+
+      const cascadeConflicts = [];
+
+      for (const { user, chain } of usersWithSources) {
+        for (const source of chain) {
+          if (source.isCurrentFile) continue;
+          if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role]) continue;
+
+          cascadeConflicts.push({
+            userId: user.id,
+            ancestorId: source.fileId,
+            ancestorName: source.name,
+            previousRole: source.role,
+            requestedRole: user.role,
+          });
+        }
+      }
+
+      if (cascadeConflicts.length && confirmCascade !== true) {
+        return res.status(200).json({
+          needsConfirmation: true,
+          conflicts: cascadeConflicts,
+        });
+      }
+
+      const responses = await Promise.all(
+        usersWithSources.map(async ({ user, email, chain }) => {
+          // downgrade every ancestor with a broader role, root-first, so each
+          // one is no longer blocked by something above it by the time we reach it
+          for (const source of chain) {
+            if (source.isCurrentFile) continue;
+            if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role])
+              continue;
+
+            await drive.permissions.update({
+              fileId: source.fileId,
+              permissionId: source.permissionId,
+              requestBody: { role: user.role },
+              fields: "id,type,role",
+            });
+          }
+
+          const directOnFile = chain.find((s) => s.isCurrentFile);
+
+          if (directOnFile) {
+            const response = await drive.permissions.update({
+              fileId: id,
+              permissionId: directOnFile.permissionId,
+              requestBody: { role: user.role },
+              fields: "id,type,role,emailAddress,displayName,photoLink",
             });
 
             return {
@@ -1394,11 +1468,7 @@ export const giveAccessById = async (req, res, next) => {
 
           const response = await drive.permissions.create({
             fileId: id,
-            requestBody: {
-              type: "user",
-              role: user.role,
-              emailAddress: email,
-            },
+            requestBody: { type: "user", role: user.role, emailAddress: email },
             sendNotificationEmail: true,
             fields: "id,type,role,emailAddress,displayName",
           });
@@ -1416,10 +1486,9 @@ export const giveAccessById = async (req, res, next) => {
       });
     }
 
+    // Local
     if (!["file", "folder"].includes(type)) {
-      return res.status(400).json({
-        message: "Invalid resource type",
-      });
+      return res.status(400).json({ message: "Invalid resource type" });
     }
 
     const Model = type === "folder" ? Directory : File;
@@ -1430,9 +1499,7 @@ export const giveAccessById = async (req, res, next) => {
       .lean();
 
     if (!item) {
-      return res.status(404).json({
-        message: `${type} not found`,
-      });
+      return res.status(404).json({ message: `${type} not found` });
     }
 
     if (type === "folder") {
@@ -1444,170 +1511,155 @@ export const giveAccessById = async (req, res, next) => {
         owner?.parentDirId &&
         item._id.toString() === owner.parentDirId.toString()
       ) {
-        return res.status(400).json({
-          message: "Root directory cannot be shared",
-        });
+        return res
+          .status(400)
+          .json({ message: "Root directory cannot be shared" });
       }
     }
-
-    const writeRole = async (object, userId, role) => {
-      await fgaClient.write(
-        {
-          writes: [
-            {
-              user: getFgaObject("user", userId),
-              relation: role,
-              object,
-            },
-          ],
-        },
-        {
-          transaction: {
-            disable: true,
-          },
-        },
-      );
-    };
 
     const findDirectPermission = async (object, userId) => {
       const result = await fgaClient.read({
         user: getFgaObject("user", userId),
         object,
       });
-
       const tuples = result?.tuples || [];
 
-      const tuple = tuples.find(
-        (t) =>
-          t.key?.user === getFgaObject("user", userId) &&
-          ["reader", "writer"].includes(t.key?.relation),
+      const tuple = tuples.find((t) =>
+        ["shared_reader", "shared_writer", "reader", "writer"].includes(
+          t.key?.relation,
+        ),
       );
 
       return tuple?.key || null;
     };
 
-    const findExistingPermissionSource = async ({
+    const findExistingPermissionSource = async (
       resourceType,
       resourceId,
       userId,
-    }) => {
+    ) => {
       let currentType = resourceType;
       let currentId = resourceId;
+      let resourceName = null;
 
       while (currentId) {
         const currentObject = getFgaObject(currentType, currentId);
+        const direct = await findDirectPermission(currentObject, userId);
 
-        const directPermission = await findDirectPermission(
-          currentObject,
-          userId,
-        );
-
-        if (directPermission) {
+        if (direct) {
           return {
             object: currentObject,
-            type: currentType,
             id: currentId,
-            role: directPermission.relation,
+            role: direct.relation,
+            name: resourceName,
             isCurrentObject: currentId.toString() === resourceId.toString(),
           };
         }
 
         const currentModel = currentType === "folder" ? Directory : File;
-
-        const currentResource = await currentModel
+        const resource = await currentModel
           .findById(currentId)
-          .select("parentDirId")
+          .select("name parentDirId")
+          .populate("parentDirId", "name")
           .lean();
 
-        if (!currentResource) {
-          break;
-        }
-
-        const parentId = currentResource.parentDirId;
-
-        if (!parentId) {
-          break;
-        }
+        if (!resource?.parentDirId) break;
 
         currentType = "folder";
-        currentId = parentId;
+        resourceName = resource.parentDirId.name;
+        currentId = resource.parentDirId._id;
       }
 
       return null;
     };
 
-    await Promise.all(
+    for (const user of usersArray) {
+      if (!user.id)
+        return res.status(400).json({ message: "User id is required" });
+      if (!["reader", "writer"].includes(user.role)) {
+        return res.status(400).json({ message: `Invalid role: ${user.role}` });
+      }
+    }
+
+    const usersWithSource = await Promise.all(
       usersArray.map(async (user) => {
-        if (!user.id) {
-          throw new Error("User id is required");
-        }
+        const source = await findExistingPermissionSource(type, id, user.id);
+        return { user, source };
+      }),
+    );
 
-        if (!["reader", "writer"].includes(user.role)) {
-          throw new Error(`Invalid role: ${user.role}`);
-        }
+    const cascadeConflicts = [];
 
-        const userId = user.id;
-
-        const existingPermissionSource = await findExistingPermissionSource({
-          resourceType: type,
-          resourceId: id,
-          userId,
+    for (const { user, source } of usersWithSource) {
+      if (!source || source.isCurrentObject) continue;
+      if (source.role === user.role) continue;
+      const rootOwner = await User.findOne({ parentDirId: source.id })
+        .select("_id")
+        .lean();
+      if (rootOwner) {
+        return res.status(400).json({
+          message:
+            "Cannot change an inherited permission from the root directory",
         });
+      }
 
-        let targetFgaObject;
-        let previousRole = null;
-        let inherited = false;
+      cascadeConflicts.push({
+        userId: user.id,
+        ancestorId: source.id,
+        ancestorName: source.name,
+        previousRole: source.role,
+        requestedRole: user.role,
+      });
+    }
 
-        if (existingPermissionSource) {
-          targetFgaObject = existingPermissionSource.object;
-          previousRole = existingPermissionSource.role;
-          inherited = !existingPermissionSource.isCurrentObject;
-        } else {
-          targetFgaObject = getFgaObject(type, id);
-        }
+    if (cascadeConflicts.length && confirmCascade !== true) {
+      return res.status(200).json({
+        needsConfirmation: true,
+        conflicts: cascadeConflicts,
+      });
+    }
 
-        if (inherited) {
-          const sourceId = existingPermissionSource.id;
+    // apply the changes
+    await Promise.all(
+      usersWithSource.map(async ({ user, source }) => {
+        const targetObject = source ? source.object : getFgaObject(type, id);
+        const previousRole = source?.role || null;
 
-          const rootOwner = await User.findOne({
-            parentDirId: sourceId,
-          })
-            .select("_id parentDirId")
-            .lean();
-
-          if (rootOwner) {
-            throw new Error(
-              "Cannot change an inherited permission from the root directory",
-            );
-          }
-        }
-
-        if (previousRole === user.role) {
-          return;
-        }
+        if (previousRole === user.role) return;
 
         if (previousRole) {
           await fgaClient.write({
             deletes: [
               {
-                user: getFgaObject("user", userId),
+                user: getFgaObject("user", user.id),
                 relation: previousRole,
-                object: targetFgaObject,
+                object: targetObject,
               },
             ],
           });
         }
 
-        await writeRole(targetFgaObject, userId, user.role);
+        await fgaClient.write(
+          {
+            writes: [
+              {
+                user: getFgaObject("user", user.id),
+                relation: user.role,
+                object: targetObject,
+              },
+            ],
+          },
+          { transaction: { disable: true } },
+        );
 
-        if (!existingPermissionSource) {
+        if (!source) {
           await SharedAccess.updateOne(
-            { itemId: id, itemType: type, userId },
+            { itemId: id, itemType: type, userId: user.id },
             { $setOnInsert: { sharedWithMeTime: new Date() } },
             { upsert: true },
           );
 
-          const userData = await User.findById(userId)
+          const userData = await User.findById(user.id)
             .select("name email avatar")
             .lean();
 
@@ -1619,9 +1671,7 @@ export const giveAccessById = async (req, res, next) => {
               fromEmail: item.userId.email,
               itemName: item.name,
               itemType: type,
-              itemUrl: `${process.env.CLIENT_URL}/${
-                type === "folder" ? "directory" : "file"
-              }/${id}`,
+              itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "directory" : "file"}/${id}`,
               role: user.role,
               message,
             });
@@ -1651,7 +1701,7 @@ export const giveAccessById = async (req, res, next) => {
 export const revokeAccessById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { targetId: permissionId, type, relation } = req.body;
+    const { targetId: permissionId, type, relation, confirmCascade } = req.body;
 
     const userId = req.user?._id;
     if (!permissionId) {
@@ -1665,45 +1715,142 @@ export const revokeAccessById = async (req, res, next) => {
       const { drive_access_token } = req.signedCookies;
 
       if (!drive_access_token) {
-        return res.status(401).json({
-          message: "Missing token",
-        });
+        return res.status(401).json({ message: "Missing token" });
       }
 
       const drive = getDriveClient(drive_access_token);
-      const file = await drive.files.get({
-        fileId: id,
-        fields: "*",
-      });
+      const isPublicLink = permissionId === "anyoneWithLink";
 
-      const publicPermission = file.data.permissions?.find(
-        (permission) => permission.type === "anyone",
+      // find the actual Drive permission object matching this identifier —
+      // "anyoneWithLink" -> the type: "anyone" entry, otherwise -> a specific
+      // user's email/id
+      const findPermission = async (fileId) => {
+        const { data } = await drive.permissions.list({
+          fileId,
+          fields: "permissions(id,type,role,emailAddress,permissionDetails)",
+        });
+
+        return isPublicLink
+          ? data.permissions?.find((p) => p.type === "anyone")
+          : data.permissions?.find(
+              (p) =>
+                p.type === "user" &&
+                (p.emailAddress?.toLowerCase() ===
+                  permissionId?.toLowerCase() ||
+                  p.id === permissionId),
+            );
+      };
+
+      const targetPermission = await findPermission(id);
+
+      if (!targetPermission) {
+        return res.status(404).json({ message: "Permission not found" });
+      }
+
+      // walk up: does this permission trace back to an ancestor rather than
+      // being set directly on this file?
+      const hasInherited = targetPermission.permissionDetails?.some(
+        (d) => d.inherited === true,
       );
 
-      const hasInheritedPublicPermission =
-        publicPermission?.permissionDetails?.some(
-          (detail) => detail.inherited === true,
-        );
+      if (hasInherited && confirmCascade !== true) {
+        const { data: fileMeta } = await drive.files.get({
+          fileId: id,
+          fields: "parents",
+        });
+
+        let ancestorId = fileMeta.parents?.[0];
+        let ancestorMatch = null;
+
+        while (ancestorId) {
+          const perm = await findPermission(ancestorId);
+
+          if (perm) {
+            const { data: ancestorMeta } = await drive.files.get({
+              fileId: ancestorId,
+              fields: "id, name, parents",
+            });
+            ancestorMatch = {
+              fileId: ancestorId,
+              name: ancestorMeta.name,
+              permission: perm,
+            };
+            break;
+          }
+
+          const { data: nextMeta } = await drive.files.get({
+            fileId: ancestorId,
+            fields: "parents",
+          });
+          ancestorId = nextMeta.parents?.[0];
+        }
+
+        return res.status(200).json({
+          needsConfirmation: true,
+          conflicts: ancestorMatch
+            ? {
+                ancestorId: ancestorMatch.fileId,
+                ancestorName: ancestorMatch.name,
+                previousRole: ancestorMatch.permission.role,
+              }
+            : null,
+          message: isPublicLink
+            ? "This link is inherited from a parent folder. Removing it here will also remove the parent folder's link."
+            : "This user's access is inherited from a parent folder. Removing it here will also remove their access to the parent folder.",
+        });
+      }
 
       const canDisableInheritedPermissions =
-        file.data.capabilities?.canDisableInheritedPermissions === true;
+        (await drive.files.get({ fileId: id, fields: "capabilities" })).data
+          .capabilities?.canDisableInheritedPermissions === true;
 
-      if (hasInheritedPublicPermission && !canDisableInheritedPermissions) {
+      if (hasInherited && !canDisableInheritedPermissions) {
         return res.status(403).json({
           message:
-            "Public permission cannot be removed because this file has an inherited public permission and the current user cannot disable inherited permissions.",
+            "Permission cannot be removed because it is inherited and you don't have permission to disable inherited access.",
           code: "INHERITED_PERMISSION_NOT_REMOVABLE",
         });
       }
 
+      // if inherited and confirmed, the actual deletable permission lives on
+      // the ancestor, not this file — re-walk to find and delete it there
+      if (hasInherited && confirmCascade === true) {
+        let ancestorId = (
+          await drive.files.get({ fileId: id, fields: "parents" })
+        ).data.parents?.[0];
+
+        while (ancestorId) {
+          const perm = await findPermission(ancestorId);
+
+          if (perm) {
+            await drive.permissions.delete({
+              fileId: ancestorId,
+              permissionId: perm.id,
+            });
+            break;
+          }
+
+          const { data: nextMeta } = await drive.files.get({
+            fileId: ancestorId,
+            fields: "parents",
+          });
+          ancestorId = nextMeta.parents?.[0];
+        }
+
+        return res
+          .status(200)
+          .json({ message: "Permission revoked successfully" });
+      }
+
+      // direct, non-inherited permission — safe to delete right here
       await drive.permissions.delete({
         fileId: id,
-        permissionId,
+        permissionId: targetPermission.id,
       });
 
-      return res.status(200).json({
-        message: "Permission revoked successfully",
-      });
+      return res
+        .status(200)
+        .json({ message: "Permission revoked successfully" });
     }
 
     const objectType = type === "folder" ? "folder" : "file";
@@ -1971,7 +2118,7 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     if (conflicting && confirmCascade !== true) {
       return res.status(200).json({
         needsConfirmation: true,
-        conflict: {
+        conflicts: {
           ancestorId: conflicting._id,
           ancestorName: conflicting.name,
           ancestorRole: conflicting.publicRole,

@@ -7,6 +7,7 @@ import { GoogleDriveCard, GridItem, ListRow } from ".";
 import RecentFilters from "./Recent/RecentFilters";
 import { useNavigate } from "react-router-dom";
 import SortButton from "../ListRow/SortButton";
+import { useAuth } from "../../Contexts";
 
 const DefaultView = ({
   items,
@@ -17,7 +18,6 @@ const DefaultView = ({
   isGoogleDrive,
   isHomeRoute,
   dirId,
-  user,
   selectedItems,
   onSelect,
   onRowClick,
@@ -33,6 +33,7 @@ const DefaultView = ({
   onStar,
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
+  const {user} = useAuth();
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -43,9 +44,7 @@ const DefaultView = ({
     const data = [...filteredItems];
 
     data.sort((a, b) => {
-      // --------------------------------
-      // FOLDERS ON TOP
-      // --------------------------------
+
       if (sortConfig.folders === "top") {
         const aIsFolder = a.isDirectory === true;
         const bIsFolder = b.isDirectory === true;
@@ -59,9 +58,7 @@ const DefaultView = ({
         }
       }
 
-      // --------------------------------
-      // SORT BY SELECTED COLUMN
-      // --------------------------------
+
       let aValue;
       let bValue;
 
@@ -113,6 +110,8 @@ const DefaultView = ({
 
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
+  const isGoogleDriveRoute = route === "google-drive"
+
   return (
     <div className="gd-drive">
       <RecentFilters
@@ -149,7 +148,7 @@ const DefaultView = ({
                     key={item._id ?? item.id}
                     item={item}
                     dirId={dirId}
-                    avatar={item.userId?.avatar || item.owners?.[0]?.photoLink}
+                    avatar={isGoogleDrive ? user.avatar : item.userId?.avatar || item.owners?.[0]?.photoLink}
                     owner={item.userId?.name || item.owners?.[0]?.displayName}
                     email={item.userId?.email || item.owners?.[0]?.emailAddress}
                     selected={selectedItems.has(item.id ?? item._id)}
@@ -177,7 +176,7 @@ const DefaultView = ({
                   key={item._id ?? item.id}
                   item={item}
                   dirId={dirId}
-                  avatar={item.userId?.avatar || item.owners?.[0]?.photoLink}
+                  avatar={isGoogleDriveRoute ? user.avatar : item.userId?.avatar || item.owners?.[0]?.photoLink}
                   owner={item.userId?.name || item.owners?.[0]?.displayName}
                   email={item.userId?.email || item.owners?.[0]?.emailAddress}
                   selected={selectedItems.has(item.id ?? item._id)}

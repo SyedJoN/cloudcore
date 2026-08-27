@@ -49,6 +49,7 @@ export default function ShareModal({
   item,
   setItem = null,
   allUsers,
+  setUserRole,
   selectedUsers,
   peopleWithAccess,
   setPeopleWithAccess,
@@ -278,9 +279,12 @@ export default function ShareModal({
 
       const finalPermissions = [...updatedPermissions, ...newPermissions];
 
+      const childrenIds = isGoogleDriveRoute ? [itemId, ...item.childrenIds] : [itemId]
+
       setFilesList((list) =>
         list.map((resource) => {
-          if (String(resource._id ?? resource.id) !== itemId) {
+          const resourceId = String(resource._id ?? resource.id);
+          if (!childrenIds.includes(resourceId)) {
             return resource;
           }
 
@@ -293,7 +297,8 @@ export default function ShareModal({
 
       setDirectoriesList((list) =>
         list.map((resource) => {
-          if (String(resource._id ?? resource.id) !== itemId) {
+          const resourceId = String(resource._id ?? resource.id);
+          if (!childrenIds.includes(resourceId)) {
             return resource;
           }
 
@@ -400,8 +405,9 @@ export default function ShareModal({
     setInviteInput("");
   }
 
-  async function updatePersonRole(person, idx, role) {
-    const userId = person.id;
+  async function updatePersonRole(person, role) {
+    const userEmail = person.emailAddress
+    setUserRole({ emailAddress: userEmail, role });
     setPeopleWithAccess((prev) => {
       const hasPublicAccess = prev.some((p) => p.type === "anyone");
 
@@ -1194,12 +1200,12 @@ export default function ShareModal({
 
                 {item.permissions?.length > 0 && (
                   <div className="gd-share-people-list">
-                    {peopleWithAccess.sort((a,b)=> ROLE_PRIORITY[b.role] - ROLE_PRIORITY[a.role])
+                    {peopleWithAccess
+                      .sort(
+                        (a, b) => ROLE_PRIORITY[b.role] - ROLE_PRIORITY[a.role],
+                      )
                       ?.map((person, idx) => {
-                        if (
-                          person?.type === "anyone"
-                        )
-                          return null;
+                        if (person?.type === "anyone") return null;
                         if (!personRefs.current[idx])
                           personRefs.current[idx] = { current: null };
                         return (
@@ -1242,8 +1248,10 @@ export default function ShareModal({
                                         current: el,
                                       })
                                     }
-                                    disabled={person.role === "owner" || !canChangeRole}
-                                    className="gd-share-person-role-btn"
+                                    disabled={
+                                      person.role === "owner" || !canChangeRole
+                                    }
+                                    className={`${person.role === "owner" ? "gd-share-owner-role-btn" : "gd-share-person-role-btn"}`}
                                     aria-disabled={!canChangeRole}
                                     onClick={(e) => {
                                       if (!canChangeRole) return;
@@ -1254,18 +1262,21 @@ export default function ShareModal({
                                     }}
                                     style={{
                                       opacity: !canChangeRole ? 0.5 : 1,
-                                      cursor: !canChangeRole || person.role === "owner"
-                                        ? "default"
-                                        : "pointer",
+                                      cursor:
+                                        !canChangeRole ||
+                                        person.role === "owner"
+                                          ? "default"
+                                          : "pointer",
                                       pointerEvents: !canChangeRole
                                         ? "none"
                                         : "auto",
                                     }}
                                   >
                                     {ROLE_LABEL[person?.role]}{" "}
-                                    {canChangeRole && person.role !== "owner" && (
-                                      <IconChevronDown size={12} />
-                                    )}
+                                    {canChangeRole &&
+                                      person.role !== "owner" && (
+                                        <IconChevronDown size={12} />
+                                      )}
                                   </button>
                                 </MouseTooltip>
 
@@ -1281,9 +1292,7 @@ export default function ShareModal({
                                   }
                                   anchorRef={personRefs.current[idx]}
                                   current={ROLE_LABEL[person?.role]}
-                                  onChange={(r) =>
-                                    updatePersonRole(person, idx, r)
-                                  }
+                                  onChange={(r) => updatePersonRole(person, r)}
                                   onClose={() => setOpenDropdown(null)}
                                   showRemove={true}
                                   isOwner={isOwner}
