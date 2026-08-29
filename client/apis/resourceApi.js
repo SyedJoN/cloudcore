@@ -32,6 +32,7 @@ export async function sendLink({
   url,
   isPublic,
   publicRole,
+  notifyPeople
 }) {
   const { data } = await axiosWithCreds.post("/item/send-link", {
     toEmail,
@@ -42,6 +43,7 @@ export async function sendLink({
     url,
     isPublic,
     publicRole,
+    notifyPeople
   });
 
   return data.message;

@@ -1264,7 +1264,7 @@ export const toggleFilePublic = async (req, res, next) => {
     if (conflicting && confirmCascade !== "true") {
       return res.status(200).json({
         needsConfirmation: true,
-        conflicts: {
+        conflict: {
           ancestorId: conflicting._id,
           ancestorName: conflicting.name,
           ancestorRole: conflicting.publicRole,
@@ -1279,12 +1279,14 @@ export const toggleFilePublic = async (req, res, next) => {
 
     if (isRestricted) {
       const tuples = await fgaClient.read({ object });
-      const toDelete = tuples.tuples.filter(
-        (t) =>
-          (t.key.user === "user:*" &&
-            ["link_reader", "link_writer"].includes(t.key.relation)) ||
-          ["shared_reader", "shared_writer"].includes(t.key.relation),
-      );
+      const toDelete = tuples.tuples.filter((t) => {
+  return (
+    (t.key.user === "user:*" &&
+      ["link_reader", "link_writer"].includes(t.key.relation)) ||
+    ["shared_reader", "shared_writer"].includes(t.key.relation)
+  );
+});
+
 
       if (toDelete.length) {
         try {
@@ -1357,8 +1359,7 @@ export const giveAccessById = async (req, res, next) => {
       const drive = getDriveClient(drive_access_token);
       const ROLE_PRIORITY = { reader: 1, writer: 2 };
 
-      // walk the FULL ancestor chain (file -> root), collecting every level
-      // that has a direct permission for this email — not just the nearest one
+      
       const findAllPermissionSources = async (fileId, email) => {
         const chain = [];
         let currentId = fileId;
@@ -1396,8 +1397,7 @@ export const giveAccessById = async (req, res, next) => {
           isFirst = false;
         }
 
-        // chain is currently nearest -> farthest; reverse so it's root -> nearest,
-        // since we must fix the top of the chain before any level below it
+       
         return chain.reverse();
       };
 
@@ -1429,14 +1429,13 @@ export const giveAccessById = async (req, res, next) => {
       if (cascadeConflicts.length && confirmCascade !== true) {
         return res.status(200).json({
           needsConfirmation: true,
-          conflicts: cascadeConflicts,
+          conflict: cascadeConflicts,
         });
       }
 
       const responses = await Promise.all(
         usersWithSources.map(async ({ user, email, chain }) => {
-          // downgrade every ancestor with a broader role, root-first, so each
-          // one is no longer blocked by something above it by the time we reach it
+        
           for (const source of chain) {
             if (source.isCurrentFile) continue;
             if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role])
@@ -1615,7 +1614,7 @@ export const giveAccessById = async (req, res, next) => {
     if (cascadeConflicts.length && confirmCascade !== true) {
       return res.status(200).json({
         needsConfirmation: true,
-        conflicts: cascadeConflicts,
+        conflict: cascadeConflicts,
       });
     }
 
@@ -1721,9 +1720,6 @@ export const revokeAccessById = async (req, res, next) => {
       const drive = getDriveClient(drive_access_token);
       const isPublicLink = permissionId === "anyoneWithLink";
 
-      // find the actual Drive permission object matching this identifier —
-      // "anyoneWithLink" -> the type: "anyone" entry, otherwise -> a specific
-      // user's email/id
       const findPermission = async (fileId) => {
         const { data } = await drive.permissions.list({
           fileId,
@@ -1747,8 +1743,6 @@ export const revokeAccessById = async (req, res, next) => {
         return res.status(404).json({ message: "Permission not found" });
       }
 
-      // walk up: does this permission trace back to an ancestor rather than
-      // being set directly on this file?
       const hasInherited = targetPermission.permissionDetails?.some(
         (d) => d.inherited === true,
       );
@@ -1787,33 +1781,16 @@ export const revokeAccessById = async (req, res, next) => {
 
         return res.status(200).json({
           needsConfirmation: true,
-          conflicts: ancestorMatch
+          conflict: ancestorMatch
             ? {
                 ancestorId: ancestorMatch.fileId,
                 ancestorName: ancestorMatch.name,
                 previousRole: ancestorMatch.permission.role,
               }
             : null,
-          message: isPublicLink
-            ? "This link is inherited from a parent folder. Removing it here will also remove the parent folder's link."
-            : "This user's access is inherited from a parent folder. Removing it here will also remove their access to the parent folder.",
         });
       }
 
-      const canDisableInheritedPermissions =
-        (await drive.files.get({ fileId: id, fields: "capabilities" })).data
-          .capabilities?.canDisableInheritedPermissions === true;
-
-      if (hasInherited && !canDisableInheritedPermissions) {
-        return res.status(403).json({
-          message:
-            "Permission cannot be removed because it is inherited and you don't have permission to disable inherited access.",
-          code: "INHERITED_PERMISSION_NOT_REMOVABLE",
-        });
-      }
-
-      // if inherited and confirmed, the actual deletable permission lives on
-      // the ancestor, not this file — re-walk to find and delete it there
       if (hasInherited && confirmCascade === true) {
         let ancestorId = (
           await drive.files.get({ fileId: id, fields: "parents" })
@@ -1842,7 +1819,6 @@ export const revokeAccessById = async (req, res, next) => {
           .json({ message: "Permission revoked successfully" });
       }
 
-      // direct, non-inherited permission — safe to delete right here
       await drive.permissions.delete({
         fileId: id,
         permissionId: targetPermission.id,
@@ -1853,6 +1829,7 @@ export const revokeAccessById = async (req, res, next) => {
         .json({ message: "Permission revoked successfully" });
     }
 
+    // Local (FGA) permission
     const objectType = type === "folder" ? "folder" : "file";
     const user = getFgaObject("user", permissionId);
     const object = getFgaObject(objectType, id);
@@ -1866,99 +1843,79 @@ export const revokeAccessById = async (req, res, next) => {
       return res.status(403).json({ message: "Unauthorized!" });
     }
 
-    const relations = relation === "remove" ? ["reader", "writer"] : [relation];
+    const relationsToCheck =
+      relation === "remove"
+        ? ["reader", "writer", "shared_reader", "shared_writer"]
+        : [relation];
 
-    const tuples = [];
+    // find the tuple that's actually granting this user access to `obj`
+    const findDirectPermission = async (obj) => {
+      const result = await fgaClient.read({ user, object: obj });
+      const tuples = result?.tuples || [];
+      return (
+        tuples.find((t) => relationsToCheck.includes(t.key?.relation)) || null
+      );
+    };
 
-    for (const rel of relations) {
-      const result = await fgaClient.read({
-        user,
-        relation: rel,
-        object,
-      });
+    // walk up from this item until we find where the user's tuple actually lives
+    const findExistingPermissionSource = async (resourceType, resourceId) => {
+      let currentType = resourceType;
+      let currentId = resourceId;
+      let resourceName = null;
 
-      tuples.push(...result.tuples);
+      while (currentId) {
+        const currentObject = getFgaObject(currentType, currentId);
+        const direct = await findDirectPermission(currentObject);
+
+        if (direct) {
+          return {
+            object: currentObject,
+            id: currentId,
+            role: direct.key.relation,
+            name: resourceName,
+            isCurrentObject: currentId.toString() === resourceId.toString(),
+          };
+        }
+
+        const currentModel = currentType === "folder" ? Directory : File;
+        const resource = await currentModel
+          .findById(currentId)
+          .select("name parentDirId")
+          .populate("parentDirId", "name")
+          .lean();
+
+        if (!resource?.parentDirId) break;
+
+        currentType = "folder";
+        resourceName = resource.parentDirId.name;
+        currentId = resource.parentDirId._id;
+      }
+
+      return null;
+    };
+
+    const source = await findExistingPermissionSource(objectType, id);
+
+    if (!source) {
+      return res.status(200).json({ message: "Access already revoked" });
     }
 
-    if (!tuples.length) {
+    if (!source.isCurrentObject && confirmCascade !== true) {
       return res.status(200).json({
-        message: "Access already revoked",
+        needsConfirmation: true,
+        conflict: {
+          ancestorId: source.id,
+          ancestorName: source.name,
+          previousRole: source.role,
+        },
       });
     }
 
     await fgaClient.write({
-      deletes: tuples.map(({ key }) => ({
-        user: key.user,
-        relation: key.relation,
-        object: key.object,
-      })),
+      deletes: [{ user, relation: source.role, object: source.object }],
     });
 
-    return res.status(200).json({
-      message: "Access revoked successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const fetchItemPermissions = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { type = "file" } = req.query;
-
-    if (!id) {
-      return res.status(404).json({ message: "Id missing" });
-    }
-
-    const object = getFgaObject(type, id);
-
-    let allTuples = [];
-    let continuationToken = undefined;
-
-    do {
-      const response = await fgaClient.read({ object }, { continuationToken });
-      allTuples = allTuples.concat(response.tuples);
-      continuationToken = response.continuation_token;
-    } while (continuationToken);
-
-    const collaborators = allTuples
-      .filter(
-        (t) =>
-          t.key.object === object &&
-          t.key.user.startsWith("user:") &&
-          ["reader", "writer"].includes(t.key.role),
-      )
-      .map((t) => ({
-        userId: t.key.user.split(":")[1],
-        role: t.key.role,
-      }));
-
-    if (!collaborators.length) {
-      return res.status(200).json({ success: true, users: [] });
-    }
-
-    const users = await User.find({
-      _id: { $in: collaborators.map((c) => c.userId) },
-    })
-      .select("name email avatar")
-      .lean();
-
-    const result = users.map((user) => {
-      const permissions = collaborators
-        .filter((c) => c.userId === user._id.toString())
-        .map((c) => c.role);
-
-      return {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        permissions,
-      };
-    });
-
-    return res.status(200).json({ success: true, users: result });
+    return res.status(200).json({ message: "Access revoked successfully" });
   } catch (error) {
     next(error);
   }
@@ -2107,27 +2064,33 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
 
     const ancestors = await getDriveAncestors(drive, fileId);
 
-    const conflicting = ancestors
-      .filter(
-        (a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority,
-      )
-      .sort(
+    const conflictingAncestors = ancestors.filter(
+      (a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority,
+    );
+
+    if (conflictingAncestors.length && confirmCascade !== true) {
+    
+      const broadest = [...conflictingAncestors].sort(
         (a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole],
       )[0];
 
-    if (conflicting && confirmCascade !== true) {
       return res.status(200).json({
         needsConfirmation: true,
-        conflicts: {
-          ancestorId: conflicting._id,
-          ancestorName: conflicting.name,
-          ancestorRole: conflicting.publicRole,
+        conflict: {
+          ancestorId: broadest._id,
+          ancestorName: broadest.name,
+          ancestorRole: broadest.publicRole,
         },
       });
     }
 
-    if (conflicting && confirmCascade === true) {
-      await setDriveFolderPublicAccess(drive, conflicting._id, role);
+    if (conflictingAncestors.length && confirmCascade === true) {
+      
+      const rootFirst = [...conflictingAncestors].reverse();
+
+      for (const ancestor of rootFirst) {
+        await setDriveFolderPublicAccess(drive, ancestor._id, role);
+      }
     }
 
     const permissions = await drive.permissions.list({

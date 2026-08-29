@@ -60,7 +60,6 @@ import MoveModal from "../Components/Modals/MoveModal";
 import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
 import CreateMenu from "../Components/Drive/CreateMenu";
 import ConfirmationModal from "../Components/Modals/ConfirmationModal";
-import { ROLE_PRIORITY } from "../../../server/utils/permissions/getRolePriority";
 import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationModal";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
@@ -994,6 +993,12 @@ export default function DirectoryView({ route }) {
       const restricted = access === "restricted";
       const userRole = DRIVE_ROLES[role] ?? "reader";
 
+      const iconType =
+        (item.isDirectory ??
+        item.mimeType === "application/vnd.google-apps.folder")
+          ? null
+          : getFileType(item?.name || "");
+
       let permission = null;
       let isMe;
       let myRole;
@@ -1008,7 +1013,7 @@ export default function DirectoryView({ route }) {
             "anyoneWithLink",
           );
           if (dryRun?.needsConfirmation) {
-            const { ancestorId, ancestorName, previousRole } = dryRun.conflicts;
+            const { ancestorId, ancestorName, previousRole } = dryRun.conflict;
             updatedParentId = ancestorId;
             const chain = [
               {
@@ -1016,17 +1021,30 @@ export default function DirectoryView({ route }) {
                 name: ancestorName,
                 fromLabel: `Anyone with the link → ${previousRole}`,
                 toLabel: "restricted",
+                isDirectory: true,
+                iconType: null,
               },
               {
                 id: itemId,
                 name: item.name,
                 fromLabel: `Anyone with the link → ${userRole}`,
                 toLabel: "restricted",
+                isDirectory:
+                  item.isDirectory ||
+                  item.mimeType === "application/vnd.google-apps.folder",
+                iconType,
               },
             ];
 
             const confirmed = await showCascadeConfirm(chain);
-            if (!confirmed) return;
+
+            if (!confirmed) {
+              const currentPublicRole = publicPermission?.role;
+              setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+              setLinkRole(currentPublicRole || "reader");
+              setPeopleWithAccess(prevPermissions);
+              return;
+            }
 
             await revokeFileAccess(
               "google",
@@ -1040,7 +1058,7 @@ export default function DirectoryView({ route }) {
           const dryRun = await toggleDriveFilePermission(itemId, userRole);
 
           if (dryRun?.needsConfirmation) {
-            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflicts;
+            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
             updatedParentId = ancestorId;
 
             const chain = [
@@ -1059,7 +1077,14 @@ export default function DirectoryView({ route }) {
             ];
 
             const confirmed = await showCascadeConfirm(chain);
-            if (!confirmed) return;
+
+            if (!confirmed) {
+              const currentPublicRole = publicPermission?.role;
+              setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+              setLinkRole(currentPublicRole || "reader");
+              setPeopleWithAccess(prevPermissions);
+              return;
+            }
 
             const data = await toggleDriveFilePermission(
               itemId,
@@ -1087,7 +1112,7 @@ export default function DirectoryView({ route }) {
         const dryRun = await toggleFilePublic(itemId, userRole, access, type);
 
         if (dryRun?.needsConfirmation) {
-          const { ancestorId, ancestorName, ancestorRole } = dryRun.conflicts;
+          const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
           updatedParentId = ancestorId;
 
           const isRestricting = access === "restricted";
@@ -1128,7 +1153,6 @@ export default function DirectoryView({ route }) {
 
         if (
           ((incomingPublicRole === "reader" || access === "restricted") &&
-            myRole &&
             myRole === "reader" &&
             isMe) ||
           ((incomingPublicRole === "reader" ||
@@ -1169,21 +1193,40 @@ export default function DirectoryView({ route }) {
         }
         await toggleFilePublic(itemId, userRole, access, type, confirmCascade);
       }
-      const parentChildIds = [
+      console.log("updatedParentId", updatedParentId);
+      const allIdsToBeMatched = [
         updatedParentId,
         itemId,
         ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
       ].filter(Boolean);
 
       const update = (list) =>
-        linkAccess === "restricted" && myRole === "reader" && isMe
-          ? list.filter(
-              (resource) =>
-                !parentChildIds.includes(String(resource.id ?? resource._id)),
-            )
+        linkAccess === "restricted" && myRole === "remove" && isMe
+          ? list.filter((resource) => {
+              const resourceId = String(resource?.id ?? resource?._id);
+              const parentDirId = String(
+                resource?.parentDirId ?? resource?.parents?.[0],
+              );
+
+              return (
+                !allIdsToBeMatched.includes(resourceId) &&
+                !allIdsToBeMatched.includes(parentDirId)
+              );
+            })
           : list.map((resource) => {
-              const resourceId = String(resource._id ?? resource.id);
-              if (!parentChildIds.includes(resourceId)) {
+              console.log({
+                allIdsToBeMatched,
+                parents: resource,
+              });
+              const resourceId = String(resource?._id ?? resource?.id);
+              const parentDirId = String(
+                resource?.parentDirId ?? resource?.parents?.[0],
+              );
+
+              if (
+                !allIdsToBeMatched.includes(resourceId) &&
+                !allIdsToBeMatched.includes(parentDirId)
+              ) {
                 return resource;
               }
 
@@ -1421,11 +1464,13 @@ export default function DirectoryView({ route }) {
 
       if (dryRun?.response?.needsConfirmation) {
         const { ancestorId, ancestorName, previousRole, requestedRole } =
-          dryRun.response.conflicts;
+          dryRun.response.conflict[0] || dryRun.response.conflict;
         updatedParentId = ancestorId;
-        const iconType = item.isDirectory
-          ? null
-          : getFileType(item?.name || "");
+        const iconType =
+          (item.isDirectory ??
+          item.mimeType === "application/vnd.google-apps.folder")
+            ? null
+            : getFileType(item?.name || "");
 
         const chain = [
           {
@@ -1441,7 +1486,9 @@ export default function DirectoryView({ route }) {
             name: item.name,
             fromLabel: `${DRIVE_ROLES[prevRole] || prevRole}`,
             toLabel: ` → ${DRIVE_ROLES[myRole] || myRole}`,
-            isDirectory: item.isDirectory,
+            isDirectory:
+              item.isDirectory ||
+              item.mimeType === "application/vnd.google-apps.folder",
             iconType,
           },
         ];
@@ -1463,7 +1510,6 @@ export default function DirectoryView({ route }) {
       if (
         publicRole &&
         publicRole === "reader" &&
-        myRole &&
         myRole === "reader" &&
         isMe
       ) {
@@ -1524,25 +1570,46 @@ export default function DirectoryView({ route }) {
           return p;
         })
         .filter(Boolean);
-      const parentChildIds = [
+      console.log("updatedParentId", updatedParentId);
+      const allIdsToBeMatched = [
         updatedParentId,
         itemId,
         ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
       ].filter(Boolean);
 
-      console.log("parentChildids", parentChildIds);
+      console.log("parentChildids", allIdsToBeMatched);
 
       const update = (list) =>
         linkAccess === "restricted" && myRole === "remove" && isMe
-          ? list.filter(
-              (resource) =>
-                !parentChildIds.includes(String(resource.id ?? resource._id)),
-            )
+          ? list.filter((resource) => {
+            console.log('resource?.parentDirId', resource?.parentDirId)
+              const resourceId = String(resource?.id ?? resource?._id);
+              const parentDirId = String(
+                resource?.parentDirId ?? resource?.parents?.[0],
+              );
+
+              return (
+                !allIdsToBeMatched.includes(resourceId) &&
+                !allIdsToBeMatched.includes(parentDirId)
+              );
+            })
           : list.map((resource) => {
+              console.log({
+                allIdsToBeMatched,
+                resource,
+              });
               const resourceId = String(resource?._id ?? resource?.id);
-              if (!parentChildIds.includes(resourceId)) {
+              const parentDirId = String(
+                resource?.parentDirId ?? resource?.parents?.[0],
+              );
+
+              if (
+                !allIdsToBeMatched.includes(resourceId) &&
+                !allIdsToBeMatched.includes(parentDirId)
+              ) {
                 return resource;
               }
+
               return {
                 ...resource,
                 capabilities: {
@@ -1557,6 +1624,7 @@ export default function DirectoryView({ route }) {
                 permissions: updatedPeopleWithAccess,
               };
             });
+
       setFilesList((prev) => update(prev));
       setDirectoriesList((prev) => update(prev));
       setPeopleWithAccess(updatedPeopleWithAccess);

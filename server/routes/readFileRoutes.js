@@ -1,7 +1,6 @@
 import express from "express";
 import validateIdMiddleware from "../middlewares/validateIdMiddleware.js";
 import {
-  fetchItemPermissions,
   fetchUserWithFiles,
   getFileById,
   getFileMetaById,
@@ -22,8 +21,6 @@ router.get("/user-files", checkAuth, validateSuperAdmin, fetchUserWithFiles)
 router.get("/recent-files", checkAuth, getRecentFiles)
 router.get("/:id/meta", getFileMetaById);
 router.get("/:id", getFileById);
-
-router.get("/:id/permissions", checkAuth, fetchItemPermissions);
 
 
 export default router;

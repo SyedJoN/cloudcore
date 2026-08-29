@@ -11,11 +11,6 @@ export const updateSharedAccess = async ({
   const previousPermissions = prevPermissions ?? [];
   const currentPermissions = peopleWithAccess ?? [];
 
-  /*
-   * peopleWithAccess contains the permissions being submitted
-   * by the share UI.
-   */
-
   const personsToGrant = currentPermissions.filter(
     (person) => person?.role !== "remove" && person.role !== "owner",
   );
@@ -25,9 +20,7 @@ export const updateSharedAccess = async ({
   );
 
 
-  /*
-   * Nothing changed.
-   */
+
   const equal =
     previousPermissions.length === currentPermissions.length &&
     previousPermissions.every((prev) =>
@@ -48,10 +41,6 @@ export const updateSharedAccess = async ({
   const itemId = String(item?._id ?? item?.id);
 
 
-  /*
-   * Apply grants / role changes.
-   */
-
   let response;
   let access;
   if (personsToGrant.length) {
@@ -65,9 +54,7 @@ export const updateSharedAccess = async ({
     );
   }
 
-  /*
-   * Apply removals.
-   */
+
   if (personsToRemove.length) {
     access = "remove"
    response = await Promise.all(

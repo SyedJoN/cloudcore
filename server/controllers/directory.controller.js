@@ -53,13 +53,7 @@ async function getSharedWithMeTime({ itemId, itemType, userId }) {
   return record?.sharedWithMeTime || null;
 }
 
-const resolveRole = async (
-  item,
-  type,
-  userId,
-  parentDir,
-  isShared = false,
-) => {
+const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
   const object = getFgaObject(type, item._id);
 
   const permissionMap = new Map();
@@ -76,7 +70,6 @@ const resolveRole = async (
     });
   }
 
-
   let inheritedPublicRole = null;
   let inheritedPublicFrom = null;
 
@@ -84,15 +77,12 @@ const resolveRole = async (
     const ancestors = await getAncestorDirectories(parentDir);
 
     for (const ancestor of ancestors) {
-
       const inheritedPermissions = await resolveObjectPermissions(
         `folder:${ancestor._id}`,
       );
 
       for (const { user, relation } of inheritedPermissions) {
-    
-        const inheritedRelation =
-          relation === "owner" ? "writer" : relation;
+        const inheritedRelation = relation === "owner" ? "writer" : relation;
 
         mergePermission({
           permissionMap,
@@ -104,20 +94,15 @@ const resolveRole = async (
         });
       }
 
-
       if (ancestor?.isPublic) {
-        const ancestorPublicRole =
-          ancestor.publicRole || "reader";
+        const ancestorPublicRole = ancestor.publicRole || "reader";
 
-        const ancestorPriority =
-          ROLE_PRIORITY[ancestorPublicRole] || 0;
+        const ancestorPriority = ROLE_PRIORITY[ancestorPublicRole] || 0;
 
-        const currentInheritedPriority =
-          inheritedPublicRole
-            ? ROLE_PRIORITY[inheritedPublicRole] || 0
-            : 0;
+        const currentInheritedPriority = inheritedPublicRole
+          ? ROLE_PRIORITY[inheritedPublicRole] || 0
+          : 0;
 
-       
         if (ancestorPriority > currentInheritedPriority) {
           inheritedPublicRole = ancestorPublicRole;
           inheritedPublicFrom = ancestor;
@@ -126,10 +111,7 @@ const resolveRole = async (
     }
   }
 
-  const directPublicRole = item?.isPublic
-    ? item?.publicRole || "reader"
-    : null;
-
+  const directPublicRole = item?.isPublic ? item?.publicRole || "reader" : null;
 
   const directPublicPriority = directPublicRole
     ? ROLE_PRIORITY[directPublicRole] || 0
@@ -144,22 +126,16 @@ const resolveRole = async (
       ? directPublicRole
       : inheritedPublicRole;
 
-  const hasDirectPublicPermission =
-    Boolean(directPublicRole);
+  const hasDirectPublicPermission = Boolean(directPublicRole);
 
-  const hasInheritedPublicPermission =
-    Boolean(inheritedPublicRole);
+  const hasInheritedPublicPermission = Boolean(inheritedPublicRole);
 
   const isPublic = Boolean(effectivePublicRole);
-
 
   let publicSource = null;
 
   if (effectivePublicRole) {
-    if (
-      directPublicPriority >= inheritedPublicPriority &&
-      directPublicRole
-    ) {
+    if (directPublicPriority >= inheritedPublicPriority && directPublicRole) {
       publicSource = "direct";
     } else {
       publicSource = "parent";
@@ -169,16 +145,11 @@ const resolveRole = async (
   const permissions = Array.from(permissionMap.values());
 
   const owners = permissions
-    .filter(
-      (permission) =>
-        permission.directRole === "owner",
-    )
+    .filter((permission) => permission.directRole === "owner")
     .map((permission) => ({
       displayName: permission.displayName,
       kind: "drive#user",
-      me:
-        permission.id?.toString() ===
-        userId?.toString(),
+      me: permission.id?.toString() === userId?.toString(),
       permissionId: permission.id,
       emailAddress: permission.emailAddress,
       photoLink: permission.photoLink,
@@ -190,16 +161,11 @@ const resolveRole = async (
     ? permissionMap.get(currentUserId)
     : null;
 
-  const directRole =
-    currentUserPermission?.directRole || null;
+  const directRole = currentUserPermission?.directRole || null;
 
-  const inheritedRole =
-    currentUserPermission?.inheritedRole || null;
+  const inheritedRole = currentUserPermission?.inheritedRole || null;
 
-
-  const directPriority = directRole
-    ? ROLE_PRIORITY[directRole] || 0
-    : 0;
+  const directPriority = directRole ? ROLE_PRIORITY[directRole] || 0 : 0;
 
   const inheritedPriority = inheritedRole
     ? ROLE_PRIORITY[inheritedRole] || 0
@@ -219,17 +185,10 @@ const resolveRole = async (
   let roleSource = null;
 
   if (highestPriority > 0) {
-    
-    if (
-      publicPriority === highestPriority &&
-      effectivePublicRole
-    ) {
+    if (publicPriority === highestPriority && effectivePublicRole) {
       currentRole = effectivePublicRole;
       roleSource = "public";
-    } else if (
-      directPriority >= inheritedPriority &&
-      directRole
-    ) {
+    } else if (directPriority >= inheritedPriority && directRole) {
       currentRole = directRole;
       roleSource = "direct";
     } else if (inheritedRole) {
@@ -238,22 +197,15 @@ const resolveRole = async (
     }
   }
 
-  const isPublicEffective =
-    Boolean(
-      effectivePublicRole &&
-        publicPriority === highestPriority,
-    );
-
- 
-  const parentId = getIdString(
-    parentDir?.parentDirId,
+  const isPublicEffective = Boolean(
+    effectivePublicRole && publicPriority === highestPriority,
   );
 
-  const isRootDirectory =
-    Boolean(parentDir?._id) && !parentId;
+  const parentId = getIdString(parentDir?.parentDirId);
 
-  const isRootLevelFile =
-    type === "file" && isRootDirectory;
+  const isRootDirectory = Boolean(parentDir?._id) && !parentId;
+
+  const isRootLevelFile = type === "file" && isRootDirectory;
 
   const currentUserCapabilities = getCapabilities(
     currentRole,
@@ -261,10 +213,7 @@ const resolveRole = async (
     isRootLevelFile,
   );
 
-  const [
-    viewActivity,
-    modifiedActivity,
-  ] = await Promise.all([
+  const [viewActivity, modifiedActivity] = await Promise.all([
     FileActivity.findOne({
       file: item._id,
       user: userId,
@@ -284,33 +233,27 @@ const resolveRole = async (
       .lean(),
   ]);
 
-  const viewedByMeTime =
-    viewActivity?.occuredAt || null;
+  const viewedByMeTime = viewActivity?.occuredAt || null;
 
-  const modifiedByMeTime =
-    modifiedActivity?.occuredAt || null;
-
+  const modifiedByMeTime = modifiedActivity?.occuredAt || null;
 
   let sharedWithMeTime = null;
 
   if (roleSource === "direct") {
-    sharedWithMeTime =
-      await getSharedWithMeTime({
-        itemId: item._id,
-        itemType: type,
-        userId: currentUserId,
-      });
+    sharedWithMeTime = await getSharedWithMeTime({
+      itemId: item._id,
+      itemType: type,
+      userId: currentUserId,
+    });
   } else if (
     roleSource === "inherited" &&
     currentUserPermission?.inheritedFrom?.id
   ) {
-    sharedWithMeTime =
-      await getSharedWithMeTime({
-        itemId:
-          currentUserPermission.inheritedFrom.id,
-        itemType: "folder",
-        userId: currentUserId,
-      });
+    sharedWithMeTime = await getSharedWithMeTime({
+      itemId: currentUserPermission.inheritedFrom.id,
+      itemType: "folder",
+      userId: currentUserId,
+    });
   }
 
   let publicCapabilities = null;
@@ -333,7 +276,6 @@ const resolveRole = async (
       });
     }
 
-
     if (inheritedPublicRole) {
       permissionDetails.push({
         permissionType: "folder",
@@ -341,9 +283,7 @@ const resolveRole = async (
         inherited: true,
         inheritedFrom: inheritedPublicFrom
           ? {
-              id: getIdString(
-                inheritedPublicFrom._id,
-              ),
+              id: getIdString(inheritedPublicFrom._id),
               name: inheritedPublicFrom.name,
               type: "folder",
             }
@@ -355,34 +295,25 @@ const resolveRole = async (
       id: "anyoneWithLink",
       type: "anyone",
 
-      
       role: effectivePublicRole,
 
-     
-      inherited:
-        publicSource === "parent",
+      inherited: publicSource === "parent",
 
       source: publicSource,
 
-     
       permissionDetails,
 
-      inheritedFrom:
-        inheritedPublicFrom
-          ? {
-              id: getIdString(
-                inheritedPublicFrom._id,
-              ),
-              name: inheritedPublicFrom.name,
-              type: "folder",
-            }
-          : null,
+      inheritedFrom: inheritedPublicFrom
+        ? {
+            id: getIdString(inheritedPublicFrom._id),
+            name: inheritedPublicFrom.name,
+            type: "folder",
+          }
+        : null,
 
-      hasDirectPermission:
-        hasDirectPublicPermission,
+      hasDirectPermission: hasDirectPublicPermission,
 
-      hasInheritedPermission:
-        hasInheritedPublicPermission,
+      hasInheritedPermission: hasInheritedPublicPermission,
     });
   }
 
@@ -394,28 +325,20 @@ const resolveRole = async (
     })
     .lean();
 
-  const ownerId = ownership?.toUser
-    ? getIdString(ownership.toUser)
-    : null;
+  const ownerId = ownership?.toUser ? getIdString(ownership.toUser) : null;
 
+  const updatedPermissions = permissions.map((permission) => {
+    const permissionId = getIdString(permission.id);
 
-  const updatedPermissions =
-    permissions.map((permission) => {
-      const permissionId =
-        getIdString(permission.id);
+    if (ownership?.status === "pending" && permissionId === ownerId) {
+      return {
+        ...permission,
+        pendingOwner: true,
+      };
+    }
 
-      if (
-        ownership?.status === "pending" &&
-        permissionId === ownerId
-      ) {
-        return {
-          ...permission,
-          pendingOwner: true,
-        };
-      }
-
-      return permission;
-    });
+    return permission;
+  });
 
   return {
     capabilities: isPublicEffective
@@ -434,7 +357,6 @@ const resolveRole = async (
     viewedByMeTime,
 
     modifiedByMeTime,
-
   };
 };
 
@@ -525,11 +447,10 @@ export const getDirectory = async (req, res, next) => {
 
       const { files: _, directories: __, ...parentDirData } = parentDir;
       const actualParent = parentDir.parentDirId
-  ? await Directory.findById(parentDir.parentDirId)
-      .select("_id name parentDirId isPublic publicRole")
-      .lean()
-  : null;
-
+        ? await Directory.findById(parentDir.parentDirId)
+            .select("_id name parentDirId isPublic publicRole")
+            .lean()
+        : null;
 
       const [filesWithRoles, directoriesWithRoles] = await Promise.all([
         Promise.all(
@@ -558,7 +479,6 @@ export const getDirectory = async (req, res, next) => {
               "folder",
               userId,
               parentDir,
-              
             );
             return {
               ...d,
@@ -787,7 +707,10 @@ export const getSharedWithMe = async (req, res, next) => {
       listSharedObjects("file", userId),
       listSharedObjects("folder", userId),
     ]);
-
+console.log({
+  allowedFileIds,
+  allowedFolderIds
+})
     if (!allowedFolderIds.length || !allowedFileIds.length) {
       return res.status(404).json({ files: [], directories: [] });
     }
@@ -961,7 +884,7 @@ export const getStarredItems = async (req, res, next) => {
           file,
           "file",
           userId,
-          file.parentDirId
+          file.parentDirId,
         );
         return {
           ...file,
@@ -979,7 +902,7 @@ export const getStarredItems = async (req, res, next) => {
           dir,
           "folder",
           userId,
-          dir.parentDirId
+          dir.parentDirId,
         );
         return {
           ...dir,
@@ -1461,14 +1384,23 @@ export const requestAccess = async (req, res, next) => {
 
 export const sendLink = async (req, res, next) => {
   try {
-    const { id, toEmail, message, name, type, url, isPublic, publicRole } =
-      req.body;
+    const {
+      id,
+      toEmail,
+      message,
+      name,
+      type,
+      url,
+      isPublic,
+      publicRole,
+      notifyPeople,
+    } = req.body;
     const userId = req.user._id;
     const isGoogleDriveLink = type.startsWith("google-drive");
     const sender = await User.findById(userId).select("name email").lean();
     const cleanMessage = sanitizeText(message || "");
 
-    if (isGoogleDriveLink) {
+    if (isGoogleDriveLink && notifyPeople) {
       await sendLinkEmail({
         toEmail,
         fromName: sender.name,
@@ -1480,26 +1412,31 @@ export const sendLink = async (req, res, next) => {
         publicRole: publicRole,
         message: cleanMessage,
       });
-      return res.status(200).json({ message: "Link sent" });
+      return res
+        .status(200)
+        .json({ message: `${notifyPeople ? "Link sent" : "Item Shared"}` });
     }
     const item =
       type === "folder"
         ? await Directory.findById(id).lean()
         : await File.findById(id).lean();
 
-    await sendLinkEmail({
-      toEmail,
-      fromName: sender.name,
-      fromEmail: sender.email,
-      itemName: item.name,
-      itemType: type,
-      itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "currentDirectory" : "file"}/${id}`,
-      isPublic: item.isPublic,
-      publicRole: item.publicRole,
-      message: cleanMessage,
-    });
-
-    return res.status(200).json({ message: "Link sent" });
+    if (notifyPeople) {
+      await sendLinkEmail({
+        toEmail,
+        fromName: sender.name,
+        fromEmail: sender.email,
+        itemName: item.name,
+        itemType: type,
+        itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "currentDirectory" : "file"}/${id}`,
+        isPublic: item.isPublic,
+        publicRole: item.publicRole,
+        message: cleanMessage,
+      });
+    }
+    return res
+      .status(200)
+      .json({ message: `${notifyPeople ? "Link sent" : "Item Shared"}` });
   } catch (error) {
     next(error);
   }
@@ -1916,8 +1853,6 @@ export const downloadFolder = async (req, res, next) => {
   let cancelled = false;
 
   try {
-
-
     const { id } = req.params;
 
     if (!id) {
