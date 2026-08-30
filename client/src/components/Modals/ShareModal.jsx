@@ -3,11 +3,9 @@ import {
   IconClose,
   IconPersonAdd,
   IconLink,
-  IconLinkOff,
   IconCheck,
   IconChevronDown,
   IconGlobe,
-  IconLock,
 } from "../Icons/Icons.jsx";
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
 import {
@@ -15,14 +13,11 @@ import {
   ROLE_DESC,
   ROLE_LABEL,
 } from "../../../Utils/displayUtils.js";
-import { searchUsers } from "../../../apis/userApi.js";
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
 import { UseAvatar } from "../../Hooks/useAvatar.jsx";
 import {
-  fetchFilePermissions,
   grantAccessById,
-  revokeFileAccess,
 } from "../../../apis/fileApi.js";
 import { useToast } from "../../Contexts/ToastContext.jsx";
 import {
@@ -32,14 +27,13 @@ import {
 } from "../../../apis/resourceApi.js";
 import { useAuth } from "../../Contexts/AuthContext.jsx";
 import ConfirmationModal from "./ConfirmationModal.jsx";
-import { createPortal } from "react-dom";
 import { getResourceType } from "../../../Utils/getResourceType.js";
 import { updateItemState } from "../../../Utils/updateItemState.js";
 import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
+
 export const ROLE_PRIORITY = {
   reader: 1,
   writer: 2,
@@ -93,7 +87,7 @@ export default function ShareModal({
   const accessDropdownRef = useRef(null);
   const prevRoleRef = useRef(null);
   const shareModalOverlayRef = useRef(null);
-  const [showMessageBox, setShowMessageBox] = useState(true);
+  const [notifyPeople, setNotifyPeople] = useState(true);
   const modalContentRef = useRef(null);
   const [modalHeight, setModalHeight] = useState(null);
   const [heightReady, setHeightReady] = useState(false);
@@ -135,7 +129,6 @@ export default function ShareModal({
     setPeopleWithAccess(permissions);
     setPrevPermissions(permissions);
 
-    // Whatever state you're using for link sharing:
     setLinkAccess(linkPermission ? "anyone" : "restricted");
 
     if (linkPermission) {
@@ -244,7 +237,7 @@ export default function ShareModal({
         selectedUsers,
         message,
         false,
-        showMessageBox,
+        notifyPeople,
       );
       let updatedUsers;
 
@@ -401,7 +394,7 @@ export default function ShareModal({
         publicRole:
           item.publicRole ||
           item.permissions?.find((p) => p.type === "anyone")?.role,
-        notifyPeople: showMessageBox,
+        notifyPeople: notifyPeople,
       });
 
       toast({
@@ -944,7 +937,7 @@ export default function ShareModal({
               {showInvitePanel && selectedUsers.length > 0 ? (
                 /* ── Invite panel ── */
                 <form onSubmit={handleSend} style={{ padding: "0 24px" }}>
-                  <div className="gd-share-invite-row mt-4">
+                  <div className="gd-share-invite-row my-4">
                     <div
                       className="gd-share-input-wrap gd-invite-chip-wrap"
                       ref={inviteSuggestionsRef}
@@ -996,11 +989,7 @@ export default function ShareModal({
                                   p.emailAddress?.toLowerCase(),
                                 );
 
-                                if (isOnlyPublic) {
-                                  return owners.includes(
-                                    user.email?.toLowerCase(),
-                                  );
-                                }
+                           
 
                                 return [...owners, ...accessEmails].includes(
                                   user.email?.toLowerCase(),
@@ -1078,8 +1067,8 @@ export default function ShareModal({
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={showMessageBox}
-                        onChange={(e) => setShowMessageBox(e.target.checked)}
+                        checked={notifyPeople}
+                        onChange={(e) => setNotifyPeople(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <span className="text-sm text-(--text-secondary)">
@@ -1088,7 +1077,7 @@ export default function ShareModal({
                     </label>
                   </div>
 
-                  <div className={`${showMessageBox ? "block" : "hide"}`}>
+                  <div className={`${notifyPeople ? "block" : "hide"}`}>
                     <textarea
                       className="gd-invite-message"
                       placeholder="Message"
@@ -1135,10 +1124,10 @@ export default function ShareModal({
                       }}
                     >
                       {isShareLoading
-                        ? !showMessageBox
+                        ? !notifyPeople
                           ? "Sending..."
                           : "Sharing"
-                        : showMessageBox
+                        : notifyPeople
                           ? "Send"
                           : "Share"}
                     </button>
@@ -1187,10 +1176,7 @@ export default function ShareModal({
                             user.email?.toLowerCase(),
                           );
 
-                          if (isOnlyPublic) {
-                            return isOwner;
-                          }
-
+                   
                           const addedPeople = peopleWithAccess.some(
                             (p) =>
                               p.emailAddress?.toLowerCase() ===
@@ -1353,7 +1339,7 @@ export default function ShareModal({
 
                   <div className="gd-share-link-section">
                     <div
-                      className={`gd-share-link-row ${isOnlyPublic ? "disabled" : ""}`}
+                      className={`gd-share-link-row`}
                     >
                       <div
                         className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
@@ -1372,7 +1358,7 @@ export default function ShareModal({
                           style={{ position: "relative" }}
                         >
                           <button
-                            disabled={isOnlyPublic}
+          
                             className="gd-share-access-btn"
                             onClick={() =>
                               setShowAccessDropdown(!showAccessDropdown)
@@ -1425,7 +1411,6 @@ export default function ShareModal({
                           <div className="gd-share-link-role-wrap">
                             <button
                               ref={linkRoleRef}
-                              disabled={isOnlyPublic}
                               className="gd-share-role-btn"
                               onClick={() =>
                                 setOpenDropdown(
@@ -1434,7 +1419,7 @@ export default function ShareModal({
                               }
                             >
                               {ROLE_LABEL[linkRole]}{" "}
-                              {!isOnlyPublic && <IconChevronDown size={14} />}
+                              {<IconChevronDown size={14} />}
                             </button>
 
                             <RoleDropdown

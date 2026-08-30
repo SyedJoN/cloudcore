@@ -6,10 +6,7 @@
   width: 560px;
   max-width: 95vw;
   overflow: hidden;
-  box-shadow:
-    0 11px 15px -7px rgba(0, 0, 0, 0.2),
-    0 24px 38px 3px rgba(0, 0, 0, 0.14),
-    0 9px 46px 8px rgba(0, 0, 0, 0.12);
+  box-shadow:var(--shadow-dynamic);
   animation: modal-grow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -17,11 +14,8 @@
   transition: height 0.2s ease;
 }
 
-
-
-
 .gd-share-modal-loader {
-  position: absolute; /* back to absolute, pinned to modal */
+  position: absolute; 
   top: 0;
   left: 0;
   width: 100%;
@@ -136,6 +130,7 @@
   width: 220px;
   padding: 8px 0;
   overflow: hidden;
+  user-select: none;
 }
 
 .gd-role-option {
@@ -809,7 +804,7 @@
 @keyframes modal-grow {
   from {
     opacity: 0;
-    transform: scale(0.1);
+    transform: scale(0.9);
   }
   to {
     opacity: 1;

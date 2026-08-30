@@ -1252,7 +1252,7 @@ export const toggleFilePublic = async (req, res, next) => {
     const incomingPriority = isRestricted ? 0 : ROLE_PRIORITY[role];
 
     const ancestors = await getAncestors(item.path);
-    console.log("ancestors", ancestors);
+
     const conflicting = ancestors
       .filter(
         (a) => a.isPublic && ROLE_PRIORITY[a.publicRole] > incomingPriority,
@@ -1260,7 +1260,7 @@ export const toggleFilePublic = async (req, res, next) => {
       .sort(
         (a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole],
       )[0];
-    console.log("conflicting", conflicting);
+
     if (conflicting && confirmCascade !== "true") {
       return res.status(200).json({
         needsConfirmation: true,
@@ -1277,32 +1277,60 @@ export const toggleFilePublic = async (req, res, next) => {
       await setFolderPublicAccess(conflicting._id, isRestricted ? null : role);
     }
 
-    if (isRestricted) {
-      const tuples = await fgaClient.read({ object });
-      const toDelete = tuples.tuples.filter((t) => {
-  return (
-    (t.key.user === "user:*" &&
-      ["link_reader", "link_writer"].includes(t.key.relation)) ||
-    ["shared_reader", "shared_writer"].includes(t.key.relation)
-  );
-});
+   if (isRestricted) {
 
+  const fileIds = [];
+  const folderIds = [];
 
-      if (toDelete.length) {
-        try {
-          await fgaClient.write({
-            deletes: toDelete.map((t) => ({
-              user: t.key.user,
-              relation: t.key.relation,
-              object: t.key.object,
-            })),
-          });
-        } catch {}
+  if (type === "folder") {
+    const queue = [itemId];
+    while (queue.length) {
+      const currentId = queue.shift();
+      const [files, folders] = await Promise.all([
+        File.find({ parentDirId: currentId, isDeleted: false }).select("_id").lean(),
+        Directory.find({ parentDirId: currentId, isDeleted: false }).select("_id").lean(),
+      ]);
+      fileIds.push(...files.map((f) => f._id));
+      for (const f of folders) {
+        folderIds.push(f._id);
+        queue.push(f._id);
       }
+    }
+  }
 
-      item.isPublic = false;
-      item.publicRole = undefined;
-    } else {
+  const allObjects = [
+    object,
+    ...fileIds.map((id) => getFgaObject("file", id)),
+    ...folderIds.map((id) => getFgaObject("folder", id)),
+  ];
+
+  const allToDelete = [];
+  for (const obj of allObjects) {
+    const tuples = await fgaClient.read({ object: obj });
+    const matches = tuples.tuples.filter((t) => {
+      if (["shared_reader", "shared_writer"].includes(t.key.relation)) return true;
+      if (["link_reader", "link_writer"].includes(t.key.relation)) return t.key.user === "user:*";
+      return false;
+    });
+    allToDelete.push(...matches);
+  }
+
+  if (allToDelete.length) {
+    try {
+      await fgaClient.write({
+        deletes: allToDelete.map((t) => ({ user: t.key.user, relation: t.key.relation, object: t.key.object })),
+      });
+    } catch (err) {
+      console.error("FGA DELETE FAILED:", err);
+    }
+  }
+
+  if (fileIds.length) await File.updateMany({ _id: { $in: fileIds } }, { $set: { isPublic: false }, $unset: { publicRole: "" } });
+  if (folderIds.length) await Directory.updateMany({ _id: { $in: folderIds } }, { $set: { isPublic: false }, $unset: { publicRole: "" } });
+
+  item.isPublic = false;
+  item.publicRole = undefined;
+}else {
       const newRelation = role === "reader" ? "link_reader" : "link_writer";
       const oldRelation = role === "reader" ? "link_writer" : "link_reader";
 
@@ -1359,7 +1387,6 @@ export const giveAccessById = async (req, res, next) => {
       const drive = getDriveClient(drive_access_token);
       const ROLE_PRIORITY = { reader: 1, writer: 2 };
 
-      
       const findAllPermissionSources = async (fileId, email) => {
         const chain = [];
         let currentId = fileId;
@@ -1393,11 +1420,10 @@ export const giveAccessById = async (req, res, next) => {
           }
 
           if (!fileMeta.parents?.length) break;
-          currentId = fileMeta.parents[0];
+          currentId = fileMeta.parents?.[0];
           isFirst = false;
         }
 
-       
         return chain.reverse();
       };
 
@@ -1435,13 +1461,12 @@ export const giveAccessById = async (req, res, next) => {
 
       const responses = await Promise.all(
         usersWithSources.map(async ({ user, email, chain }) => {
-        
           for (const source of chain) {
             if (source.isCurrentFile) continue;
             if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role])
               continue;
 
-            await drive.permissions.update({
+            drive.permissions.update({
               fileId: source.fileId,
               permissionId: source.permissionId,
               requestBody: { role: user.role },
@@ -1452,7 +1477,7 @@ export const giveAccessById = async (req, res, next) => {
           const directOnFile = chain.find((s) => s.isCurrentFile);
 
           if (directOnFile) {
-            const response = await drive.permissions.update({
+            const response = drive.permissions.update({
               fileId: id,
               permissionId: directOnFile.permissionId,
               requestBody: { role: user.role },
@@ -1619,64 +1644,73 @@ export const giveAccessById = async (req, res, next) => {
     }
 
     // apply the changes
-    await Promise.all(
-      usersWithSource.map(async ({ user, source }) => {
-        const targetObject = source ? source.object : getFgaObject(type, id);
-        const previousRole = source?.role || null;
+    // apply the changes
+await Promise.all(
+  usersWithSource.map(async ({ user, source }) => {
+    const targetObject = source ? source.object : getFgaObject(type, id);
+    const previousRole = source?.role || null;
+    const fgaUser = getFgaObject("user", user.id);
 
-        if (previousRole === user.role) return;
+    if (previousRole === user.role) return;
 
-        if (previousRole) {
-          await fgaClient.write({
-            deletes: [
-              {
-                user: getFgaObject("user", user.id),
-                relation: previousRole,
-                object: targetObject,
-              },
-            ],
-          });
-        }
+    if (previousRole && ["reader", "writer"].includes(previousRole)) {
+      const previousSharedRelation =
+        previousRole === "reader" ? "shared_reader" : "shared_writer";
 
-        await fgaClient.write(
-          {
-            writes: [
-              {
-                user: getFgaObject("user", user.id),
-                relation: user.role,
-                object: targetObject,
-              },
-            ],
-          },
-          { transaction: { disable: true } },
-        );
+      await Promise.all([
+        fgaClient.write({
+          deletes: [
+            { user: fgaUser, relation: previousRole, object: targetObject },
+          ],
+        }),
+        fgaClient.write({
+          deletes: [
+            { user: fgaUser, relation: previousSharedRelation, object: targetObject },
+          ],
+        }),
+      ]);
+    }
 
-        if (!source) {
-          await SharedAccess.updateOne(
-            { itemId: id, itemType: type, userId: user.id },
-            { $setOnInsert: { sharedWithMeTime: new Date() } },
-            { upsert: true },
-          );
+    const newSharedRelation =
+      user.role === "reader" ? "shared_reader" : "shared_writer";
 
-          const userData = await User.findById(user.id)
-            .select("name email avatar")
-            .lean();
+    await Promise.all([
+      fgaClient.write(
+        { writes: [{ user: fgaUser, relation: user.role, object: targetObject }] },
+        { transaction: { disable: true } },
+      ),
+      fgaClient.write(
+        { writes: [{ user: fgaUser, relation: newSharedRelation, object: targetObject }] },
+        { transaction: { disable: true } },
+      ),
+    ]);
 
-          if (userData) {
-            await sendAccessEmail({
-              toEmail: userData.email,
-              toName: userData.name,
-              fromName: item.userId.name,
-              fromEmail: item.userId.email,
-              itemName: item.name,
-              itemType: type,
-              itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "directory" : "file"}/${id}`,
-              role: user.role,
-              message,
-            });
-          }
-        }
-      }),
+    if (!source) {
+      await SharedAccess.updateOne(
+        { itemId: id, itemType: type, userId: user.id },
+        { $setOnInsert: { sharedWithMeTime: new Date() } },
+        { upsert: true },
+      );
+
+      const userData = await User.findById(user.id)
+        .select("name email avatar")
+        .lean();
+
+      if (userData) {
+        await sendAccessEmail({
+          toEmail: userData.email,
+          toName: userData.name,
+          fromName: item.userId.name,
+          fromEmail: item.userId.email,
+          itemName: item.name,
+          itemType: type,
+          itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "directory" : "file"}/${id}`,
+          role: user.role,
+          message,
+        });
+      }
+    }
+  })
     );
 
     const finalResult = await resolveRole(
@@ -1729,11 +1763,7 @@ export const revokeAccessById = async (req, res, next) => {
         return isPublicLink
           ? data.permissions?.find((p) => p.type === "anyone")
           : data.permissions?.find(
-              (p) =>
-                p.type === "user" &&
-                (p.emailAddress?.toLowerCase() ===
-                  permissionId?.toLowerCase() ||
-                  p.id === permissionId),
+              (p) => p.type === "user" && p.id === permissionId,
             );
       };
 
@@ -1792,15 +1822,17 @@ export const revokeAccessById = async (req, res, next) => {
       }
 
       if (hasInherited && confirmCascade === true) {
-        let ancestorId = (
-          await drive.files.get({ fileId: id, fields: "parents" })
-        ).data.parents?.[0];
 
+        const { data: fileMeta } = await drive.files.get({
+          fileId: id,
+          fields: "parents",
+        });
+        let ancestorId = fileMeta?.parents?.[0];
         while (ancestorId) {
           const perm = await findPermission(ancestorId);
 
           if (perm) {
-            await drive.permissions.delete({
+            drive.permissions.delete({
               fileId: ancestorId,
               permissionId: perm.id,
             });
@@ -1819,7 +1851,7 @@ export const revokeAccessById = async (req, res, next) => {
           .json({ message: "Permission revoked successfully" });
       }
 
-      await drive.permissions.delete({
+      drive.permissions.delete({
         fileId: id,
         permissionId: targetPermission.id,
       });
@@ -1848,74 +1880,71 @@ export const revokeAccessById = async (req, res, next) => {
         ? ["reader", "writer", "shared_reader", "shared_writer"]
         : [relation];
 
-    // find the tuple that's actually granting this user access to `obj`
-    const findDirectPermission = async (obj) => {
-      const result = await fgaClient.read({ user, object: obj });
-      const tuples = result?.tuples || [];
-      return (
-        tuples.find((t) => relationsToCheck.includes(t.key?.relation)) || null
-      );
-    };
+ 
+   const findDirectPermissions = async (obj) => {
+  const result = await fgaClient.read({ user, object: obj });
+  const tuples = result?.tuples || [];
+  return tuples.filter((t) => relationsToCheck.includes(t.key?.relation));
+};
 
-    // walk up from this item until we find where the user's tuple actually lives
-    const findExistingPermissionSource = async (resourceType, resourceId) => {
-      let currentType = resourceType;
-      let currentId = resourceId;
-      let resourceName = null;
+const findExistingPermissionSource = async (resourceType, resourceId) => {
+  let currentType = resourceType;
+  let currentId = resourceId;
+  let resourceName = null;
 
-      while (currentId) {
-        const currentObject = getFgaObject(currentType, currentId);
-        const direct = await findDirectPermission(currentObject);
+  while (currentId) {
+    const currentObject = getFgaObject(currentType, currentId);
+    const direct = await findDirectPermissions(currentObject);
 
-        if (direct) {
-          return {
-            object: currentObject,
-            id: currentId,
-            role: direct.key.relation,
-            name: resourceName,
-            isCurrentObject: currentId.toString() === resourceId.toString(),
-          };
-        }
-
-        const currentModel = currentType === "folder" ? Directory : File;
-        const resource = await currentModel
-          .findById(currentId)
-          .select("name parentDirId")
-          .populate("parentDirId", "name")
-          .lean();
-
-        if (!resource?.parentDirId) break;
-
-        currentType = "folder";
-        resourceName = resource.parentDirId.name;
-        currentId = resource.parentDirId._id;
-      }
-
-      return null;
-    };
-
-    const source = await findExistingPermissionSource(objectType, id);
-
-    if (!source) {
-      return res.status(200).json({ message: "Access already revoked" });
+    if (direct.length) {
+      return {
+        object: currentObject,
+        id: currentId,
+        roles: direct.map((t) => t.key.relation), // now an array
+        name: resourceName,
+        isCurrentObject: currentId.toString() === resourceId.toString(),
+      };
     }
 
-    if (!source.isCurrentObject && confirmCascade !== true) {
-      return res.status(200).json({
-        needsConfirmation: true,
-        conflict: {
-          ancestorId: source.id,
-          ancestorName: source.name,
-          previousRole: source.role,
-        },
-      });
-    }
+    const currentModel = currentType === "folder" ? Directory : File;
+    const resource = await currentModel
+      .findById(currentId)
+      .select("name parentDirId")
+      .populate("parentDirId", "name")
+      .lean();
 
-    await fgaClient.write({
-      deletes: [{ user, relation: source.role, object: source.object }],
-    });
+    if (!resource?.parentDirId) break;
 
-    return res.status(200).json({ message: "Access revoked successfully" });
+    currentType = "folder";
+    resourceName = resource.parentDirId.name;
+    currentId = resource.parentDirId._id;
+  }
+
+  return null;
+};
+
+const source = await findExistingPermissionSource(objectType, id);
+
+if (!source) {
+  return res.status(200).json({ message: "Access already revoked" });
+}
+
+if (!source.isCurrentObject && confirmCascade !== true) {
+  return res.status(200).json({
+    needsConfirmation: true,
+    conflict: {
+      ancestorId: source.id,
+      ancestorName: source.name,
+      previousRole: source.roles[0], // just for display
+    },
+  });
+}
+
+await fgaClient.write({
+  deletes: source.roles.map((role) => ({ user, relation: role, object: source.object })),
+});
+
+return res.status(200).json({ message: "Access revoked successfully" });
   } catch (error) {
     next(error);
   }
@@ -2069,7 +2098,6 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     );
 
     if (conflictingAncestors.length && confirmCascade !== true) {
-    
       const broadest = [...conflictingAncestors].sort(
         (a, b) => ROLE_PRIORITY[b.publicRole] - ROLE_PRIORITY[a.publicRole],
       )[0];
@@ -2085,7 +2113,6 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
     }
 
     if (conflictingAncestors.length && confirmCascade === true) {
-      
       const rootFirst = [...conflictingAncestors].reverse();
 
       for (const ancestor of rootFirst) {

@@ -124,6 +124,7 @@ export default function DirectoryView({ route }) {
   const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
+
   const [sortConfig, setSortConfig] = useState({
     key: "name",
     direction: "asc",
@@ -134,7 +135,7 @@ export default function DirectoryView({ route }) {
     message: "",
     resolve: null,
   });
-  const [cascadeModal, setCascadeModal] = useState(null); // { chain, resolve } | null
+  const [cascadeModal, setCascadeModal] = useState(null);
 
   function showCascadeConfirm(chain) {
     return new Promise((resolve) => {
@@ -474,7 +475,8 @@ export default function DirectoryView({ route }) {
 
   useEffect(() => {
     setError("");
-  }, []);
+  }, [route]);
+
   useEffect(() => {
     if (grantUserId && grantRole && dirId && !grantExecutedRef.current) {
       grantExecutedRef.current = true;
@@ -1101,10 +1103,14 @@ export default function DirectoryView({ route }) {
           (p) => p.emailAddress === user.email,
         );
 
+        const isOwnerViewing = item.owners?.some(
+          (o) => o.emailAddress === user.email,
+        );
+
         isMe = incomingRole
           ? (incomingRole?.email ?? incomingRole.emailAddress) === user.email
-          : false;
-        const myRole = incomingRole?.role;
+          : !isOwnerViewing;
+        myRole = incomingRole?.role;
         incomingPublicRole = DRIVE_ROLES[role] || role;
 
         let confirmCascade = false;
@@ -1116,7 +1122,7 @@ export default function DirectoryView({ route }) {
           updatedParentId = ancestorId;
 
           const isRestricting = access === "restricted";
-          const iconType = item.isDirectory
+          const chainIconType = item.isDirectory
             ? null
             : getFileType(item?.name || "");
 
@@ -1135,7 +1141,7 @@ export default function DirectoryView({ route }) {
               fromLabel: `Anyone with the link → ${DRIVE_ROLES[publicPermission?.role] || publicPermission?.role}`,
               toLabel: isRestricting ? "Restricted" : DRIVE_ROLES[role] || role,
               isDirectory: item.isDirectory,
-              iconType,
+              iconType: chainIconType,
             },
           ];
 
@@ -1191,9 +1197,13 @@ export default function DirectoryView({ route }) {
             return;
           }
         }
-        await toggleFilePublic(itemId, userRole, access, type, confirmCascade);
+
+      
+        if (confirmCascade) {
+          await toggleFilePublic(itemId, userRole, access, type, true);
+        }
       }
-      console.log("updatedParentId", updatedParentId);
+
       const allIdsToBeMatched = [
         updatedParentId,
         itemId,
@@ -1201,7 +1211,7 @@ export default function DirectoryView({ route }) {
       ].filter(Boolean);
 
       const update = (list) =>
-        linkAccess === "restricted" && myRole === "remove" && isMe
+        restricted && (myRole === "remove" || myRole === undefined) && isMe
           ? list.filter((resource) => {
               const resourceId = String(resource?.id ?? resource?._id);
               const parentDirId = String(
@@ -1214,10 +1224,6 @@ export default function DirectoryView({ route }) {
               );
             })
           : list.map((resource) => {
-              console.log({
-                allIdsToBeMatched,
-                parents: resource,
-              });
               const resourceId = String(resource?._id ?? resource?.id);
               const parentDirId = String(
                 resource?.parentDirId ?? resource?.parents?.[0],
@@ -1304,10 +1310,10 @@ export default function DirectoryView({ route }) {
         const personsToRemove = peopleWithAccess.filter(
           (person) => person?.role === "remove",
         );
-        const type = item.isDirectory ? "folder" : "file";
+        const removeType = item.isDirectory ? "folder" : "file";
         const message = await Promise.all(
           personsToRemove.map((person) =>
-            revokeFileAccess(type, itemId, person.id, person.role),
+            revokeFileAccess(removeType, itemId, person.id, person.role),
           ),
         );
         if (incomingPublicRole === "reader") {
@@ -1332,7 +1338,7 @@ export default function DirectoryView({ route }) {
                     permissions: updatedPeopleWithAccess,
                   };
                 });
-          if (type === "folder") {
+          if (removeType === "folder") {
             setDirectoriesList((prev) => update(prev));
           } else {
             setFilesList((prev) => update(prev));
@@ -1353,7 +1359,7 @@ export default function DirectoryView({ route }) {
                 permissions: updatedPeopleWithAccess,
               };
             });
-          if (type === "folder") {
+          if (removeType === "folder") {
             setDirectoriesList((prev) => update(prev));
           } else {
             setFilesList((prev) => update(prev));
@@ -1582,7 +1588,7 @@ export default function DirectoryView({ route }) {
       const update = (list) =>
         linkAccess === "restricted" && myRole === "remove" && isMe
           ? list.filter((resource) => {
-            console.log('resource?.parentDirId', resource?.parentDirId)
+              console.log("resource?.parentDirId", resource?.parentDirId);
               const resourceId = String(resource?.id ?? resource?._id);
               const parentDirId = String(
                 resource?.parentDirId ?? resource?.parents?.[0],

@@ -6,7 +6,8 @@ export const updateSharedAccess = async ({
   message,
   grantAccessById,
   revokeFileAccess,
-  confirmCascade
+  confirmCascade,
+  notifyPeople
 }) => {
   const previousPermissions = prevPermissions ?? [];
   const currentPermissions = peopleWithAccess ?? [];
@@ -50,7 +51,8 @@ export const updateSharedAccess = async ({
       itemId,
       personsToGrant,
       message,
-      confirmCascade
+      confirmCascade,
+      notifyPeople
     );
   }
 

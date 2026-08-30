@@ -66,14 +66,14 @@ export async function grantAccessById(
   usersArray,
   message,
   confirmCascade = false,
-  showMessageBox
+  notifyPeople
 ) {
   const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {
     usersArray,
     message,
     type,
     confirmCascade,
-    showMessageBox
+    notifyPeople
   });
   return data;
 }

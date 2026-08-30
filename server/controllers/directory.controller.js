@@ -361,7 +361,7 @@ const resolveRole = async (item, type, userId, parentDir, isShared = false) => {
 };
 
 async function listSharedObjects(type, userId) {
-  const [sharedResult, readerResult] = await Promise.all([
+  const [readResult, writeResult] = await Promise.all([
     fgaClient.listObjects({
       user: `user:${userId}`,
       relation: "shared_reader",
@@ -369,12 +369,12 @@ async function listSharedObjects(type, userId) {
     }),
     fgaClient.listObjects({
       user: `user:${userId}`,
-      relation: "can_read",
+      relation: "shared_writer",
       type,
     }),
   ]);
 
-  const combined = [...sharedResult.objects, ...readerResult.objects];
+  const combined = [...readResult.objects, ...writeResult.objects];
 
   return [...new Set(combined)].map((o) => o.split(":").pop()).filter(Boolean);
 }
@@ -707,12 +707,9 @@ export const getSharedWithMe = async (req, res, next) => {
       listSharedObjects("file", userId),
       listSharedObjects("folder", userId),
     ]);
-console.log({
-  allowedFileIds,
-  allowedFolderIds
-})
-    if (!allowedFolderIds.length || !allowedFileIds.length) {
-      return res.status(404).json({ files: [], directories: [] });
+
+    if (!allowedFolderIds.length && !allowedFileIds.length) {
+      return res.status(200).json({ files: [], directories: [] });
     }
 
     const allowedFolderIdSet = new Set(
@@ -777,19 +774,28 @@ console.log({
     });
 
     const filesWithRoles = await Promise.all(
-      topLevelFiles.map(async (file) => {
-        const { owners, capabilities, permissions, sharedWithMeTime } =
-          await resolveRole(file, "file", userId, file.parentDirId, true);
+  topLevelFiles.map(async (file) => {
+    let parentDir = null;
 
-        return {
-          ...file,
-          owners,
-          capabilities,
-          permissions,
-          sharedWithMeTime,
-        };
-      }),
-    );
+    const parentId = getParentId(file.parentDirId);
+    if (parentId) {
+      parentDir = await Directory.findById(parentId)
+        .select("_id name parentDirId isPublic publicRole")
+        .lean();
+    }
+
+    const { owners, capabilities, permissions, sharedWithMeTime } =
+      await resolveRole(file, "file", userId, parentDir, true);
+
+    return {
+      ...file,
+      owners,
+      capabilities,
+      permissions,
+      sharedWithMeTime,
+    };
+  }),
+);
 
     const directoriesWithRoles = await Promise.all(
       topLevelDirectories.map(async (directory) => {

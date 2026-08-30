@@ -55,6 +55,7 @@
   top: 0;
   z-index: 4;
   border-bottom: 1px solid transparent;
+  user-select: none;
 }
 
 .gd-logo {
@@ -211,6 +212,7 @@
   overflow-y: auto;
   flex-direction: column;
   gap: 4px;
+  user-select: none;
 }
 .gd-btn {
   padding: 10px 24px;
@@ -776,6 +778,7 @@
   min-width: 300px;
   padding: 8px 0;
   z-index: 1000;
+  user-select: none;
 }
 .gd-context-menu {
   position: fixed;
@@ -797,6 +800,7 @@
     transform 267ms cubic-bezier(0.4, 0, 0.2, 1) 0s,
     margin-top 267ms cubic-bezier(0.4, 0, 0.2, 1),
     opacity 267ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
 }
 
 .gd-context-menu.open {
@@ -928,7 +932,7 @@
   gap: 8px;
 }
 
-/* ===================== UPLOAD PROGRESS ===================== */
+/* UPLOAD PROGRESS  */
 .gd-upload-tray {
   position: fixed;
   bottom: 24px;
@@ -940,6 +944,7 @@
   max-width: 360px;
   z-index: 900;
   overflow: hidden;
+  user-select: none;
 }
 .gd-upload-tray-header {
   display: flex;
@@ -980,7 +985,7 @@
   transition: width 0.2s ease;
 }
 
-/* ===================== EMPTY STATE ===================== */
+/* EMPTY STATE  */
 .gd-empty {
   display: flex;
   flex-direction: column;
@@ -1234,9 +1239,7 @@ body.gd-overlay-open {
   height: 48px;
   background: var(--surface-white);
   border-radius: var(--radius-full);
-  box-shadow:
-    0 4px 12px rgba(60, 64, 67, 0.25),
-    0 1px 4px rgba(60, 64, 67, 0.15);
+  box-shadow:var(--shadow-dynamic);
   position: fixed;
   top: 72px;
   left: 50%;
@@ -1244,6 +1247,7 @@ body.gd-overlay-open {
   z-index: 500;
   pointer-events: all;
   animation: sel-drop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
 @keyframes sel-drop {
