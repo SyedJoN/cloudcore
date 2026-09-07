@@ -1,4 +1,4 @@
-import NotFound from "../components/NotFound";
+import NotFound from "../Components/NotFound";
 import { optionalAuthRoutes } from "./optionalAuthRoutes";
 import { protectedRoutes } from "./ProtectedRoutes";
 import { publicRoutes } from "./PublicRoutes";
