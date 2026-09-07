@@ -1,0 +1,37 @@
+services:
+  # One-off migration job — runs once on deploy, sets up the schema
+  - type: worker
+    name: openfga-migrate
+    runtime: image
+    image:
+      url: docker.io/openfga/openfga:latest
+    dockerCommand: migrate
+    plan: starter
+    envVars:
+      - key: OPENFGA_DATASTORE_ENGINE
+        value: postgres
+      - key: OPENFGA_DATASTORE_URI
+        sync: false # set manually in Render dashboard to your Neon connection string
+    autoDeploy: true
+
+  # The actual OpenFGA server
+  - type: web
+    name: openfga-server
+    runtime: image
+    image:
+      url: docker.io/openfga/openfga:latest
+    dockerCommand: run
+    plan: starter
+    envVars:
+      - key: OPENFGA_DATASTORE_ENGINE
+        value: postgres
+      - key: OPENFGA_DATASTORE_URI
+        sync: false # set manually in Render dashboard to your Neon connection string
+      - key: OPENFGA_LOG_FORMAT
+        value: json
+      - key: OPENFGA_CORS_ALLOWED_ORIGINS
+        value: https://cloudcoreapp.netlify.app 
+      - key: OPENFGA_PLAYGROUND_ENABLED
+        value: "false" # recommended off in production
+    healthCheckPath: /healthz
+    numInstances: 1
