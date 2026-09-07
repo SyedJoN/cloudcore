@@ -32,7 +32,7 @@ export const createSubscription = async (req, res, next) => {
           quantity: 1,
         },
       ],
-      success_url: "http://localhost:5173",
+      success_url: process.env.CLIENT_URL,
       metadata: {
         userId: req.user._id.toString(),
       },
@@ -139,7 +139,7 @@ export const getCustomerPortalUrl = async (req, res, next) => {
     const customerId = subscription.customerId;
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: "http://localhost:5173",
+      return_url: process.env.CLIENT_URL,
     });
     return res.status(200).json({ url: session.url });
   } catch (error) {

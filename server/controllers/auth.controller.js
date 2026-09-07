@@ -676,7 +676,7 @@ export const githubAuth = async (req, res, next) => {
       maxAge: sessionExpiryTime,
     });
 
-    return res.redirect("http://localhost:5173");
+    return res.redirect(process.env.CLIENT_URL);
   } catch (error) {
     if (error.code === 121) {
       return res.status(400).json({ message: "Invalid Input", details: error });
@@ -711,9 +711,9 @@ export const googleDrive = async (req, res) => {
     maxAge: 60 * 60 * 1000,
   });
   if (dirId) {
-    res.redirect(`http://localhost:5173/directory/${dirId}`);
+    res.redirect(`http://${process.env.CLIENT_URL}/directory/${dirId}`);
   } else {
-    res.redirect("http://localhost:5173/google-drive");
+    res.redirect(`http://${process.env.CLIENT_URL}/google-drive`);
   }
 };
 
