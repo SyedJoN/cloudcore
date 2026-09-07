@@ -28,7 +28,8 @@ import getExt from "../../../utils/getExtension";
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
-const BASE_URL = process.env.VITE_BACKEND_BASE_URL;
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
+
 
 export default function FileViewer({
   item,
