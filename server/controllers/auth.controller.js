@@ -23,6 +23,7 @@ import Subscription from "../models/subscription.model.js";
 import { getDriveClient } from "../services/googleDriveClient.js";
 
 let MAX_TRIES = 2;
+let isProduction = process.env.NODE_ENV === "production";
 
 export const registerUser = async (req, res, next) => {
   const { success, data, error } = registerSchema.safeParse(req.body);
@@ -395,6 +396,8 @@ export const verifyOtp = async (req, res, next) => {
       res.cookie("sid", sessionId, {
         httpOnly: true,
         signed: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: sessionExpirySeconds * 1000,
       });
 
@@ -535,8 +538,8 @@ export const googleAuth = async (req, res, next) => {
       httpOnly: true,
       signed: true,
       maxAge: sessionExpiryTime,
-      sameSite: "lax",
-      secure: false,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
     });
 
     return res.status(200).json({
@@ -667,6 +670,9 @@ export const githubAuth = async (req, res, next) => {
     res.cookie("sid", sessionId, {
       httpOnly: true,
       signed: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+
       maxAge: sessionExpiryTime,
     });
 
@@ -697,12 +703,11 @@ export const googleDrive = async (req, res) => {
       message: "Missing or invalid access token",
     });
   }
-
   res.cookie("drive_access_token", accessToken, {
     httpOnly: true,
     signed: true,
-    secure: false,
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
     maxAge: 60 * 60 * 1000,
   });
   if (dirId) {
