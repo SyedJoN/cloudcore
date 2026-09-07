@@ -1,4 +1,4 @@
-import PublicOnlyRoute from "../components/Layouts/PublicOnlyLayout";
+import PublicOnlyRoute from "../Components/Layouts/PublicOnlyLayout";
 import Login from "../Pages/Login";
 import Register from "../Pages/Register";
 

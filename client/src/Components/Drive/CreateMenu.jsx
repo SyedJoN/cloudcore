@@ -16,7 +16,7 @@ import {
   Portal,
   useTransitionClass,
   useSelfMountedTransition,
-} from "../../hooks/useFloatingMenu";
+} from "../../Hooks/useFloatingMenu";
 import {
   ArrowUpOnSquareIcon,
   ArrowUpOnSquareStackIcon,

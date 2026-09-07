@@ -10,7 +10,7 @@ import { ROLE_LABEL, DRIVE_ROLES } from "../../../Utils/displayUtils";
 
 import { CheckIcon } from "@heroicons/react/24/solid";
 import MouseTooltip from "../Tooltip/Tooltip";
-import { Portal, useTransitionClass } from "../../hooks/useFloatingMenu";
+import { Portal, useTransitionClass } from "../../Hooks/useFloatingMenu";
 
 const ROLES = ["viewer", "editor"];
 

@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "../Styles/Auth.css";
-import OTPInput from "../components/OTPInput";
+import OTPInput from "../Components/OTPInput";
 import { useEffect } from "react";
-import GoogleLoginBtn from "../components/ThirdPartyButtons/GoogleLogin";
-import GithubLoginBtn from "../components/ThirdPartyButtons/GithubLogin";
+import GoogleLoginBtn from "../Components/ThirdPartyButtons/GoogleLogin";
+import GithubLoginBtn from "../Components/ThirdPartyButtons/GithubLogin";
 import { axiosWithCreds, axiosWithoutCreds } from "../../apis/axiosInstances";
 import { OTPSchema, registerSchema } from "../../Validators/authSchema";
 import { registerUser, sendOtp, verifyOtp } from "../../apis/authApi";

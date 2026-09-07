@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import "../Styles/Auth.css";
-import OTPInput from "../components/OTPInput";
-import GoogleLoginBtn from "../components/ThirdPartyButtons/GoogleLogin";
-import GithubLoginBtn from "../components/ThirdPartyButtons/GithubLogin";
+import OTPInput from "../Components/OTPInput";
+import GoogleLoginBtn from "../Components/ThirdPartyButtons/GoogleLogin";
+import GithubLoginBtn from "../Components/ThirdPartyButtons/GithubLogin";
 import { loginSchema, OTPSchema } from "../../Validators/authSchema";
 import { loginUser, sendOtp, verifyOtp } from "../../apis/authApi";
 import { createSubscription } from "../../apis/subscriptionApi";

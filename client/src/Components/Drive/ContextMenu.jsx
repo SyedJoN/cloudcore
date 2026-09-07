@@ -16,7 +16,7 @@ import {
   Portal,
   useTransitionClass,
   useSelfMountedTransition,
-} from "../../hooks/useFloatingMenu";
+} from "../../Hooks/useFloatingMenu";
 import { DocumentDuplicateIcon } from "@heroicons/react/24/outline";
 import { FolderOpenIcon, StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";

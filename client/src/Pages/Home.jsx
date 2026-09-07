@@ -8,7 +8,7 @@ import {
   FAQ,
   CTABand,
   Footer,
-} from "../components/Home/index.js";
+} from "../Components/Home/index.js";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Contexts/AuthContext.jsx";
