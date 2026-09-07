@@ -1,4 +1,4 @@
-import OptionalAuth from "../components/Layouts/OptionalAuthLayout";
+import OptionalAuth from "../Components/Layouts/OptionalAuthLayout";
 import FileViewPage from "../Pages/FileViewPage";
 import Home from "../Pages/Home";
 
