@@ -1,5 +1,5 @@
 
-import { getItemCategory } from "./itemCategory.js";
+import { getItemCategory } from "./ItemCategory.js";
 import { getLastActivityTime } from "./RecencyBuckets.js";
 
 const DAY = 86400000;
