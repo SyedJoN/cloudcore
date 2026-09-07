@@ -4,7 +4,7 @@ services:
     name: openfga-migrate
     runtime: image
     image:
-      url: docker.io/openfga/openfga:latest
+      url: openfga/openfga:latest
     dockerCommand: migrate
     plan: starter
     envVars:
@@ -19,7 +19,7 @@ services:
     name: openfga-server
     runtime: image
     image:
-      url: docker.io/openfga/openfga:latest
+      url: openfga/openfga:latest
     dockerCommand: run
     plan: starter
     envVars:
