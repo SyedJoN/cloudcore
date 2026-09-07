@@ -8,10 +8,10 @@ import {
   updateUser,
 } from "../../apis/userApi.js";
 import { useNavigate } from "react-router-dom";
-import canAccess from "../../Utils/canAccess.js";
+import canAccess from "../../utils/canAccess.js";
 import CircularLoader from "../Components/Loaders/CircularLoader.jsx";
 import "../Styles/UsersPage.css";
-import { getColor } from "../../Utils/getProfileColor.js";
+import { getColor } from "../../utils/getProfileColor.js";
 import FileBrowser from "../Components/File/FileBrowser.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import { useAuth, useSidebar } from "../Contexts";

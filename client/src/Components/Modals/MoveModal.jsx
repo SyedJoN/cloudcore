@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { IconFolder, IconClose, IconChevronDown } from "./../Icons/Icons";
 import { addDirectory } from "../../../apis/directoryApi";
 import FileBadge from "../File/FileBadge";
-import { getFileIcon } from "../../../Utils/displayUtils";
+import { getFileIcon } from "../../../utils/displayUtils";
 import { moveItem } from "../../../apis/resourceApi";
 import { useToast } from "../../Contexts";
 import { FolderIcon, InboxIcon, UsersIcon } from "@heroicons/react/24/solid";

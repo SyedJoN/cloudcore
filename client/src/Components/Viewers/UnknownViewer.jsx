@@ -1,4 +1,4 @@
-import getExt from "../../../Utils/getExtension";
+import getExt from "../../../utils/getExtension";
 import { IconDownload } from "../Icons/Icons";
 
 function UnknownViewer({ item }) {

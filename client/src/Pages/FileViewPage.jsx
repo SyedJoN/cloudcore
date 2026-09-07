@@ -12,11 +12,9 @@ import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useRef } from "react";
 import { useAuth, useGDrive, useToast } from "../Contexts";
 import { searchUsers } from "../../apis/userApi";
-import { useDirectoryData } from "../Hooks/useDirectoryData";
-import { updateSharedAccess } from "../../Utils/shareRoleAccess";
-import { getResourceType } from "../../Utils/getResourceType";
-import { DRIVE_ROLES } from "../../Utils/displayUtils";
-import { updateItemState } from "../../Utils/updateItemState";
+import { updateSharedAccess } from "../../utils/shareRoleAccess";
+import { getResourceType } from "../../utils/getResourceType";
+import { DRIVE_ROLES } from "../../utils/displayUtils";
 import { toggleItemStar } from "../../apis/resourceApi";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;

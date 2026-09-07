@@ -4,7 +4,7 @@ import "../Styles/Auth.css";
 import OTPInput from "../Components/OTPInput";
 import GoogleLoginBtn from "../Components/ThirdPartyButtons/GoogleLogin";
 import GithubLoginBtn from "../Components/ThirdPartyButtons/GithubLogin";
-import { loginSchema, OTPSchema } from "../../Validators/authSchema";
+import { loginSchema, OTPSchema } from "../../validators/authSchema";
 import { loginUser, sendOtp, verifyOtp } from "../../apis/authApi";
 import { createSubscription } from "../../apis/subscriptionApi";
 

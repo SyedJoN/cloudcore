@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { IconFolder } from "../Icons/Icons";
-import { getFileType } from "../../../Utils/displayUtils";
+import { getFileType } from "../../../utils/displayUtils";
 import FileBadge from "../File/FileBadge";
 
 function CascadeConfirmationModal({

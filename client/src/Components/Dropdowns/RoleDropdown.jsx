@@ -6,7 +6,7 @@ import {
   useCallback,
 } from "react";
 
-import { ROLE_LABEL, DRIVE_ROLES } from "../../../Utils/displayUtils";
+import { ROLE_LABEL, DRIVE_ROLES } from "../../../utils/displayUtils";
 
 import { CheckIcon } from "@heroicons/react/24/solid";
 import MouseTooltip from "../Tooltip/Tooltip";

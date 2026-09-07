@@ -12,7 +12,7 @@ import {
   DRIVE_ROLES,
   ROLE_DESC,
   ROLE_LABEL,
-} from "../../../Utils/displayUtils.js";
+} from "../../../utils/displayUtils.js";
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
 import { UseAvatar } from "../../Hooks/useAvatar.jsx";
@@ -27,8 +27,8 @@ import {
 } from "../../../apis/resourceApi.js";
 import { useAuth } from "../../Contexts/AuthContext.jsx";
 import ConfirmationModal from "./ConfirmationModal.jsx";
-import { getResourceType } from "../../../Utils/getResourceType.js";
-import { updateItemState } from "../../../Utils/updateItemState.js";
+import { getResourceType } from "../../../utils/getResourceType.js";
+import { updateItemState } from "../../../utils/updateItemState.js";
 import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";

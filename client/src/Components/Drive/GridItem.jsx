@@ -2,9 +2,9 @@ import { useState } from "react";
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
-import { getFileType } from "../../../Utils/displayUtils";
-import { getColor } from "../../../Utils/getProfileColor";
-import { formatDate } from "../../../Utils/formatDate";
+import { getFileType } from "../../../utils/displayUtils";
+import { getColor } from "../../../utils/getProfileColor";
+import { formatDate } from "../../../utils/formatDate";
 import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
 

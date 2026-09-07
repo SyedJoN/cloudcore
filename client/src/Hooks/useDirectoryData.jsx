@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { getDirectory } from "../../apis/directoryApi";
 import { useGDrive } from "../Contexts";
-import { ROUTE_CONFIG } from "../../Utils/routeConfig";
+import { ROUTE_CONFIG } from "../../utils/routeConfig";
 
 const isRootName = (n) => (n ?? "").startsWith("root");
 

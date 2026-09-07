@@ -21,9 +21,9 @@ import {
   ImageViewer,
 } from "../Viewers";
 
-import getCategory from "../../../Utils/getFileCategory";
+import getCategory from "../../../utils/getFileCategory";
 import { useAuth, useToast } from "../../Contexts";
-import getExt from "../../../Utils/getExtension";
+import getExt from "../../../utils/getExtension";
 
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";

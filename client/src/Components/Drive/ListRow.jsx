@@ -1,8 +1,8 @@
 import { IconFolder } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
-import { getFileType } from "../../../Utils/displayUtils";
-import { formatDate } from "../../../Utils/formatDate";
-import { formatSize } from "../../../Utils/formatHelpers";
+import { getFileType } from "../../../utils/displayUtils";
+import { formatDate } from "../../../utils/formatDate";
+import { formatSize } from "../../../utils/formatHelpers";
 import { useAuth, useGDrive } from "../../Contexts";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";

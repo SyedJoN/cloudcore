@@ -39,8 +39,8 @@ import { fetchPortalUrl } from "../../apis/subscriptionApi";
 import { useDirectoryData } from "../Hooks/useDirectoryData";
 import { useUploadQueue } from "../Hooks/useUploadQueue";
 import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu";
-import { getResourceType } from "../../Utils/getResourceType";
-import { DRIVE_ROLES, getFileType } from "../../Utils/displayUtils";
+import { getResourceType } from "../../utils/getResourceType";
+import { DRIVE_ROLES, getFileType } from "../../utils/displayUtils";
 import {
   clearPendingDriveFile,
   getPendingDriveFile,
@@ -50,7 +50,7 @@ import RecentView from "../Components/Drive/Recent/RecentView";
 
 import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { searchUsers } from "../../apis/userApi";
-import { updateSharedAccess } from "../../Utils/shareRoleAccess";
+import { updateSharedAccess } from "../../utils/shareRoleAccess";
 import DownloadTray from "../Components/Drive/DownloadTray";
 import { useFolderUploadQueue } from "../Hooks/useFolderUploadQueue";
 import { addDirectory } from "../../apis/directoryApi";

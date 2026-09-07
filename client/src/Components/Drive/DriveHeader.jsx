@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { googleLogout } from "@react-oauth/google";
-import { getColor } from "../../../Utils/getProfileColor.js";
+import { getColor } from "../../../utils/getProfileColor.js";
 import {
   IconDrive,
   IconSearch,

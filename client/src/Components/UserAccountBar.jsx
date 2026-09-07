@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
-import { getColor } from "../../Utils/getProfileColor";
+import { getColor } from "../../utils/getProfileColor";
 import { IconLogin, IconLogout, IconUsers } from "./Icons/Icons";
 import { HardDrive, Package, Users, Diamond, DiamondPlus } from "lucide-react";
 import { fetchPortalUrl } from "../../apis/subscriptionApi";

@@ -7,7 +7,7 @@ import {
   FaSignOutAlt,
   FaSignInAlt,
 } from "react-icons/fa";
-import { getColor } from "../../../Utils/getProfileColor.js";
+import { getColor } from "../../../utils/getProfileColor.js";
 import GoogleDriveBtn from "../ThirdPartyButtons/GoogleDrive.jsx";
 import { useAuth } from "../../Contexts/AuthContext.jsx";
 

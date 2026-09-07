@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { IconGrid, IconList, IconInfo } from "../Icons/Icons";
 import { useAuth } from "../../Contexts/AuthContext";
-import { getRouteConfig } from "../../../Utils/routeConfig"; 
+import { getRouteConfig } from "../../../utils/routeConfig"; 
 
 export default function DriveToolbar({
   dirContext,

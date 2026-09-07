@@ -1,5 +1,5 @@
 // components/DetailsSidebar.jsx
-import { formatSize } from "../../../Utils/formatHelpers";
+import { formatSize } from "../../../utils/formatHelpers";
 import { useAuth } from "../../Contexts";
 import FilePreview from "../File/FilePreview";
 import { IconClose, IconFolder, IconShare } from "../Icons/Icons";
