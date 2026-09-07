@@ -223,6 +223,7 @@ export default function ShareModal({
 
   async function handleSend(e) {
     e.preventDefault();
+    console.log('asd')
 
     if (!selectedUsers.length) return;
 

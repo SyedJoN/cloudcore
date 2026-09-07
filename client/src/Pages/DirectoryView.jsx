@@ -1113,6 +1113,47 @@ export default function DirectoryView({ route }) {
         myRole = incomingRole?.role;
         incomingPublicRole = DRIVE_ROLES[role] || role;
 
+        if (
+          ((incomingPublicRole === "reader" || access === "restricted") &&
+            myRole === "reader" &&
+            isMe) ||
+          ((incomingPublicRole === "reader" ||
+            incomingPublicRole === "writer") &&
+            myRole === "remove" &&
+            isMe)
+        ) {
+          const confirmed = await showConfirmModal(
+            "You will not be able to share. Are you sure?",
+          );
+          if (!confirmed) {
+            const currentPublicRole = publicPermission?.role;
+            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
+            setLinkRole(currentPublicRole || "reader");
+            setPeopleWithAccess(prevPermissions);
+            return;
+          }
+        }
+        if (
+          access === "restricted" &&
+          (myRole === undefined || myRole === "remove") &&
+          isMe
+        ) {
+          const confirmed = await showConfirmModal(
+            "You will no longer have access. Are you sure?",
+          );
+          if (!confirmed) {
+            const currentPublicRole = prevPermissions.find(
+              (p) => p.type === "anyone",
+            )?.role;
+
+            setLinkAccess("anyone");
+            setLinkRole(currentPublicRole);
+            setPeopleWithAccess(prevPermissions);
+
+            return;
+          }
+        }
+
         let confirmCascade = false;
 
         const dryRun = await toggleFilePublic(itemId, userRole, access, type);
@@ -1157,48 +1198,6 @@ export default function DirectoryView({ route }) {
           confirmCascade = true;
         }
 
-        if (
-          ((incomingPublicRole === "reader" || access === "restricted") &&
-            myRole === "reader" &&
-            isMe) ||
-          ((incomingPublicRole === "reader" ||
-            incomingPublicRole === "writer") &&
-            myRole === "remove" &&
-            isMe)
-        ) {
-          const confirmed = await showConfirmModal(
-            "You will not be able to share. Are you sure?",
-          );
-          if (!confirmed) {
-            const currentPublicRole = publicPermission?.role;
-            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
-            setLinkRole(currentPublicRole || "reader");
-            setPeopleWithAccess(prevPermissions);
-            return;
-          }
-        }
-        if (
-          access === "restricted" &&
-          (myRole === undefined || myRole === "remove") &&
-          isMe
-        ) {
-          const confirmed = await showConfirmModal(
-            "You will no longer have access. Are you sure?",
-          );
-          if (!confirmed) {
-            const currentPublicRole = prevPermissions.find(
-              (p) => p.type === "anyone",
-            )?.role;
-
-            setLinkAccess("anyone");
-            setLinkRole(currentPublicRole);
-            setPeopleWithAccess(prevPermissions);
-
-            return;
-          }
-        }
-
-      
         if (confirmCascade) {
           await toggleFilePublic(itemId, userRole, access, type, true);
         }
@@ -1393,8 +1392,12 @@ export default function DirectoryView({ route }) {
   };
 
   const handleSharedRoleUpdate = async (item, type, message) => {
+    console.log("hiasd");
     setIsShareLoading(true);
     const itemId = item._id ?? item.id;
+    let confirmCascade = false;
+
+    let updatedParentId;
 
     try {
       const allPermissions = item?.permissions ?? [];
@@ -1442,9 +1445,31 @@ export default function DirectoryView({ route }) {
       console.log("isMe", isMe);
       const publicRole = linkRole;
 
-      let confirmCascade = false;
+      if (
+        publicRole &&
+        publicRole === "reader" &&
+        myRole === "reader" &&
+        isMe
+      ) {
+        const confirmed = await showConfirmModal(
+          "You will not be able to share. Are you sure?",
+        );
 
-      let updatedParentId;
+        if (!confirmed) {
+          setPeopleWithAccess(prevPermissions);
+          return;
+        }
+      }
+
+      if (linkAccess === "restricted" && myRole === "remove" && isMe) {
+        const confirmed = await showConfirmModal(
+          "You will no longer have access. Are you sure?",
+        );
+        if (!confirmed) {
+          setPeopleWithAccess(prevPermissions);
+          return;
+        }
+      }
 
       const dryRun = await updateSharedAccess({
         item,
@@ -1511,30 +1536,6 @@ export default function DirectoryView({ route }) {
         }
 
         confirmCascade = true;
-      }
-
-      if (
-        publicRole &&
-        publicRole === "reader" &&
-        myRole === "reader" &&
-        isMe
-      ) {
-        const confirmed = await showConfirmModal(
-          "You will not be able to share. Are you sure?",
-        );
-        if (!confirmed) {
-          setPeopleWithAccess(prevPermissions);
-          return;
-        }
-      }
-      if (linkAccess === "restricted" && myRole === "remove" && isMe) {
-        const confirmed = await showConfirmModal(
-          "You will no longer have access. Are you sure?",
-        );
-        if (!confirmed) {
-          setPeopleWithAccess(prevPermissions);
-          return;
-        }
       }
       if (confirmCascade) {
         const result = await updateSharedAccess({

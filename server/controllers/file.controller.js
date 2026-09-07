@@ -1644,35 +1644,30 @@ export const giveAccessById = async (req, res, next) => {
     }
 
     // apply the changes
-    // apply the changes
+const targetObject = getFgaObject(type, id);
+
 await Promise.all(
   usersWithSource.map(async ({ user, source }) => {
-    const targetObject = source ? source.object : getFgaObject(type, id);
-    const previousRole = source?.role || null;
     const fgaUser = getFgaObject("user", user.id);
 
-    if (previousRole === user.role) return;
+    if (source?.isCurrentObject) {
+      const existing = await fgaClient.read({ user: fgaUser, object: targetObject });
+      const relevant = (existing?.tuples || []).filter((t) =>
+        ["reader", "writer", "shared_reader", "shared_writer"].includes(t.key?.relation),
+      );
 
-    if (previousRole && ["reader", "writer"].includes(previousRole)) {
-      const previousSharedRelation =
-        previousRole === "reader" ? "shared_reader" : "shared_writer";
-
-      await Promise.all([
-        fgaClient.write({
-          deletes: [
-            { user: fgaUser, relation: previousRole, object: targetObject },
-          ],
-        }),
-        fgaClient.write({
-          deletes: [
-            { user: fgaUser, relation: previousSharedRelation, object: targetObject },
-          ],
-        }),
-      ]);
+      if (relevant.length) {
+        await Promise.all(
+          relevant.map((t) =>
+            fgaClient.write({
+              deletes: [{ user: fgaUser, relation: t.key.relation, object: targetObject }],
+            }),
+          ),
+        );
+      }
     }
 
-    const newSharedRelation =
-      user.role === "reader" ? "shared_reader" : "shared_writer";
+    const newSharedRelation = user.role === "reader" ? "shared_reader" : "shared_writer";
 
     await Promise.all([
       fgaClient.write(
@@ -1692,9 +1687,7 @@ await Promise.all(
         { upsert: true },
       );
 
-      const userData = await User.findById(user.id)
-        .select("name email avatar")
-        .lean();
+      const userData = await User.findById(user.id).select("name email avatar").lean();
 
       if (userData) {
         await sendAccessEmail({
@@ -1710,13 +1703,12 @@ await Promise.all(
         });
       }
     }
-  })
-    );
-
+  }),
+);
     const finalResult = await resolveRole(
       item,
       type,
-      item?.userId,
+      item?.userId._id,
       item.parentDirId,
       true,
     );
