@@ -3,7 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 const client = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  redirectUri: "http://localhost:4000/auth/google-drive/callback"
+  redirectUri: `${process.env.VITE_BACKEND_BASE_URL}/auth/google-drive/callback`
 });
 
 export async function fetchUserUsingIdToken(idToken) {

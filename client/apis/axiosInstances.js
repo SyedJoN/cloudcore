@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = 'http://localhost:4000'
+const BASE_URL = process.env.VITE_BACKEND_BASE_URL
 
 export const axiosWithCreds = axios.create({
     baseURL: BASE_URL,

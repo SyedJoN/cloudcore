@@ -4,7 +4,7 @@ function GithubLoginBtn({ setServerError }) {
 
   const params = new URLSearchParams({
     client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
-    redirect_uri: "http://localhost:4000/auth/github/callback",
+    redirect_uri: `${process.env.VITE_BACKEND_BASE_URL}/auth/github/callback`,
     scope: "read:user user:email",
   });
 

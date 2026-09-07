@@ -66,7 +66,7 @@ export default function Header() {
             </a>
             <a
               href="/register"
-              className="text-sm font-medium text-white bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-4 py-2 rounded-lg shadow-[0_0_0_1px_rgba(56,189,248,0.3)] cc-focus"
+              className="text-sm font-medium text-white bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-4 py-2 rounded-lg shadow-[0_0_0_1px_rgba(56,189,248,0.3)] cc-focus"
             >
               Get started
             </a>
@@ -96,12 +96,12 @@ export default function Header() {
             </a>
           ))}
           <div className="flex flex-col gap-3 pt-2 border-t border-white/10">
-            <a href="#signin" className="text-sm text-[#c3d2ef]">
+            <a href="/login" className="text-sm text-[#c3d2ef]">
               Sign in
             </a>
             <a
-              href="#pricing"
-              className="text-sm font-medium text-center text-white bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] px-4 py-2 rounded-lg"
+              href="/register"
+              className="text-sm font-medium text-center text-white bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] px-4 py-2 rounded-lg"
             >
               Get started
             </a>

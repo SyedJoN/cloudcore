@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useState } from "react";
 
-const BASE_URL = "http://localhost:4000";
+const BASE_URL = process.env.VITE_BACKEND_BASE_URL;
 
 // ── Colour + icon per file type ───────────────────────────────────────────────
 const TYPE_META = {
