@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import GoogleLoginBtn from "../Components/ThirdPartyButtons/GoogleLogin";
 import GithubLoginBtn from "../Components/ThirdPartyButtons/GithubLogin";
 import { axiosWithCreds, axiosWithoutCreds } from "../../apis/axiosInstances";
-import { OTPSchema, registerSchema } from "../../Validators/authSchema";
+import { OTPSchema, registerSchema } from "../../validators/authSchema";
 import { registerUser, sendOtp, verifyOtp } from "../../apis/authApi";
 
 const Register = () => {
