@@ -33,8 +33,6 @@ import {
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
 
-await connectDB();
-
 const app = express();
 const PORT = config.port || 4000;
 app.use(
@@ -49,7 +47,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "frame-ancestors": ["'self'", "http://localhost:5173"],
+        "frame-ancestors": ["'self'", process.env.CLIENT_URL],
       },
     },
   }),
@@ -86,26 +84,26 @@ app.use((req, res, next) => {
 
 app.use(
   "/file",
-  // rateLimitMiddleware(LIMITERS.readFileOps),
+  rateLimitMiddleware(LIMITERS.readFileOps),
   optionalAuth,
   readFileRoutes,
 );
 app.use(
   "/file",
-  // rateLimitMiddleware(LIMITERS.writeFileOps),
+  rateLimitMiddleware(LIMITERS.writeFileOps),
   optionalAuth,
   writeFileRoutes,
 );
 
 app.use(
   "/directory",
-  // rateLimitMiddleware(LIMITERS.readDirOps),
+  rateLimitMiddleware(LIMITERS.readDirOps),
   checkAuth,
   readDirRoutes,
 );
 app.use(
   "/directory",
-  // rateLimitMiddleware(LIMITERS.writeDirOps),
+  rateLimitMiddleware(LIMITERS.writeDirOps),
   checkAuth,
   writeDirRoutes,
 );
@@ -120,7 +118,11 @@ app.patch("/item/:type/:id/toggle-star", checkAuth, toggleItemStar);
 app.post("/item/send-link", checkAuth, sendLink);
 app.post("/item/sendMail/transfer-ownership", checkAuth, sendOwnershipMail);
 app.post("/item/cancel-pending-ownership", checkAuth, cancelOwnershipMail);
-app.get("/item/ownership-transfer/:transferId/:action", checkAuth, ownershipAction);
+app.get(
+  "/item/ownership-transfer/:transferId/:action",
+  checkAuth,
+  ownershipAction,
+);
 app.post("/item/copy", checkAuth, copyItem);
 app.post("/item/move", checkAuth, moveItem);
 
@@ -133,3 +135,9 @@ startSubscriptionCron();
 app.listen(PORT, () => {
   console.log(`Server Started on PORT ${PORT}`);
 });
+try {
+  await connectDB();
+  console.log("MongoDB connected");
+} catch (error) {
+  console.error("MongoDB connection failed:", error);
+}
