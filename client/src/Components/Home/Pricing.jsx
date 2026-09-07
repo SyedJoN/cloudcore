@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Cloud, Zap, Check, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser } from "../../../apis/userApi";
 import { useToast } from "../../Contexts/ToastContext";
 import { createSubscription } from "../../../apis/subscriptionApi";
 
@@ -69,13 +68,11 @@ export default function Pricing() {
     },
   ];
 
-  // Yearly billing = 10x monthly rate, i.e. 2 months free.
   const YEARLY_MULTIPLIER = 10;
 
   async function handlePlanClick(plan) {
     if (plan.monthly === 0) {
-      window.open("/", "_blank");
-      return;
+       navigate("/")
     }
     try {
       const data = await createSubscription({ priceId: plan.priceId });
