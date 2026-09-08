@@ -786,7 +786,7 @@ export const getRecentFiles = async (req, res, next) => {
     const sharedFileIds = await listSharedObjects("file", userId);
 
     const [ownFiles, sharedFiles] = await Promise.all([
-      File.find({ userId, isDeleted: false })
+      File.find({ userId, isDeleted: false, isUploading: false })
         .populate("userId", "name email avatar")
         .populate("path", "name")
         .lean(),
