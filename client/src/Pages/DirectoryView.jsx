@@ -695,10 +695,10 @@ export default function DirectoryView({ route }) {
   async function handleCreateDirectory(e) {
     e.preventDefault();
     showError("");
+    setIsActionLoading(true);
 
     const type = isGoogleDriveRoute ? "google" : "local";
     try {
-      setIsActionLoading(true);
       const response = await addDirectory(dirId, newDirname, type);
       setShowCreateDir(false);
       setNewDirname("Untitled folder");
@@ -1579,7 +1579,6 @@ export default function DirectoryView({ route }) {
         ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
       ].filter(Boolean);
 
-
       const update = (list) =>
         linkAccess === "restricted" && myRole === "remove" && isMe
           ? list.filter((resource) => {
@@ -1777,7 +1776,6 @@ export default function DirectoryView({ route }) {
     selectedItems.size === 1
       ? combinedItems.find((i) => (i.id ?? i._id) === [...selectedItems][0])
       : null;
-
 
   let CREATE_MENU_WIDTH = 180;
   const handleCreateNewMenu = useCallback((e) => {
