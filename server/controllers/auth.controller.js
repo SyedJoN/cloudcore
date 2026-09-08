@@ -428,7 +428,6 @@ export const verifyOtp = async (req, res, next) => {
 };
 
 export const googleAuth = async (req, res, next) => {
-  console.log("Google auth route hit");
   const session = await mongoose.startSession();
 
   try {

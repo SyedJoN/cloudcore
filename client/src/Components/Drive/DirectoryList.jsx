@@ -18,7 +18,7 @@ function DirectoryList({
   return (
     <div className="directory-list">
       {items.map((item) => {
-        console.log({item})
+
         const uploadProgress = progressMap[item._id] || 0;
         return (
           <DirectoryItem

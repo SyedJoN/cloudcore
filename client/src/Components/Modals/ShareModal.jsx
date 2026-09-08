@@ -223,7 +223,6 @@ export default function ShareModal({
 
   async function handleSend(e) {
     e.preventDefault();
-    console.log('asd')
 
     if (!selectedUsers.length) return;
 
@@ -264,7 +263,6 @@ export default function ShareModal({
 
       const currentPermissions = item?.permissions ?? [];
 
-      console.log("updatedUser", updatedUsers);
       const updatedPermissions = currentPermissions.map((permission) => {
         const updatedUser = updatedUsers?.find(
           (user) => String(user.id) === String(permission.id),

@@ -81,7 +81,6 @@ export const subscriptionWebhook = async (req, res, next) => {
 
       case "customer.subscription.updated": {
         const subscription = event.data.object;
-        console.log("status", subscription.status);
         if (
           subscription.status === "active" ||
           subscription.status === "trialing"

@@ -6,7 +6,6 @@ import { createSubscription } from "../../../apis/subscriptionApi";
 import { useRef } from "react";
 
 function GoogleLoginBtn({ setServerError, priceId }) {
-  console.log("priceId", priceId);
   const navigate = useNavigate();
   const { setLoggedIn } = useAuth();
   const inFlight = useRef(false);
@@ -47,11 +46,9 @@ function GoogleLoginBtn({ setServerError, priceId }) {
         } finally {
           inFlight.current = false;
         }
-        console.log("credentialResponse", credentialResponse);
       }}
       onError={(err) => {
         setServerError(err || "Error while logging google");
-        console.log("Login Failed");
       }}
       useOneTap
       width={346}

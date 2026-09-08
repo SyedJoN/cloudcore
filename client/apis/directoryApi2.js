@@ -6,7 +6,6 @@ export async function getRootDirectory() {
   return response;
 }
 export async function getDirectory(dirId) {
-  console.log('dirId', dirId)
   const response = await axiosWithCreds.get(`/directory/${dirId || ""}`);
   return response;
 }

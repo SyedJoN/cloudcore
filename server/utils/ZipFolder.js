@@ -14,18 +14,17 @@ export const FOLDER_MIME =
 export const GOOGLE_PREFIX =
   "application/vnd.google-apps.";
 
-// =====================================================
+
 // CREATE ZIP
-// =====================================================
 
 export const createGoogleDriveZip = async (job) => {
   const drive = getDriveClient(job.accessToken);
 
   let cancelled = false;
 
-  // =================================================
+  
   // TEMP DIRECTORY
-  // =================================================
+  
 
   const tempDir = fs.mkdtempSync(
     path.join(
@@ -47,17 +46,17 @@ export const createGoogleDriveZip = async (job) => {
     tempZipPath,
   );
 
-  // =================================================
+  
   // OUTPUT
-  // =================================================
+  
 
   const output = fs.createWriteStream(
     tempZipPath,
   );
 
-  // =================================================
+  
   // ARCHIVE
-  // =================================================
+  
 
   const archive = new ZipArchive({
     zlib: {
@@ -67,9 +66,9 @@ export const createGoogleDriveZip = async (job) => {
 
   archive.pipe(output);
 
-  // =================================================
+  
   // ERROR HANDLING
-  // =================================================
+  
 
   archive.on("error", (error) => {
     if (!cancelled) {
@@ -89,9 +88,9 @@ export const createGoogleDriveZip = async (job) => {
     }
   });
 
-  // =================================================
+  
   // CANCELLATION
-  // =================================================
+  
 
   const checkCancelled = () => {
     if (job.cancelled) {
@@ -102,9 +101,9 @@ export const createGoogleDriveZip = async (job) => {
     return false;
   };
 
-  // =================================================
+  
   // GET ALL DOWNLOADABLE FILES
-  // =================================================
+  
 
   const files = [];
 
@@ -234,9 +233,9 @@ export const createGoogleDriveZip = async (job) => {
     );
   };
 
-  // =================================================
+  
   // COLLECT FILES
-  // =================================================
+  
 
   console.log(
     "Scanning folder...",
@@ -286,9 +285,9 @@ export const createGoogleDriveZip = async (job) => {
     return;
   }
 
-  // =================================================
+  
   // DOWNLOAD ONE FILE
-  // =================================================
+  
 
   const addFileToZip = async (
     file,
@@ -501,9 +500,7 @@ export const createGoogleDriveZip = async (job) => {
     );
   };
 
-  // =================================================
   // PROCESS CONCURRENTLY
-  // =================================================
 
   const CONCURRENCY = 5;
 
@@ -545,9 +542,9 @@ export const createGoogleDriveZip = async (job) => {
     }
   };
 
-  // =================================================
+  
   // START 5 WORKERS
-  // =================================================
+  
 
   console.log(
     `Starting ${CONCURRENCY} concurrent downloads...`,
@@ -567,9 +564,9 @@ export const createGoogleDriveZip = async (job) => {
     workers,
   );
 
-  // =================================================
+  
   // CANCELLED
-  // =================================================
+  
 
   if (checkCancelled()) {
     console.log(
@@ -587,9 +584,9 @@ export const createGoogleDriveZip = async (job) => {
     return;
   }
 
-  // =================================================
+  
   // FINALIZE
-  // =================================================
+  
 
   console.log(
     "All files added. Finalizing ZIP...",
@@ -670,9 +667,9 @@ export const createGoogleDriveZip = async (job) => {
     },
   );
 
-  // =================================================
+  
   // READY
-  // =================================================
+  
 
   if (checkCancelled()) {
     return;

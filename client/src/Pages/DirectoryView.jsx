@@ -246,9 +246,7 @@ export default function DirectoryView({ route }) {
       errorTimeoutRef.current = setTimeout(() => setError(""), 5000);
     }
   }
-  useEffect(() => {
-    console.log("item", shareItem);
-  }, [shareItem]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ownership = params.get("ownership");
@@ -386,9 +384,7 @@ export default function DirectoryView({ route }) {
     handleMainMouseMove,
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef });
-  useEffect(() => {
-    console.log("route", route);
-  }, [route]);
+
   useEffect(() => {
     if (!isStarredRoute) return;
     setIsStarred((prev) => {
@@ -525,7 +521,6 @@ export default function DirectoryView({ route }) {
 
   // Navigation
   function handleRowClick(itemId) {
-    console.log("true");
     setContextItem(null);
     handleSelect(itemId);
   }
@@ -1392,7 +1387,6 @@ export default function DirectoryView({ route }) {
   };
 
   const handleSharedRoleUpdate = async (item, type, message) => {
-    console.log("hiasd");
     setIsShareLoading(true);
     const itemId = item._id ?? item.id;
     let confirmCascade = false;
@@ -1435,14 +1429,12 @@ export default function DirectoryView({ route }) {
         (p) => p.emailAddress === userRole.emailAddress,
       );
 
-      console.log("incomingROle", incomingRole);
       const myRole = incomingRole?.role;
 
       const isMe = incomingRole
         ? (incomingRole?.emailAddress ?? incomingRole.emailAddress) ===
           user.email
         : false;
-      console.log("isMe", isMe);
       const publicRole = linkRole;
 
       if (
@@ -1577,19 +1569,17 @@ export default function DirectoryView({ route }) {
           return p;
         })
         .filter(Boolean);
-      console.log("updatedParentId", updatedParentId);
+
       const allIdsToBeMatched = [
         updatedParentId,
         itemId,
         ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
       ].filter(Boolean);
 
-      console.log("parentChildids", allIdsToBeMatched);
 
       const update = (list) =>
         linkAccess === "restricted" && myRole === "remove" && isMe
           ? list.filter((resource) => {
-              console.log("resource?.parentDirId", resource?.parentDirId);
               const resourceId = String(resource?.id ?? resource?._id);
               const parentDirId = String(
                 resource?.parentDirId ?? resource?.parents?.[0],
@@ -1601,10 +1591,6 @@ export default function DirectoryView({ route }) {
               );
             })
           : list.map((resource) => {
-              console.log({
-                allIdsToBeMatched,
-                resource,
-              });
               const resourceId = String(resource?._id ?? resource?.id);
               const parentDirId = String(
                 resource?.parentDirId ?? resource?.parents?.[0],

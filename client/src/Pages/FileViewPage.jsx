@@ -264,7 +264,6 @@ export default function FileViewPage({ route = null }) {
   const getFileById = async (fileId) => {
     try {
       const data = await getFileByMetaId(fileId);
-      console.log("filedata", data);
       setItem([data]);
     } catch (error) {
       setError(error.message || "Failed to load file");

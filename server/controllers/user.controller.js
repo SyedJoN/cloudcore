@@ -77,7 +77,6 @@ export const fetchUsers = async (req, res, next) => {
 
     return res.status(200).json({ users });
   } catch (error) {
-    console.log(error);
     next(error);
   }
 };
@@ -167,7 +166,6 @@ export const updateUser = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.log(error);
     next(error);
   }
 };
@@ -319,7 +317,6 @@ export const searchUsers = async (req, res, next) => {
     }
     return res.status(200).json({ users: allUsers });
   } catch (error) {
-    console.log(error);
     next(error);
   }
 };

@@ -33,7 +33,6 @@ function RoleDropdownContent({
     (action) =>
     (...args) => {
       action?.(...args);
-      console.log('hi')
       onClose();
     };
     

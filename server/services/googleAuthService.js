@@ -14,7 +14,6 @@ export async function fetchUserUsingIdToken(idToken) {
     });
     return loginTicket.getPayload();
   } catch (error) {
-    console.log(error);
     throw new Error("Failed to verify Google token");
   }
 }
