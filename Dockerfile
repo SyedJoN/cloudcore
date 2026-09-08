@@ -2,4 +2,4 @@ FROM openfga/openfga:latest
 
 EXPOSE 8080
 
-CMD ["run"]
+CMD ["sh", "-c", "openfga run --http-addr 0.0.0.0:${PORT}"]
