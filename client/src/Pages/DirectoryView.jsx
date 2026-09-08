@@ -80,11 +80,11 @@ export default function DirectoryView({ route }) {
 
   const grantUserId = useMemo(
     () => new URLSearchParams(location.search).get("grant"),
-    [],
+    [location.search],
   );
   const grantRole = useMemo(
     () => new URLSearchParams(location.search).get("role"),
-    [],
+    [location.search],
   );
 
   const isHomeRoute = route === "home" || params.get("usp") === "drive_link";
@@ -1789,9 +1789,7 @@ export default function DirectoryView({ route }) {
       ? combinedItems.find((i) => (i.id ?? i._id) === [...selectedItems][0])
       : null;
 
-  if (needsAccess) {
-    return <RequestAccess dirId={dirId} />;
-  }
+
   let CREATE_MENU_WIDTH = 180;
   const handleCreateNewMenu = useCallback((e) => {
     e.stopPropagation();
@@ -1817,6 +1815,10 @@ export default function DirectoryView({ route }) {
     setShowCreateMenu(true);
     setCreateMenuPos({ x, y: e.clientY });
   }, []);
+
+  if (needsAccess) {
+    return <RequestAccess dirId={dirId} />;
+  }
 
   return (
     <div className="directory-view">
