@@ -1,5 +1,5 @@
 FROM openfga/openfga:latest
 
-EXPOSE 8080
+ENTRYPOINT ["openfga"]
 
-CMD ["run"]
+CMD ["run", "--http-addr", "0.0.0.0:10000"]
