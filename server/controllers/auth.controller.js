@@ -711,9 +711,9 @@ export const googleDrive = async (req, res) => {
     maxAge: 60 * 60 * 1000,
   });
   if (dirId) {
-    res.redirect(`http://${process.env.CLIENT_URL}/directory/${dirId}`);
+    res.redirect(`${process.env.CLIENT_URL}/directory/${dirId}`);
   } else {
-    res.redirect(`http://${process.env.CLIENT_URL}/google-drive`);
+    res.redirect(`${process.env.CLIENT_URL}/google-drive`);
   }
 };
 
