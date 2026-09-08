@@ -5,6 +5,7 @@ function CreateDirectoryModal({
   setNewDirname,
   onClose,
   onCreateDirectory,
+  isDirectoryCreationLoading,
 }) {
   const inputRef = useRef(null);
 
@@ -50,13 +51,18 @@ function CreateDirectoryModal({
           <div className="gd-modal-actions">
             <button
               type="button"
-              className="gd-btn gd-btn-text"
+              className={`gd-btn gd-btn-text ${isDirectoryCreationLoading ? "disabled" : ""}`}
               onClick={onClose}
+              disabled={isDirectoryCreationLoading}
             >
               Cancel
             </button>
-            <button type="submit" className="gd-btn gd-btn-primary">
-              Create
+            <button
+              type="submit"
+              className={`gd-btn gd-btn-text ${isDirectoryCreationLoading ? "disabled" : ""}`}
+              disabled={isDirectoryCreationLoading}
+            >
+              {isDirectoryCreationLoading ? "Creating..." : "Create"}
             </button>
           </div>
         </form>
