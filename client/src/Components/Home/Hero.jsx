@@ -5,7 +5,7 @@ export default function Hero() {
   return (
     <section id="top" className="relative overflow-hidden">
       <div className="absolute inset-0 cc-grain opacity-40" />
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[700px] rounded-full bg-[#2f5cf5] opacity-20 blur-[140px]" />
+      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-175 h-175 rounded-full bg-[#2f5cf5] opacity-20 blur-[140px]" />
 
       <div className="relative max-w-6xl mx-auto px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-2 gap-14 items-center">
         <div>
@@ -27,7 +27,7 @@ export default function Hero() {
           <div className="flex flex-wrap items-center gap-4">
             <a
               href="/login"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-5 py-3 rounded-lg cc-focus"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-5 py-3 rounded-lg cc-focus"
             >
               Start free with 2GB
               <ChevronRight size={16} />

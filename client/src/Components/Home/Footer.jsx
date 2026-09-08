@@ -36,7 +36,7 @@ export default function Footer() {
               href="#top"
               className="flex items-center gap-2 mb-4 cc-focus rounded-lg w-fit"
             >
-              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#38bdf8] to-[#2f5cf5]">
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
                 <Cloud size={18} className="text-white" strokeWidth={2.2} />
               </span>
               <span className="cc-display text-lg font-semibold text-white">

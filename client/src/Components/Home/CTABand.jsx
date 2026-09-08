@@ -12,7 +12,7 @@ export default function CTABand() {
         </p>
         <a
           href="#pricing"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-6 py-3 rounded-lg cc-focus"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-6 py-3 rounded-lg cc-focus"
         >
           Get started free
           <ChevronRight size={16} />
