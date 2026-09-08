@@ -26,7 +26,7 @@ export default function Hero() {
 
           <div className="flex flex-wrap items-center gap-4">
             <a
-              href="#pricing"
+              href="/login"
               className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-5 py-3 rounded-lg cc-focus"
             >
               Start free with 2GB
