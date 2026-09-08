@@ -112,7 +112,7 @@ export default function DirectoryView({ route }) {
   const [shareItem, setShareItem] = useState(null);
   const [viewItem, setViewItem] = useState(null);
   const [moveItem, setMoveItem] = useState(null);
-  const [isRenameLoading, setIsRenameLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [isShareLoading, setIsShareLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
@@ -698,12 +698,15 @@ export default function DirectoryView({ route }) {
 
     const type = isGoogleDriveRoute ? "google" : "local";
     try {
+      setIsActionLoading(true);
       const response = await addDirectory(dirId, newDirname, type);
       setShowCreateDir(false);
       setNewDirname("Untitled folder");
       setDirectoriesList((prev) => [response.data, ...prev]);
     } catch (err) {
       showError(err.message);
+    } finally {
+      setIsActionLoading(false);
     }
   }
 
@@ -719,7 +722,7 @@ export default function DirectoryView({ route }) {
     e.preventDefault();
     showError("");
     try {
-      setIsRenameLoading(true);
+      setIsActionLoading(true);
       const url =
         renameType === "file" || renameType === "google"
           ? `/file/${renameId}?type=${renameType}`
@@ -760,7 +763,7 @@ export default function DirectoryView({ route }) {
     } catch (err) {
       showError(err.message);
     } finally {
-      setIsRenameLoading(false);
+      setIsActionLoading(false);
     }
   }
   async function handleToggleStar(items) {
@@ -2085,14 +2088,14 @@ export default function DirectoryView({ route }) {
           value={newDirname}
           setNewDirname={setNewDirname}
           onCreateDirectory={handleCreateDirectory}
-          isDirectoryCreationLoading={isRenameLoading}
+          isDirectoryCreationLoading={isActionLoading}
           onClose={() => setShowCreateDir(false)}
         />
       )}
 
       {showRename && (
         <RenameModal
-          isRenameLoading={isRenameLoading}
+          isRenameLoading={isActionLoading}
           renameValue={renameValue}
           setRenameValue={setRenameValue}
           onRenameSubmit={handleRenameSubmit}
