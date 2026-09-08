@@ -1935,7 +1935,8 @@ export default function DirectoryView({ route }) {
 
             {error && (
               <div className="gd-error-banner">
-                <IconInfo size={16} /> {error}
+                <IconInfo size={16} />{error?.message || String(error)}
+
               </div>
             )}
             {moveItem && (
