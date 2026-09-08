@@ -1,3 +1,3 @@
 FROM openfga/openfga:latest
 
-CMD ["run"]
+CMD ["migrate"]
