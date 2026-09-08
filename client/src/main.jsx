@@ -10,9 +10,7 @@ if (!clientId) {
   throw new Error("Missing Google Client ID in env");
 }
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
     <GoogleOAuthProvider clientId={clientId}>
     <App />
     </GoogleOAuthProvider>
-  </StrictMode>,
 )
