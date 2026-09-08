@@ -108,7 +108,6 @@ export function useDirectoryData({
           navigate("/login");
         } else {
           console.log(err);
-          console.error(err);
           navigate("/");
         }
       } finally {

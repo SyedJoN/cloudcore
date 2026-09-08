@@ -2085,6 +2085,7 @@ export default function DirectoryView({ route }) {
           value={newDirname}
           setNewDirname={setNewDirname}
           onCreateDirectory={handleCreateDirectory}
+          isDirectoryCreationLoading={isRenameLoading}
           onClose={() => setShowCreateDir(false)}
         />
       )}
