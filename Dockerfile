@@ -1,5 +1,5 @@
 FROM openfga/openfga:latest
 
-ENTRYPOINT ["openfga"]
+EXPOSE 10000
 
 CMD ["run", "--http-addr", "0.0.0.0:10000"]
