@@ -142,5 +142,3 @@ try {
   console.error("MongoDB connection failed:", error);
 }
 
-
-console.log('test')
