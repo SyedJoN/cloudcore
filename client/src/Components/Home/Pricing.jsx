@@ -113,7 +113,7 @@ export default function Pricing() {
             aria-checked={yearly}
             aria-label="Toggle yearly billing"
             onClick={() => setYearly((y) => !y)}
-            className="cc-focus relative w-12 h-6 rounded-full bg-[#152452] border border-[#38bdf8]/30 transition-colors"
+            className="cc-focus relative w-12 h-6 rounded-full bg-[#152452] border border-[#38bdf8]/30 transition-colors cursor-pointer"
           >
             <span
               className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-gradient-to-br from-[#38bdf8] to-[#2f5cf5] transition-transform ${

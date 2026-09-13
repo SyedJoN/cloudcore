@@ -28,7 +28,7 @@ export default function FAQ() {
           {faqs.map((f, i) => (
             <div key={f.q} className="cc-card rounded-xl overflow-hidden">
               <button
-                className="w-full flex items-center justify-between text-left px-5 py-4 cc-focus"
+                className="w-full flex items-center justify-between text-left px-5 py-4 cc-focus cursor-pointer"
                 onClick={() => setOpenIdx(openIdx === i ? -1 : i)}
                 aria-expanded={openIdx === i}
               >

@@ -110,7 +110,7 @@ app.use(
 
 app.use("/subscription", subscriptionRoutes);
 app.use("/user", checkAuth, validateDeletedUser, userRoutes);
-app.use("/auth", /*rateLimitMiddleware(LIMITERS.auth)*/ authRoutes);
+app.use("/auth", rateLimitMiddleware(LIMITERS.auth), authRoutes);
 app.get("/shared", checkAuth, getSharedWithMe);
 app.get("/starred", checkAuth, getStarredItems);
 app.get("/trash/{:id}", checkAuth, getTrashItems);
