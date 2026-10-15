@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { LockKeyhole, Share2, ShieldAlert, ShieldCheck } from "lucide-react";
 
 export default function SecurityBand() {
   const securityFeatures = [
