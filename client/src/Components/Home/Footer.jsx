@@ -1,12 +1,6 @@
-
-import {
-  Mail,
-  Globe,
-  ExternalLink,
-  ArrowUpRight,
-  Cloud,
-} from "lucide-react";
-
+import { Cloud } from "lucide-react";
+import { FaGithub, FaLinkedinIn } from "react-icons/fa";
+import { FiMail } from "react-icons/fi";
 export default function Footer() {
   const columns = [
     {
@@ -15,7 +9,7 @@ export default function Footer() {
     },
     {
       title: "Legal",
-      links: ["Privacy", "Terms", "Cookie", "Licenses"],
+      links: ["Privacy", "Terms", "Cookies", "Licenses"],
     },
   ];
 
@@ -40,11 +34,29 @@ export default function Footer() {
               your day takes them.
             </p>
             <div className="flex items-center gap-3">
-              {[Mail, Globe, ExternalLink, ArrowUpRight].map((Icon, i) => (
+              {[
+                {
+                  icon: FiMail,
+                  href: "mailto:muhammadjoncs16@gmail.com",
+                  label: "Email",
+                },
+                {
+                  icon: FaGithub,
+                  href: "https://github.com/SyedJoN",
+                  label: "GitHub",
+                },
+                {
+                  icon: FaLinkedinIn,
+                  href: "https://www.linkedin.com/in/syed-muhammad-jon",
+                  label: "LinkedIn",
+                },
+              ].map(({ icon: Icon, href, label }) => (
                 <a
-                  key={i}
-                  href="#social"
-                  aria-label="Social link"
+                  key={label}
+                  href={href}
+                  aria-label={label}
+                  target={label === "Email" ? undefined : "_blank"}
+                  rel={label === "Email" ? undefined : "noopener noreferrer"}
                   className="w-9 h-9 rounded-lg bg-[#0f1a3d] border border-white/10 flex items-center justify-center text-[#8fa3c8] hover:text-white hover:border-[#38bdf8]/50 transition-colors cc-focus"
                 >
                   <Icon size={15} />
@@ -62,7 +74,11 @@ export default function Footer() {
                 {col.links.map((l) => (
                   <li key={l}>
                     <a
-                     href={col.title === "Product" ? `#${l.toLowerCase()}` : `/${l.toLowerCase()}`}
+                      href={
+                        col.title === "Product"
+                          ? `#${l.toLowerCase()}`
+                          : `/${l.toLowerCase()}`
+                      }
                       className="text-sm text-[#a9bbdc] hover:text-white transition-colors cc-focus rounded"
                     >
                       {l}

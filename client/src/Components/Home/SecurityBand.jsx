@@ -1,4 +1,4 @@
-import { LockKeyhole, Share2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { LockKeyhole, Share2, ShieldAlert, ShieldCheck, FolderLock  } from "lucide-react";
 
 export default function SecurityBand() {
   const securityFeatures = [
@@ -23,6 +23,13 @@ export default function SecurityBand() {
         "Share files with others through CloudCore's file-sharing functionality.",
       label: "Easy Collaboration",
     },
+    {
+  icon: FolderLock,
+  title: "File Access Protection",
+  description:
+    "Protect files with authentication and authorization checks to prevent unauthorized access.",
+  label: "Access Control",
+},
   ];
 
   return (
