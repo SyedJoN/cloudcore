@@ -209,6 +209,11 @@ export const logoutUser = async (req, res, next) => {
       httpOnly: true,
       signed: true,
     });
+    res.clearCookie("drive_access_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+    });
     return res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     next(error);
@@ -237,6 +242,11 @@ export const logoutAll = async (req, res, next) => {
     res.clearCookie("sid", {
       httpOnly: true,
       signed: true,
+    });
+    res.clearCookie("drive_access_token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
     });
     return res
       .status(200)
