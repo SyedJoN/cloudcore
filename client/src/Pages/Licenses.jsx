@@ -3,7 +3,7 @@ import LegalLayout, { LEGAL_CONFIG as C } from "./LegalLayout";
 
 const MIT_TEXT = `MIT License
 
-Copyright (c) [year] [copyright holders]
+Copyright (c) 2026 Cloudcore
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,58 +41,94 @@ const sections = [
         table: {
           head: ["Package", "Used for", "License"],
           rows: [
-  // Frontend
-  ["React", "User interface", "MIT"],
-  ["React DOM", "Rendering React components in the browser", "MIT"],
-  ["React Router", "Page navigation and routing", "MIT"],
-  ["Tailwind CSS", "Styling", "MIT"],
-  ["Tailwind CSS Vite Plugin", "Tailwind CSS integration with Vite", "MIT"],
-  ["Zod", "Form and input validation", "MIT"],
-  ["Axios", "HTTP requests to our API", "MIT"],
-  ["Google Drive Picker React", "Google Drive file selection", "MIT"],
-  ["Heroicons React", "UI icons", "MIT"],
-  ["Google OAuth React", "Google sign-in and authentication", "MIT"],
-  ["Lucide React", "UI icons", "ISC"],
-  ["React Icons", "Icon library", "MIT"],
+            // Frontend
+            ["React", "User interface", "MIT"],
+            ["React DOM", "Rendering React components in the browser", "MIT"],
+            ["React Router", "Page navigation and routing", "MIT"],
+            ["Tailwind CSS", "Styling", "MIT"],
+            [
+              "Tailwind CSS Vite Plugin",
+              "Tailwind CSS integration with Vite",
+              "MIT",
+            ],
+            ["Zod", "Form and input validation", "MIT"],
+            ["Axios", "HTTP requests to our API", "MIT"],
+            ["Google Drive Picker React", "Google Drive file selection", "MIT"],
+            ["Heroicons React", "UI icons", "MIT"],
+            ["Google OAuth React", "Google sign-in and authentication", "MIT"],
+            ["Lucide React", "UI icons", "ISC"],
+            ["React Icons", "Icon library", "MIT"],
 
-  // Backend
-  ["AWS SDK for JavaScript. S3 Client", "Amazon S3 file storage operations", "Apache-2.0"],
-  ["AWS SDK S3 Request Presigner", "Generating presigned S3 URLs", "Apache-2.0"],
-  ["OpenFGA SDK", "Fine-grained authorization and access control", "Apache-2.0"],
-  ["Archiver", "Creating compressed archives", "MIT"],
-  ["Bcrypt", "Password hashing", "MIT"],
-  ["Cookie Parser", "Parsing HTTP cookies", "MIT"],
-  ["CORS", "Cross-origin resource sharing", "MIT"],
-  ["Dotenv", "Loading environment variables", "BSD-2-Clause"],
-  ["Express", "Backend web server and API framework", "MIT"],
-  ["Express Rate Limit", "Limiting repeated HTTP requests", "MIT"],
-  ["Google Auth Library", "Google authentication and OAuth", "Apache-2.0"],
-  ["Google APIs", "Integrating with Google APIs", "Apache-2.0"],
-  ["Helmet", "HTTP security headers", "MIT"],
-  ["ioredis", "Redis client", "MIT"],
-  ["Mime Types", "Mapping file extensions to MIME types", "MIT"],
-  ["Mongoose", "MongoDB object modeling", "MIT"],
-  ["Node Cron", "Scheduling recurring tasks", "ISC"],
-  ["Nodemailer", "Sending emails", "MIT"],
-  ["Rate Limiter Flexible", "Rate limiting and abuse prevention", "MIT"],
-  ["Redis", "Redis client", "MIT"],
-  ["Sanitize HTML", "Sanitizing HTML content", "MIT"],
-  ["Stripe", "Payment processing integration", "MIT"],
+            // Backend
+            [
+              "AWS SDK for JavaScript. S3 Client",
+              "Amazon S3 file storage operations",
+              "Apache-2.0",
+            ],
+            [
+              "AWS SDK S3 Request Presigner",
+              "Generating presigned S3 URLs",
+              "Apache-2.0",
+            ],
+            [
+              "OpenFGA SDK",
+              "Fine-grained authorization and access control",
+              "Apache-2.0",
+            ],
+            ["Archiver", "Creating compressed archives", "MIT"],
+            ["Bcrypt", "Password hashing", "MIT"],
+            ["Cookie Parser", "Parsing HTTP cookies", "MIT"],
+            ["CORS", "Cross-origin resource sharing", "MIT"],
+            ["Dotenv", "Loading environment variables", "BSD-2-Clause"],
+            ["Express", "Backend web server and API framework", "MIT"],
+            ["Express Rate Limit", "Limiting repeated HTTP requests", "MIT"],
+            [
+              "Google Auth Library",
+              "Google authentication and OAuth",
+              "Apache-2.0",
+            ],
+            ["Google APIs", "Integrating with Google APIs", "Apache-2.0"],
+            ["Helmet", "HTTP security headers", "MIT"],
+            ["ioredis", "Redis client", "MIT"],
+            ["Mime Types", "Mapping file extensions to MIME types", "MIT"],
+            ["Mongoose", "MongoDB object modeling", "MIT"],
+            ["Node Cron", "Scheduling recurring tasks", "ISC"],
+            ["Nodemailer", "Sending emails", "MIT"],
+            [
+              "Rate Limiter Flexible",
+              "Rate limiting and abuse prevention",
+              "MIT",
+            ],
+            ["Redis", "Redis client", "MIT"],
+            ["Sanitize HTML", "Sanitizing HTML content", "MIT"],
+            ["Stripe", "Payment processing integration", "MIT"],
 
-  // Development tools
-  ["ESLint", "JavaScript linting", "MIT"],
-  ["ESLint JS", "JavaScript linting configuration", "MIT"],
-  ["ESLint Plugin React", "React-specific linting rules", "MIT"],
-  ["ESLint Plugin React Hooks", "Linting React Hooks usage", "MIT"],
-  ["ESLint Plugin React Refresh", "React Fast Refresh linting rules", "MIT"],
-  ["Globals", "Global variable definitions for linting", "MIT"],
-  ["TypeScript React Types", "Type definitions for React", "MIT"],
-  ["TypeScript React DOM Types", "Type definitions for React DOM", "MIT"],
-  ["Vite", "Frontend development server and build tool", "MIT"],
-  ["Vite React Plugin", "React integration for Vite", "MIT"],
-  ["Prettier", "Code formatting", "MIT"],
-  ["License Checker", "Checking third-party dependency licenses", "BSD-3-Clause"]
-]
+            // Development tools
+            ["ESLint", "JavaScript linting", "MIT"],
+            ["ESLint JS", "JavaScript linting configuration", "MIT"],
+            ["ESLint Plugin React", "React-specific linting rules", "MIT"],
+            ["ESLint Plugin React Hooks", "Linting React Hooks usage", "MIT"],
+            [
+              "ESLint Plugin React Refresh",
+              "React Fast Refresh linting rules",
+              "MIT",
+            ],
+            ["Globals", "Global variable definitions for linting", "MIT"],
+            ["TypeScript React Types", "Type definitions for React", "MIT"],
+            [
+              "TypeScript React DOM Types",
+              "Type definitions for React DOM",
+              "MIT",
+            ],
+            ["Vite", "Frontend development server and build tool", "MIT"],
+            ["Vite React Plugin", "React integration for Vite", "MIT"],
+            ["Prettier", "Code formatting", "MIT"],
+            [
+              "License Checker",
+              "Checking third-party dependency licenses",
+              "BSD-3-Clause",
+            ],
+          ],
         },
       },
     ],
@@ -100,9 +136,10 @@ const sections = [
   {
     id: "fonts",
     title: "Fonts",
-    body: [
-      "Space Grotesk and Inter are open fonts licensed under the SIL Open Font License 1.1, and are served from Google Fonts.",
-    ],
+  body: [
+  "Space Grotesk and Inter are open-source fonts licensed under the SIL Open Font License 1.1 and served via Google Fonts.",
+  "Google Sans and Roboto are also used in the project and loaded via Google Fonts."
+]
   },
   {
     id: "mit-text",

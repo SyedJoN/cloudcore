@@ -11,15 +11,11 @@ export default function Footer() {
   const columns = [
     {
       title: "Product",
-      links: ["Features", "Pricing", "Security", "Changelog"],
-    },
-    {
-      title: "Company",
-      links: ["About", "Careers", "Blog", "Press"],
+      links: ["Features", "Pricing", "Security", "FAQ"],
     },
     {
       title: "Legal",
-      links: ["Privacy", "Terms", "Cookie policy", "Licenses"],
+      links: ["privacy", "terms", "cookie", "licenses"],
     },
   ];
 
@@ -66,7 +62,7 @@ export default function Footer() {
                 {col.links.map((l) => (
                   <li key={l}>
                     <a
-                      href="#"
+                     href={col.title === "Product" ? `#${l.toLowerCase()}` : `/${l.toLowerCase()}`}
                       className="text-sm text-[#a9bbdc] hover:text-white transition-colors cc-focus rounded"
                     >
                       {l}
