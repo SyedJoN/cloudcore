@@ -1005,7 +1005,7 @@ export default function DirectoryView({ route }) {
       let incomingPublicRole;
       let updatedParentId;
 
-      if isGoogleDriveRoute {
+      if (isGoogleDriveRoute) {
         if (restricted) {
           const dryRun = await revokeFileAccess(
             "google",
