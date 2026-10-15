@@ -1387,7 +1387,7 @@ export const toggleFilePublic = async (req, res, next) => {
 };
 export const giveAccessById = async (req, res, next) => {
   try {
-    const { usersArray, message, type, confirmCascade } = req.body;
+    const { usersArray, message, type, confirmCascade, notifyPeople} = req.body;
     const id = req.params.id;
 
     if (!Array.isArray(usersArray) || usersArray.length === 0) {
@@ -1511,7 +1511,7 @@ export const giveAccessById = async (req, res, next) => {
           const response = await drive.permissions.create({
             fileId: id,
             requestBody: { type: "user", role: user.role, emailAddress: email },
-            sendNotificationEmail: true,
+            sendNotificationEmail: notifyPeople,
             fields: "id,type,role,emailAddress,displayName",
           });
 
@@ -1733,7 +1733,7 @@ export const giveAccessById = async (req, res, next) => {
             .select("name email avatar")
             .lean();
 
-          if (userData) {
+          if (userData && notifyPeople) {
             await sendAccessEmail({
               toEmail: userData.email,
               toName: userData.name,
