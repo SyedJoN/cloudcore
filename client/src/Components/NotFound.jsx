@@ -7,7 +7,7 @@ const NotFound = () => {
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#050b1f] px-5 py-8 font-sans text-[#eaf2ff]">
       {/* ambient glow */}
-      <div className="pointer-events-none absolute left-1/2 -top-56 h-[640px] w-[640px] -translate-x-1/2 rounded-full bg-[#2f5cf5] opacity-20 blur-[130px]" />
+      <div className="pointer-events-none absolute left-1/2 -top-56 h-160 w-160 -translate-x-1/2 rounded-full bg-[#2f5cf5] opacity-20 blur-[130px]" />
       {/* dot grid */}
       <div
         className="pointer-events-none absolute inset-0 opacity-50"
@@ -20,7 +20,7 @@ const NotFound = () => {
 
       <div className="relative z-10 w-full max-w-md text-center">
         <Link to="/" className="inline-flex items-center gap-2 mb-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-gradient-to-br from-[#38bdf8] to-[#2f5cf5]">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
             <svg
               viewBox="0 0 24 24"
               width="16"
@@ -39,7 +39,7 @@ const NotFound = () => {
           </span>
         </Link>
 
-        <div className="mx-auto mt-2 mb-1 max-w-[300px]" aria-hidden="true">
+        <div className="mx-auto mt-2 mb-1 max-w-75" aria-hidden="true">
           <svg viewBox="0 0 400 300" className="h-auto w-full">
             <defs>
               <radialGradient id="nfGlow" cx="50%" cy="50%" r="50%">
@@ -106,7 +106,7 @@ const NotFound = () => {
           </svg>
         </div>
 
-        <p className="font-display my-1 bg-gradient-to-r from-[#38bdf8] to-[#3b6bf6] bg-clip-text text-6xl font-bold leading-none tracking-tight text-transparent sm:text-7xl">
+        <p className="font-display my-1 bg-linear-to-r from-[#38bdf8] to-[#3b6bf6] bg-clip-text text-6xl font-bold leading-none tracking-tight text-transparent sm:text-7xl">
           404
         </p>
         <h1 className="font-display mb-2.5 text-xl font-semibold tracking-tight text-white sm:text-2xl">
@@ -119,8 +119,8 @@ const NotFound = () => {
 
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-[#3b6bf6] to-[#38bdf8] px-5 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
+            to="/main"
+            className="inline-flex items-center justify-center rounded-lg bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] px-5 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
             Back to home
           </Link>
