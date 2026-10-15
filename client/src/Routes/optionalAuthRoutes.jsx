@@ -14,6 +14,22 @@ export const optionalAuthRoutes = [
         path: "/file/:fileId",
         element: <FileViewPage route='direct'/>,
       },
+        {
+        path: "/privacy",
+        element: <PrivacyPolicy />,
+      },
+      {
+        path: "/terms",
+        element: <TermsAndConditions />,
+      },
+      {
+        path: "/cookies",
+        element: <CookiePolicy />,
+      },
+      {
+        path: "/licenses",
+        element: <Licenses />,
+      },
     ],
   },
 ];

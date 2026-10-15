@@ -129,7 +129,7 @@ const sections = [
     id: "contact",
     title: "Contact us",
     body: [
-      `Questions or requests? Email ${C.legalEmail}, or write to ${C.company}, ${C.address}.`,
+      `Questions or requests? Email ${C.legalEmail}, or write to ${C.company}`,
     ],
   },
 ];

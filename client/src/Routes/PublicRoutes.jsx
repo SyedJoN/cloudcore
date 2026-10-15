@@ -18,22 +18,7 @@ export const publicRoutes = [
         path: "/register",
         element: <Register />,
       },
-      {
-        path: "/privacy",
-        element: <PrivacyPolicy />,
-      },
-      {
-        path: "/terms",
-        element: <TermsAndConditions />,
-      },
-      {
-        path: "/cookies",
-        element: <CookiePolicy />,
-      },
-      {
-        path: "/licenses",
-        element: <Licenses />,
-      },
+    
     ],
   },
 ];
