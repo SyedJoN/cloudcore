@@ -1,6 +1,5 @@
 import React from "react";
-import LegalLayout, { LEGAL_CONFIG as C } from "./LegalLayout";
-
+import LegalLayout, { LEGAL_CONFIG as C } from "../Components/Layouts/LegalLayout";
 const MIT_TEXT = `MIT License
 
 Copyright (c) 2026 Cloudcore

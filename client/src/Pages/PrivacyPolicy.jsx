@@ -1,5 +1,5 @@
 import React from "react";
-import LegalLayout, { LEGAL_CONFIG as C } from "./LegalLayout";
+import LegalLayout, { LEGAL_CONFIG as C } from "../Components/Layouts/LegalLayout";
 
 const sections = [
   {
