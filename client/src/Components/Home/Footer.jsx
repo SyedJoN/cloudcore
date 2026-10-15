@@ -18,10 +18,6 @@ export default function Footer() {
       links: ["About", "Careers", "Blog", "Press"],
     },
     {
-      title: "Resources",
-      links: ["Help center", "API docs", "Status", "Community"],
-    },
-    {
       title: "Legal",
       links: ["Privacy", "Terms", "Cookie policy", "Licenses"],
     },

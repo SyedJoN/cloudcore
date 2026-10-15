@@ -11,7 +11,7 @@ export default function CTABand() {
           Set up in under two minutes. No credit card needed to start.
         </p>
         <a
-          href="#pricing"
+          href="/login"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] hover:brightness-110 transition-all px-6 py-3 rounded-lg cc-focus"
         >
           Get started free

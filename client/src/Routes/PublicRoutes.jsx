@@ -1,6 +1,10 @@
 import PublicOnlyRoute from "../Components/Layouts/PublicOnlyLayout";
+import CookiePolicy from "../Pages/CookiePolicy";
+import Licenses from "../Pages/Licenses";
 import Login from "../Pages/Login";
+import PrivacyPolicy from "../Pages/PrivacyPolicy";
 import Register from "../Pages/Register";
+import TermsAndConditions from "../Pages/TermsAndConditions";
 
 export const publicRoutes = [
   {
@@ -13,6 +17,22 @@ export const publicRoutes = [
       {
         path: "/register",
         element: <Register />,
+      },
+      {
+        path: "/privacy",
+        element: <PrivacyPolicy />,
+      },
+      {
+        path: "/terms",
+        element: <TermsAndConditions />,
+      },
+      {
+        path: "/cookies",
+        element: <CookiePolicy />,
+      },
+      {
+        path: "/licenses",
+        element: <Licenses />,
       },
     ],
   },
