@@ -9,7 +9,12 @@ export default function Footer() {
     },
     {
       title: "Legal",
-      links: ["Privacy", "Terms", "Cookies", "Licenses"],
+      links: [
+        { label: "Privacy Policy", href: "/privacy" },
+        { label: "Terms and Conditions", href: "/terms" },
+        { label: "Cookie Policy", href: "/cookies" },
+        { label: "Licenses", href: "/licenses" },
+      ],
     },
   ];
 
@@ -70,21 +75,29 @@ export default function Footer() {
               <h4 className="text-xs font-semibold uppercase tracking-wide text-[#6d84ae] mb-4">
                 {col.title}
               </h4>
+
               <ul className="flex flex-col gap-3">
-                {col.links.map((l) => (
-                  <li key={l}>
-                    <a
-                      href={
-                        col.title === "Product"
-                          ? `#${l.toLowerCase()}`
-                          : `/${l.toLowerCase()}`
-                      }
-                      className="text-sm text-[#a9bbdc] hover:text-white transition-colors cc-focus rounded"
-                    >
-                      {l}
-                    </a>
-                  </li>
-                ))}
+                {col.links.map((item) => {
+                  const label = typeof item === "string" ? item : item.label;
+
+                  const href =
+                    typeof item === "string"
+                      ? col.title === "Product"
+                        ? `#${item.toLowerCase()}`
+                        : `/${item.toLowerCase()}`
+                      : item.href;
+
+                  return (
+                    <li key={label}>
+                      <a
+                        href={href}
+                        className="text-sm text-[#a9bbdc] hover:text-white transition-colors cc-focus rounded"
+                      >
+                        {label}
+                      </a>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
