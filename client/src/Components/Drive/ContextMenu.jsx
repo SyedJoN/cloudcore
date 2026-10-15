@@ -526,7 +526,7 @@ function ContextMenuContent({
             <button
               className="gd-context-item danger"
               disabled={isDeleted || !canDelete}
-              onClick={close(() => onDeleteForever("google"))}
+              onClick={close(() => onDeleteForever(isGoogle ? "google" : "local"))}
             >
               <IconTrash size={18} />
               Delete forever
