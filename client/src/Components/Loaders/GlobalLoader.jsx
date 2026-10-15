@@ -19,21 +19,25 @@ import React from "react";
  *               existing content instead of a solid full-page background
  *  - fullScreen: boolean, set false to render inline (e.g. inside a card)
  *               instead of position:fixed across the viewport
- */
-const GlobalLoader = ({ label = "Loading...", overlay = false, fullScreen = true }) => {
+ **/
+const GlobalLoader = ({
+  label = "Loading...",
+  overlay = false,
+  fullScreen = true,
+}) => {
   return (
     <div
       role="status"
       aria-live="polite"
       className={`
         ${fullScreen ? "fixed inset-0" : "relative w-full py-16"}
-        z-[999] flex flex-col items-center justify-center gap-5
+        z-999 flex flex-col items-center justify-center gap-5
         ${overlay ? "bg-[#050b1f]/70 backdrop-blur-sm" : "bg-[#050b1f]"}
       `}
     >
       {/* ambient glow, only for the solid full-screen variant */}
       {!overlay && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2f5cf5] opacity-20 blur-[120px]" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-130 w-130 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#2f5cf5] opacity-20 blur-[120px]" />
       )}
 
       <div className="relative z-10 flex flex-col items-center gap-5">
@@ -46,10 +50,10 @@ const GlobalLoader = ({ label = "Loading...", overlay = false, fullScreen = true
           <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#38bdf8] border-r-[#38bdf8]/40 motion-safe:animate-[spin_1.1s_linear_infinite]" />
 
           {/* middle ring, spinning opposite direction, slower */}
-          <span className="absolute inset-[6px] rounded-full border-2 border-transparent border-b-[#3b6bf6] motion-safe:animate-[spin_1.8s_linear_infinite_reverse]" />
+          <span className="absolute inset-1.5 rounded-full border-2 border-transparent border-b-[#3b6bf6] motion-safe:animate-[spin_1.8s_linear_infinite_reverse]" />
 
           {/* static core badge */}
-          <span className="absolute inset-[14px] flex items-center justify-center rounded-full bg-gradient-to-br from-[#38bdf8] to-[#2f5cf5]">
+          <span className="absolute inset-3.5 flex items-center justify-center rounded-full bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
             <svg
               viewBox="0 0 24 24"
               width="14"
