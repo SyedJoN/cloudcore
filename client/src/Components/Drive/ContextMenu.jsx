@@ -165,7 +165,7 @@ function ContextMenuContent({
 
   const isGoogle = Boolean(item.webViewLink);
   const isSharedRoute = route === "shared";
-  const isGoogleDriveRoute = route === "google-drive";
+  const isGoogleDriveRoute = route === "google-drive" && isGoogle;
   const isTrashRoute = route === "trash";
 
   const isFile = !item.isDirectory;

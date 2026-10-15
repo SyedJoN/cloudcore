@@ -10,7 +10,7 @@ import {
 } from "../Icons/Icons";
 import "./FileViewer.css";
 import UserAccountBar from "../UserAccountBar";
-
+import { useLocation } from "react-router-dom";
 import {
   OfficeViewer,
   UnknownViewer,
@@ -29,7 +29,6 @@ import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
-
 
 export default function FileViewer({
   item,
@@ -51,6 +50,10 @@ export default function FileViewer({
   const { refreshUser } = useAuth();
   const { toast } = useToast();
 
+  const location = useLocation();
+
+  const route = location.pathname.startsWith("/google-drive");
+
   // BASIC ITEM INFO
 
   const isGoogle = Boolean(item.webViewLink);
@@ -59,7 +62,7 @@ export default function FileViewer({
 
   const category = getCategory(item?.name || "");
 
-  const isGDrive = Boolean(item?.webViewLink);
+  const isGDrive = route === "google-drive" && isGoogle;
 
   const fileUrl = isGDrive
     ? item?.webContentLink || item?.webViewLink

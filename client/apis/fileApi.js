@@ -1,7 +1,7 @@
 import { axiosWithCreds, axiosWithoutCreds } from "./axiosInstances";
 
 export async function getSignedUploadUrl(data) {
-  const response = await axiosWithCreds.post("file/uploads/initiate", data);
+  const response = await axiosWithCreds.post("/file/uploads/initiate", data);
   return response.data;
 }
 export async function notifyBackend(fileId) {

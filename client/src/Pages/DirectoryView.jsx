@@ -90,7 +90,7 @@ export default function DirectoryView({ route }) {
   const isHomeRoute = route === "home" || params.get("usp") === "drive_link";
   const isSharedRoute = route === "shared";
   const isTrashRoute = route === "trash";
-  const isGoogleDriveRoute = route === "google-drive";
+  const isGoogleDriveRoute = route === "google-drive" && isGoogleDrive;
   const isRecentRoute = route === "recent";
   const isStarredRoute = route === "starred";
 
@@ -657,7 +657,6 @@ export default function DirectoryView({ route }) {
   }
 
   async function handleDelete(items, type) {
-    console.log('type', type);
     try {
       await Promise.all(
         items.map((item) => {
@@ -953,7 +952,7 @@ export default function DirectoryView({ route }) {
   }
   function handleDownload(item) {
     try {
-      if (isGoogleDrive && isGoogleDriveRoute) {
+      if isGoogleDriveRoute {
         const url = `${BASE_URL}/auth/google-drive/download?fileId=${item.id}`;
         const a = document.createElement("a");
         a.href = url;
@@ -1006,7 +1005,7 @@ export default function DirectoryView({ route }) {
       let incomingPublicRole;
       let updatedParentId;
 
-      if (isGoogleDriveRoute) {
+      if isGoogleDriveRoute {
         if (restricted) {
           const dryRun = await revokeFileAccess(
             "google",

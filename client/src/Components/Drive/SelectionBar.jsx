@@ -1,4 +1,3 @@
-
 import {
   IconClose,
   IconDownload,
@@ -9,7 +8,6 @@ import {
   IconTrash,
 } from "../../Components/Icons/Icons";
 import { useToast } from "../../Contexts";
-
 
 export default function SelectionBar({
   combinedItems,
@@ -31,7 +29,7 @@ export default function SelectionBar({
 
   // SELECTED ITEM
   const item = combinedItems.find((item) =>
-    selectedItems.has(item.id ?? item._id)
+    selectedItems.has(item.id ?? item._id),
   );
 
   if (!item) {
@@ -42,7 +40,7 @@ export default function SelectionBar({
   const isGoogle = Boolean(item.webViewLink);
   const isTrashRoute = route === "trash";
   const isSharedRoute = route === "shared";
-  const isGoogleDriveRoute = route === "google-drive";
+  const isGoogleDriveRoute = route === "google-drive" && isGoogle;
   const isDeleted = Boolean(item.isDeleted);
 
   // CAPABILITIES
@@ -56,9 +54,7 @@ export default function SelectionBar({
   // SHARE
   const canShare = true;
 
-
   // COPY LINK
-
 
   const handleCopyLink = async () => {
     if (isDeleted) {
@@ -122,9 +118,7 @@ export default function SelectionBar({
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Delete Forever"
             disabled={!canDelete}
-            onClick={() =>
-              onDeleteForever(isGoogle ? "google" : "local")
-            }
+            onClick={() => onDeleteForever(isGoogle ? "google" : "local")}
           >
             <IconTrash size={18} />
           </button>
@@ -133,38 +127,21 @@ export default function SelectionBar({
     );
   }
 
-
   // NORMAL ROUTES
 
+  const downloadDisabled = isDeleted || !canDownload;
 
-  const downloadDisabled =
-    isDeleted || !canDownload;
+  const shareDisabled = isDeleted || !canShare;
 
-  const shareDisabled =
-    isDeleted || !canShare;
+  const copyLinkDisabled = isDeleted;
 
-  const copyLinkDisabled =
-    isDeleted
+  const renameDisabled = isDeleted || !canRename;
 
-  const renameDisabled =
-    isDeleted || !canRename;
+  const trashDisabled = isDeleted || isGoogle || isSharedRoute || !canTrash;
 
-  const trashDisabled =
-    isDeleted ||
-    isGoogle ||
-    isSharedRoute ||
-    !canTrash;
+  const removeDisabled = isDeleted || isGoogle || !isSharedRoute || !canDelete;
 
-  const removeDisabled =
-    isDeleted ||
-    isGoogle ||
-    !isSharedRoute ||
-    !canDelete;
-
-  const googleDeleteDisabled =
-    isDeleted ||
-    !isGoogleDriveRoute ||
-    !canDelete;
+  const googleDeleteDisabled = isDeleted || !isGoogleDriveRoute || !canDelete;
 
   return (
     <div className="gd-selection-bar">
@@ -177,9 +154,7 @@ export default function SelectionBar({
         <IconClose size={18} />
       </button>
 
-      <span className="gd-selection-count">
-        {selectedItems.size} selected
-      </span>
+      <span className="gd-selection-count">{selectedItems.size} selected</span>
 
       <div className="gd-selection-actions">
         {/* DOWNLOAD */}
