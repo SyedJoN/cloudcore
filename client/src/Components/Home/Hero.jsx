@@ -11,7 +11,7 @@ export default function Hero() {
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-medium text-[#9fd8fb] bg-[#0f1a3d] border border-[#38bdf8]/30 rounded-full px-3 py-1 mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
-            Now with automatic version history
+            Now with Google Drive integration
           </div>
 
           <h1 className="cc-display text-4xl md:text-5xl lg:text-6xl font-semibold text-white leading-[1.08] mb-6">

@@ -10,9 +10,9 @@ const OptionalAuth = () => {
 
   const labels = {
     "/main": "Homepage",
-    "/privacy": "Privacy and policy",
+    "/privacy": "Privacy policy",
     "/terms": "Terms and conditions",
-    "/cookies": "Cookies",
+    "/cookies": "Cookies policy",
     "/licenses": "Licenses",
   };
 

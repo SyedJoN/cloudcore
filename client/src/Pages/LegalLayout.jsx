@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
+import { Cloud, Menu, X } from "lucide-react";
 
 /* ------------------------------------------------------------------
    Edit these once; every legal page picks them up.
@@ -110,21 +111,14 @@ export default function LegalLayout({ title, summary, sections }) {
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#050b1f]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
-              <svg
-                viewBox="0 0 24 24"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="#fff"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M17.5 19H9a7 7 0 1 1 6.71-9h.79a4.5 4.5 0 1 1 0 9Z" />
-              </svg>
-            </span>
+          <Link to="/main" className="flex items-center gap-2">
+            <span className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
+            <Cloud
+              className="w-4.5 h-4.5 text-white"
+              size={18}
+              strokeWidth={2.2}
+            />
+          </span>
             <span className="text-lg font-semibold tracking-tight text-white">
               {LEGAL_CONFIG.product}
             </span>
