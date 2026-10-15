@@ -62,7 +62,7 @@ export default function FileViewer({
 
   const category = getCategory(item?.name || "");
 
-  const isGDrive = route === "google-drive" && isGoogle;
+  const isGDrive = route && isGoogle;
 
   const fileUrl = isGDrive
     ? item?.webContentLink || item?.webViewLink
