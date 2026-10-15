@@ -1,6 +1,10 @@
 import OptionalAuth from "../Components/Layouts/OptionalAuthLayout";
 import FileViewPage from "../Pages/FileViewPage";
 import Home from "../Pages/Home";
+import CookiePolicy from "../Pages/CookiePolicy";
+import Licenses from "../Pages/Licenses";
+import PrivacyPolicy from "../Pages/PrivacyPolicy";
+import TermsAndConditions from "../Pages/TermsAndConditions";
 
 export const optionalAuthRoutes = [
   {
