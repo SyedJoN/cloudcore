@@ -130,7 +130,7 @@ export default function LegalLayout({ title, summary, sections }) {
             </span>
           </Link>
           <Link
-            to="/"
+            to="/main"
             className="text-sm text-[#c3d2ef] transition-colors hover:text-white"
           >
             &larr; Back to home
