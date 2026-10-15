@@ -657,6 +657,7 @@ export default function DirectoryView({ route }) {
   }
 
   async function handleDelete(items, type) {
+    console.log('type', type);
     try {
       await Promise.all(
         items.map((item) => {
