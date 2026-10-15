@@ -430,12 +430,15 @@ export default function DirectoryView({ route }) {
         if (directoryId) {
           navigate(`/directory/${directoryId}`);
         }
+        if (isGoogleDriveRoute) {
+          navigate('/');
+        }
       } catch (err) {
         console.error("Resumed Drive upload failed:", err);
         showError("Couldn't finish uploading the file you picked from Drive.");
       }
     })();
-  }, [isGoogleDrive]);
+  }, [isGoogleDrive, isGoogleDriveRoute]);
 
   useEffect(() => {
     if (isGoogleDriveRoute) getDirectoryItems("google-drive");
