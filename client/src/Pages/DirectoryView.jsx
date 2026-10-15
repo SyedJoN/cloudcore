@@ -952,7 +952,7 @@ export default function DirectoryView({ route }) {
   }
   function handleDownload(item) {
     try {
-      if isGoogleDriveRoute {
+      if (isGoogleDriveRoute) {
         const url = `${BASE_URL}/auth/google-drive/download?fileId=${item.id}`;
         const a = document.createElement("a");
         a.href = url;
