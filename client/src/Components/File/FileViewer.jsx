@@ -63,7 +63,7 @@ export default function FileViewer({
 
   const fileUrl = isGDrive
     ? item?.webContentLink || item?.webViewLink
-    : `${BASE_URL}/file/${item?._id}`;
+    : `${BASE_URL}file/${item?._id}`;
 
   // CAPABILITIES
 

@@ -34,7 +34,7 @@ export async function initiateFolderUpload(data) {
   return response.data;
 }
 export async function completeFolderUpload(fileId) {
-  const response = await axiosWithCreds.post(`directory/uploads/complete`, {
+  const response = await axiosWithCreds.post(`/directory/uploads/complete`, {
     fileId,
   });
   return response.data;
