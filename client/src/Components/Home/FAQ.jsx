@@ -12,8 +12,8 @@ export default function FAQ() {
       a: "Uploads pause and you'll get a notification, but nothing already stored is ever deleted or locked.",
     },
     {
-      q: "Is the 10GB plan really free forever?",
-      a: "Yes, no trial period or expiry. Upgrade only when you actually need more room.",
+      q: "What happens when I reach my 2GB storage limit?",
+      a: "You'll need to free up space or upgrade your plan to store more files. Your existing files remain accessible, so you can manage your storage without losing your work.",
     },
   ];
   const [openIdx, setOpenIdx] = useState(0);

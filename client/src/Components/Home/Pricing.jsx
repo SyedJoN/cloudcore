@@ -19,9 +19,7 @@ export default function Pricing() {
       features: [
         "2GB secure storage",
         "500MB Upload Limit",
-        "2 device sync",
-        "30-day version history",
-        "Community support",
+        "Share files with anyone"
       ],
       cta: "Start for free",
       highlight: false,
@@ -38,12 +36,10 @@ export default function Pricing() {
       features: [
         "1TB secure storage",
         "10GB Upload Limit",
-        "Unlimited device sync",
-        "1-year version history",
+        "Share files with anyone",
         "Priority email support",
-        "Offline access & smart caching",
       ],
-      cta: "Start 14-day trial",
+      cta: "Get Started",
       highlight: true,
     },
     {
@@ -58,10 +54,8 @@ export default function Pricing() {
       features: [
         "10TB pooled storage",
         "50GB Upload Limit",
-        "Unlimited device sync",
-        "Unlimited version history",
-        "Admin & team permissions",
-        "24/5 priority support",
+        "Share files with anyone",
+        "24/7 Support"
       ],
       cta: "Talk to sales",
       highlight: false,
