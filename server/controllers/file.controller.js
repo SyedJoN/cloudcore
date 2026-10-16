@@ -1387,7 +1387,8 @@ export const toggleFilePublic = async (req, res, next) => {
 };
 export const giveAccessById = async (req, res, next) => {
   try {
-    const { usersArray, message, type, confirmCascade, notifyPeople} = req.body;
+    const { usersArray, message, type, confirmCascade, notifyPeople } =
+      req.body;
     const id = req.params.id;
 
     if (!Array.isArray(usersArray) || usersArray.length === 0) {
@@ -1458,6 +1459,8 @@ export const giveAccessById = async (req, res, next) => {
       for (const { user, chain } of usersWithSources) {
         for (const source of chain) {
           if (source.isCurrentFile) continue;
+          if (source.role === "owner") continue;
+          if (source.name === "My Drive") continue;
           if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role]) continue;
 
           cascadeConflicts.push({
@@ -1481,10 +1484,12 @@ export const giveAccessById = async (req, res, next) => {
         usersWithSources.map(async ({ user, email, chain }) => {
           for (const source of chain) {
             if (source.isCurrentFile) continue;
+            if (source.role === "owner") continue;
+            if (source.name === "My Drive") continue;
             if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role])
               continue;
 
-            drive.permissions.update({
+            await drive.permissions.update({
               fileId: source.fileId,
               permissionId: source.permissionId,
               requestBody: { role: user.role },

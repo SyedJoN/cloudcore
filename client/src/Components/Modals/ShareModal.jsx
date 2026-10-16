@@ -292,7 +292,7 @@ export default function ShareModal({
       const finalPermissions = [...updatedPermissions, ...newPermissions];
 
       const childrenIds = isGoogleDriveRoute
-        ? [itemId, ...item.childrenIds]
+        ? [itemId, ...item.childrenIds ?? []]
         : [itemId];
 
       setFilesList((list) =>
