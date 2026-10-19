@@ -114,8 +114,6 @@ export const registerUser = async (req, res, next) => {
     return res.status(201).json({ message: "User Registered" });
   } catch (error) {
     console.log("FULL ERROR:", error);
-
-    console.log("error.errors", error.errors);
     // Mongoose validation error
     if (error?.name === "ValidationError" && error?.errors) {
       const msg = Object.values(error.errors)
