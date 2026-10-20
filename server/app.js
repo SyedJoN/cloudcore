@@ -76,8 +76,11 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 app.post(
   "/github-webhook",
   (req, res) => {
+    console.log('body', req.body)
     const signature = req.headers["x-hub-signature-256"];
+    console.log('req.headers', signature)
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    console.log('secret', secret)
     if (!secret) {
       return res.status(500).json({
         message: "Webhook secret not configured!",
