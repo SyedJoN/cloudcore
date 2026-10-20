@@ -86,59 +86,81 @@ app.use((req, res, next) => {
 
   express.json()(req, res, next);
 });
+
 app.post(
   "/github-webhook",
   express.raw({ type: "application/json" }),
-  (req, res) => {
-    const signature = req.headers["x-hub-signature-256"];
-    const secret = process.env.GITHUB_WEBHOOK_SECRET;
-    if (!secret) {
-      return res.status(500).json({
-        message: "Webhook secret not configured!",
-      });
-    }
+  async (req, res) => {
+    try {
+      const signature = req.headers["x-hub-signature-256"];
+      const secret = process.env.GITHUB_WEBHOOK_SECRET;
 
-    if (!signature) {
-      return res.status(401).json({
-        message: "Signature missing!",
-      });
-    }
-    const calculatedSignature =
-      "sha256=" +
-      crypto.createHmac("sha256", secret).update(req.body).digest("hex");
-    const signatureBuffer = Buffer.from(signature, "utf8");
-    const calculatedBuffer = Buffer.from(calculatedSignature, "utf8");
-
-    if (
-      signatureBuffer.length !== calculatedBuffer.length ||
-      !crypto.timingSafeEqual(signatureBuffer, calculatedBuffer)
-    ) {
-      return res.status(403).json({
-        message: "Unauthorized!",
-      });
-    }
-    res.json({ message: "OK" });
-
-    const bashChildProcess = spawn("bash", ["/home/ubuntu/deploy-backend.sh"]);
-
-    bashChildProcess.stdout.on("data", (data) => {
-      process.stdout.write(data);
-    });
-    bashChildProcess.stderr.on("data", (data) => {
-      process.stderr.write(data);
-    });
-    bashChildProcess.on("close", (code) => {
-      if (code === 0) {
-        console.log("Script executed successfully!");
-      } else {
-        console.log("Script failed!");
+      if (!secret) {
+        return res.status(500).json({
+          message: "Webhook secret not configured!",
+        });
       }
-    });
-    bashChildProcess.on("error", (err) => {
-      console.log("Error in spawning the process!");
-      console.log(err);
-    });
-  },
+
+      if (!signature) {
+        return res.status(401).json({
+          message: "Signature missing!",
+        });
+      }
+
+      const calculatedSignature =
+        "sha256=" +
+        crypto
+          .createHmac("sha256", secret)
+          .update(req.body)
+          .digest("hex");
+
+      const signatureBuffer = Buffer.from(signature, "utf8");
+      const calculatedBuffer = Buffer.from(
+        calculatedSignature,
+        "utf8"
+      );
+
+      if (
+        signatureBuffer.length !== calculatedBuffer.length ||
+        !crypto.timingSafeEqual(
+          signatureBuffer,
+          calculatedBuffer
+        )
+      ) {
+        return res.status(403).json({
+          message: "Unauthorized!",
+        });
+      }
+
+      res.status(200).json({ message: "OK" });
+
+      const bashChildProcess = spawn("bash", [
+        "/home/ubuntu/deploy-backend.sh",
+      ]);
+
+      bashChildProcess.stdout.on("data", (data) => {
+        process.stdout.write(data);
+      });
+
+      bashChildProcess.stderr.on("data", (data) => {
+        process.stderr.write(data);
+      });
+
+      bashChildProcess.on("close", (code) => {
+        if (code === 0) {
+          console.log("Script executed successfully!");
+        } else {
+          console.error("Script failed with exit code:", code);
+        }
+      });
+
+      bashChildProcess.on("error", (err) => {
+        console.error("Error spawning the process:", err);
+      });
+    } catch (error) {
+      console.error("GitHub webhook error:", error);
+    }
+  }
 );
 
 app.use(
