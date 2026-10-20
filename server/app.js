@@ -73,21 +73,27 @@ export const rateLimitMiddleware = (limiter, getKey) => {
   };
 };
 
+app.use((req, res, next) => {
+  if (
+    req.method === "POST" &&
+    (/^\/file\/[^/]+$/.test(req.path) ||
+      req.originalUrl === "/subscription/stripe/events")
+  ) {
+    return next();
+  }
+
+  express.json()(req, res, next);
+});
+
 app.post(
   "/github-webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
-    if (!secret) {
-      return res.status(500).json({
-        message: "Webhook secret not configured!",
-      });
-    }
-
-    if (!signature) {
+    if (!signature || !secret) {
       return res.status(401).json({
-        message: "Signature missing!",
+        message: "Signature or secret missing!",
       });
     }
     const calculatedSignature =
@@ -127,20 +133,6 @@ app.post(
     });
   },
 );
-
-app.use((req, res, next) => {
-  if (
-    req.method === "POST" &&
-    (/^\/file\/[^/]+$/.test(req.path) ||
-      req.originalUrl === "/subscription/stripe/events")
-  ) {
-    return next();
-  }
-
-  express.json()(req, res, next);
-});
-
-
 app.use(
   "/file",
   rateLimitMiddleware(LIMITERS.readFileOps),
