@@ -7,12 +7,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,11 +20,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command:
-      - migrate
+    command: migrate
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
-      OPENFGA_DATASTORE_URI: postgres://postgres:password@postgres:5432/postgres?sslmode=disable
+      OPENFGA_DATASTORE_URI: "postgres://postgres:password@postgres:5432/postgres?sslmode=disable"
     restart: "no"
 
   openfga:
@@ -34,13 +31,12 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-    command:
-      - run
+    command: run
     environment:
       OPENFGA_DATASTORE_ENGINE: postgres
-      OPENFGA_DATASTORE_URI: postgres://postgres:password@postgres:5432/postgres?sslmode=disable
+      OPENFGA_DATASTORE_URI: "postgres://postgres:password@postgres:5432/postgres?sslmode=disable"
+      OPENFGA_PLAYGROUND_ENABLED: "true"
       OPENFGA_LOG_FORMAT: json
-      OPENFGA_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     ports:
       - "8080:8080"
       - "8081:8081"

@@ -32,8 +32,10 @@ import {
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
+import { spawn } from "child_process";
 
 const app = express();
+
 const PORT = config.port || 4000;
 app.use(
   cors({
@@ -69,6 +71,31 @@ export const rateLimitMiddleware = (limiter, getKey) => {
     }
   };
 };
+
+app.post("/github-webhook", (req, res, next) => {
+  res.json({message: "OK"})
+  console.log(req.headers);
+  const bashChildProcess = spawn("bash", ["/home/ubuntu/deploy-backend.sh"]);
+
+  bashChildProcess.stdout.on("data", (data) => {
+    process.stdout.write(data);
+  });
+  bashChildProcess.stderr.on("data", (data) => {
+    process.stderr.write(data)
+    console.log("code", code);
+  });
+  bashChildProcess.on('close', (code)=> {
+    if (code === 0 ) {
+      console.log("Script executed successfully!");
+    } else {
+      console.log("Script failed!")
+    }
+  })
+  bashChildProcess.on("error", (err)=> {
+    console.log("Error in spawning the process!");
+    console.log(err);
+  })
+});
 
 app.use((req, res, next) => {
   if (
@@ -141,4 +168,3 @@ try {
 } catch (error) {
   console.error("MongoDB connection failed:", error);
 }
-
