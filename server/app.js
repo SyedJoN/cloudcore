@@ -91,9 +91,15 @@ app.post(
   (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
-    if (!signature || !secret) {
+    if (!secret) {
+      return res.status(500).json({
+        message: "Webhook secret not configured!",
+      });
+    }
+
+    if (!signature) {
       return res.status(401).json({
-        message: "Signature or secret missing!",
+        message: "Signature missing!",
       });
     }
     const calculatedSignature =
