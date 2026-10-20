@@ -6,8 +6,6 @@ import redisClient from "../config/redis.js";
 export async function checkAuth(req, res, next) {
   const sessionId = req.signedCookies.sid;
 
-  console.log('sessionId', sessionId)
-
   if (!sessionId) {
     return res.status(401).json({ error: "Not logged in" });
   }
