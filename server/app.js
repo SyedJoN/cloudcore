@@ -88,6 +88,7 @@ app.use((req, res, next) => {
 });
 app.post(
   "/github-webhook",
+  express.raw({ type: "application/json" }),
   (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
     const secret = process.env.GITHUB_WEBHOOK_SECRET;
