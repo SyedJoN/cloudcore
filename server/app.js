@@ -84,7 +84,6 @@ app.use((req, res, next) => {
   express.json()(req, res, next);
 });
 
-// github webhook
 app.post("/github-webhook", (req, res, next) => {
   res.json({ message: "OK" });
   console.log(req.headers);
