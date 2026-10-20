@@ -93,7 +93,6 @@ app.post("/github-webhook", (req, res, next) => {
   });
   bashChildProcess.stderr.on("data", (data) => {
     process.stderr.write(data);
-    console.log("code", data);
   });
   bashChildProcess.on("close", (code) => {
     if (code === 0) {
