@@ -89,7 +89,6 @@ app.use((req, res, next) => {
 
 app.post(
   "/github-webhook",
-  express.raw({ type: "application/json" }),
   async (req, res) => {
 
     try {
