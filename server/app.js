@@ -73,25 +73,10 @@ export const rateLimitMiddleware = (limiter, getKey) => {
   };
 };
 
-
-app.use((req, res, next) => {
-  if (
-    req.method === "POST" &&
-    (/^\/file\/[^/]+$/.test(req.path) ||
-      req.originalUrl === "/subscription/stripe/events") ||
-      req.originalUrl === "/github-webhook"
-  ) {
-    return next();
-  }
-
-  express.json()(req, res, next);
-});
-
 app.post(
   "/github-webhook",
   express.raw({ type: "application/json" }),
   async (req, res) => {
-console.log('hi')
     try {
       const signature = req.headers["x-hub-signature-256"];
       const secret = process.env.GITHUB_WEBHOOK_SECRET;
@@ -169,6 +154,19 @@ console.log('hi')
     }
   }
 );
+app.use((req, res, next) => {
+  if (
+    req.method === "POST" &&
+    (/^\/file\/[^/]+$/.test(req.path) ||
+      req.originalUrl === "/subscription/stripe/events")
+  ) {
+    return next();
+  }
+
+  express.json()(req, res, next);
+});
+
+
 
 app.use(
   "/file",
