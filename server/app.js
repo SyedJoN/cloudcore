@@ -79,7 +79,7 @@ app.use((req, res, next) => {
     req.method === "POST" &&
     (/^\/file\/[^/]+$/.test(req.path) ||
       req.originalUrl === "/subscription/stripe/events") ||
-      req.originalUrl === "/github-webhooks"
+      req.originalUrl === "/github-webhook"
   ) {
     return next();
   }
