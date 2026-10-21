@@ -35,8 +35,6 @@ import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
 import { spawn } from "child_process";
 
-process.loadEnvFile(".env");
-
 const app = express();
 
 const PORT = config.port || 4000;
@@ -76,7 +74,7 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 };
 
 app.get("/testz", (req, res) => {
-  return res.status(200).json({ message: "Serving" });
+  return res.status(200).json({ message: "Servings" });
 });
 app.post(
   "/github-webhook",
