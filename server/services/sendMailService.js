@@ -8,6 +8,153 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+
+export const sendPipelineFailureEmail = async ({
+  pipelineName,
+  platform = "GitHub Actions",
+  branch,
+  commit,
+  commitMessage,
+  failedStage,
+  errorMessage,
+  runUrl,
+  triggeredBy,
+  failedAt = new Date(),
+}) => {
+  const to = process.env.CI_ALERT_EMAIL;
+
+  if (!to) {
+    throw new Error("CI_ALERT_EMAIL is not configured");
+  }
+
+  const subject = `🚨 CI/CD Pipeline Failed: ${pipelineName}`;
+
+  const escapeHtml = (value = "") =>
+    String(value).replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[char]);
+
+  const details = {
+    "Pipeline": pipelineName,
+    "Platform": platform,
+    "Branch": branch || "N/A",
+    "Commit": commit || "N/A",
+    "Commit message": commitMessage || "N/A",
+    "Failed stage": failedStage || "Unknown",
+    "Triggered by": triggeredBy || "N/A",
+    "Failed at": new Date(failedAt).toLocaleString(),
+  };
+
+  const detailsHtml = Object.entries(details)
+    .map(([label, value]) => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #eee;
+                   color:#5f6368;width:140px;">
+          ${escapeHtml(label)}
+        </td>
+        <td style="padding:10px;border-bottom:1px solid #eee;
+                   color:#202124;">
+          ${escapeHtml(value)}
+        </td>
+      </tr>
+    `)
+    .join("");
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"CI/CD Alerts" <${process.env.SMTP_USER}>`,
+      to,
+      subject,
+      text: `
+CI/CD Pipeline Failed
+
+Pipeline: ${pipelineName}
+Platform: ${platform}
+Branch: ${branch || "N/A"}
+Commit: ${commit || "N/A"}
+Commit Message: ${commitMessage || "N/A"}
+Failed Stage: ${failedStage || "Unknown"}
+Triggered By: ${triggeredBy || "N/A"}
+Failed At: ${new Date(failedAt).toLocaleString()}
+Error: ${errorMessage || "No error details provided"}
+Run URL: ${runUrl || "Not available"}
+      `,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CI/CD Pipeline Failure</title>
+</head>
+<body style="margin:0;padding:24px;background:#f8f9fa;
+             font-family:Arial,Helvetica,sans-serif;color:#202124;">
+  <div style="max-width:600px;margin:20px auto;background:#fff;
+              border:1px solid #dadce0;border-radius:8px;overflow:hidden;">
+
+    <div style="padding:24px 32px;background:#fce8e6;
+                border-bottom:1px solid #f5c6cb;">
+      <h2 style="margin:0;color:#b3261e;font-size:21px;">
+        CI/CD Pipeline Failed
+      </h2>
+      <p style="margin:8px 0 0;color:#7f1d1d;font-size:14px;">
+        A pipeline failure requires your attention.
+      </p>
+    </div>
+
+    <div style="padding:28px 32px;">
+      <p style="font-size:15px;line-height:1.6;">
+        Hi, your <strong>${escapeHtml(pipelineName)}</strong> pipeline
+        has failed. Here are the execution details.
+      </p>
+
+      <table style="width:100%;border-collapse:collapse;
+                    font-size:14px;margin:20px 0;">
+        ${detailsHtml}
+      </table>
+
+      <h3 style="font-size:15px;margin-top:24px;">Error details</h3>
+      <pre style="padding:16px;background:#f8f9fa;border:1px solid #eee;
+                  border-radius:6px;white-space:pre-wrap;
+                  overflow-wrap:anywhere;font-size:13px;color:#b3261e;">${escapeHtml(errorMessage || "No error details provided")}</pre>
+
+      ${
+        runUrl
+          ? `
+            <div style="margin:28px 0;text-align:center;">
+              <a href="${escapeHtml(runUrl)}"
+                 style="display:inline-block;padding:12px 24px;
+                        background:#1a73e8;color:#fff;
+                        text-decoration:none;border-radius:5px;
+                        font-size:14px;font-weight:bold;">
+                View Failed Pipeline
+              </a>
+            </div>
+          `
+          : ""
+      }
+
+      <p style="font-size:12px;line-height:1.5;color:#80868b;">
+        This is an automated CI/CD failure notification.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+      `,
+    });
+
+    return info;
+  } catch (error) {
+    console.error("Failed to send CI/CD failure email:", error);
+    throw error;
+  }
+};
+
 export const sendOwnershipTransferEmail = async ({
   to,
   toName,
