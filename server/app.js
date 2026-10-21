@@ -74,7 +74,7 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 };
 
 app.get("/healthz", (req, res) => {
-  return res.status(200).json({ message: "Hello from SyedJoN" });
+  return res.status(200).json({ message: "SERVING" });
 });
 app.post(
   "/github-webhook",
@@ -208,7 +208,6 @@ app.use((err, req, res, next) => {
   console.log(err);
   res.status(err.status || 500).json({ error: "Something went wrong" });
 });
-startSubscriptionCron();
 
 app.listen(PORT, () => {
   console.log(`Server Started on PORT ${PORT}`);
@@ -219,3 +218,4 @@ try {
 } catch (error) {
   console.error("MongoDB connection failed:", error);
 }
+startSubscriptionCron();
