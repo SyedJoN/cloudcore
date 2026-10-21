@@ -210,6 +210,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
+if (process.send) process.send('ready');
   console.log(`Server Started on PORT ${PORT}`);
 });
 try {
