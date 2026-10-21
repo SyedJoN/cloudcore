@@ -74,7 +74,7 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 };
 
 app.get("/healthz", (req, res) => {
-  return res.status(200).json({ message: "SERVING" });
+  return res.status(200).json({ message: "Hello from SyedJoN" });
 });
 app.post(
   "/github-webhook",
@@ -114,9 +114,11 @@ app.post(
 
       res.status(200).json({ message: "OK" });
 
-      const bashChildProcess = spawn("bash", [
-        "/home/ubuntu/deploy-backend.sh",
-      ], {detached: true});
+      const bashChildProcess = spawn(
+        "bash",
+        ["/home/ubuntu/deploy-backend.sh"],
+        { detached: true },
+      );
 
       bashChildProcess.stdout.on("data", (data) => {
         process.stdout.write(data);
@@ -210,7 +212,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-if (process.send) process.send('ready');
+  if (process.send) process.send("ready");
   console.log(`Server Started on PORT ${PORT}`);
 });
 try {
