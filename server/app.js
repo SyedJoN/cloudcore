@@ -74,7 +74,7 @@ export const rateLimitMiddleware = (limiter, getKey) => {
 };
 
 app.get("/healthz", (req, res) => {
-  return res.status(200).json({ message: "Serving" });
+  return res.status(200).json({ message: "SERVING" });
 });
 app.post(
   "/github-webhook",
