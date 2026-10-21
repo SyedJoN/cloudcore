@@ -116,7 +116,7 @@ app.post(
 
       const bashChildProcess = spawn("bash", [
         "/home/ubuntu/deploy-backend.sh",
-      ]);
+      ], {detached: true});
 
       bashChildProcess.stdout.on("data", (data) => {
         process.stdout.write(data);
