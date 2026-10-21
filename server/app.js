@@ -35,6 +35,8 @@ import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
 import { spawn } from "child_process";
 
+process.loadEnvFile(".env");
+
 const app = express();
 
 const PORT = config.port || 4000;
@@ -73,6 +75,9 @@ export const rateLimitMiddleware = (limiter, getKey) => {
   };
 };
 
+app.get("/testz", (req, res) => {
+  return res.status(200).json({ message: "Serving" });
+});
 app.post(
   "/github-webhook",
   express.raw({ type: "application/json" }),
@@ -95,23 +100,14 @@ app.post(
 
       const calculatedSignature =
         "sha256=" +
-        crypto
-          .createHmac("sha256", secret)
-          .update(req.body)
-          .digest("hex");
+        crypto.createHmac("sha256", secret).update(req.body).digest("hex");
 
       const signatureBuffer = Buffer.from(signature, "utf8");
-      const calculatedBuffer = Buffer.from(
-        calculatedSignature,
-        "utf8"
-      );
+      const calculatedBuffer = Buffer.from(calculatedSignature, "utf8");
 
       if (
         signatureBuffer.length !== calculatedBuffer.length ||
-        !crypto.timingSafeEqual(
-          signatureBuffer,
-          calculatedBuffer
-        )
+        !crypto.timingSafeEqual(signatureBuffer, calculatedBuffer)
       ) {
         return res.status(403).json({
           message: "Unauthorized!",
@@ -152,7 +148,7 @@ app.post(
         });
       }
     }
-  }
+  },
 );
 app.use((req, res, next) => {
   if (
@@ -165,8 +161,6 @@ app.use((req, res, next) => {
 
   express.json()(req, res, next);
 });
-
-
 
 app.use(
   "/file",
