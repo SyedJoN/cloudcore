@@ -310,7 +310,7 @@ export const searchUsers = async (req, res, next) => {
       return res.status(404).json({ message: "User Id is required!" });
     }
     const allUsers = await User.find()
-      .select("name email avatar")
+      .select("name email avatar provider")
       .lean();
     if (!allUsers.length) {
       return res.status(404).json({ users: [], message: "Users not found" });
