@@ -22,6 +22,7 @@ function RoleDropdownContent({
   onChange,
   onTransfer,
   onCancel,
+  person,
   onClose,
   isOwner = false,
   showRemove = false,
@@ -72,6 +73,8 @@ function RoleDropdownContent({
   }, [onClose]);
   if (!rect || !open) return null;
 
+  const showTransferOwnerShip = person?.emailAddress?.split('@')[1] === "gmail.com";
+
   return (
     <div
       ref={menuRef}
@@ -115,7 +118,7 @@ function RoleDropdownContent({
       })}
       {isOwner || (showRemove && <div className="gd-context-divider" />)}
 
-      {isOwner && (
+      {isOwner && showTransferOwnerShip && (
         <>
           <MouseTooltip
             disabled={isChanged}

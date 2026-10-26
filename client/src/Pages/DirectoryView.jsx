@@ -513,6 +513,7 @@ export default function DirectoryView({ route }) {
             email: u.email,
             role: u.role,
             avatar: u.avatar,
+            provider: u.provider,
           })),
         );
       } catch (err) {

@@ -16,9 +16,7 @@ import {
 import "./ShareModal.css";
 import { useClickOutside } from "../../Hooks/useClickOutside.jsx";
 import { UseAvatar } from "../../Hooks/useAvatar.jsx";
-import {
-  grantAccessById,
-} from "../../../apis/fileApi.js";
+import { grantAccessById } from "../../../apis/fileApi.js";
 import { useToast } from "../../Contexts/ToastContext.jsx";
 import {
   cancelPendingOwnership,
@@ -32,7 +30,6 @@ import { updateItemState } from "../../../utils/updateItemState.js";
 import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";
-
 
 export const ROLE_PRIORITY = {
   reader: 1,
@@ -292,7 +289,7 @@ export default function ShareModal({
       const finalPermissions = [...updatedPermissions, ...newPermissions];
 
       const childrenIds = isGoogleDriveRoute
-        ? [itemId, ...item.childrenIds ?? []]
+        ? [itemId, ...(item.childrenIds ?? [])]
         : [itemId];
 
       setFilesList((list) =>
@@ -977,22 +974,24 @@ export default function ShareModal({
                         inviteSuggestions.length > 0 && (
                           <div className="people-card-container transition-grow">
                             {inviteSuggestions
-                              .filter((user) => user?.email)
                               .filter((user) => {
-                                const owners =
-                                  item.owners?.map((o) =>
-                                    o.emailAddress?.toLowerCase(),
-                                  ) || [];
+                                const email = user?.email?.toLowerCase();
+                                if (!email) return false;
 
-                                const accessEmails = peopleWithAccess.map((p) =>
-                                  p.emailAddress?.toLowerCase(),
-                                );
+                                if (
+                                  isGoogleDriveRoute &&
+                                  user.provider === "local"
+                                )
+                                  return false;
 
-                           
-
-                                return [...owners, ...accessEmails].includes(
-                                  user.email?.toLowerCase(),
-                                );
+                                return ![
+                                  ...(item.owners || []).map(
+                                    (o) => o.emailAddress,
+                                  ),
+                                  ...peopleWithAccess.map(
+                                    (p) => p.emailAddress,
+                                  ),
+                                ].some((e) => e?.toLowerCase() === email);
                               })
 
                               .map((user) => (
@@ -1135,7 +1134,6 @@ export default function ShareModal({
               ) : (
                 /* ── Normal share view ── */
                 <>
-   
                   <div style={{ margin: "0 24px", position: "relative" }}>
                     <div className="gd-share-invite-row">
                       <div className="gd-share-input-wrap">
@@ -1165,24 +1163,24 @@ export default function ShareModal({
                       className={`people-card-container ${showSuggestions ? "transition-grow" : ""}`}
                     >
                       {suggestions
-                        .filter((user) => {
-                          const owners =
+                        .filter((s) => {
+                          const email = s.email?.toLowerCase();
+                          if (!email) return false;
+
+                          if (email === user.email) return false;
+
+                          const ownerEmails =
                             item.owners?.map((o) =>
                               o.emailAddress?.toLowerCase(),
                             ) || [];
-
-                          const isOwner = owners.includes(
-                            user.email?.toLowerCase(),
+                          if (ownerEmails.includes(email)) return false;
+                          if (isGoogleDriveRoute) {
+                            if (s.provider === "local") return false;
+                          }
+                          const alreadyAdded = peopleWithAccess.some(
+                            (p) => p.emailAddress?.toLowerCase() === email,
                           );
-
-                   
-                          const addedPeople = peopleWithAccess.some(
-                            (p) =>
-                              p.emailAddress?.toLowerCase() ===
-                              user.email?.toLowerCase(),
-                          );
-
-                          return !addedPeople;
+                          return !alreadyAdded;
                         })
                         .map((user) => (
                           <div
@@ -1322,6 +1320,7 @@ export default function ShareModal({
                                     onClose={() => setOpenDropdown(null)}
                                     showRemove={true}
                                     isOwner={isOwner}
+                                    person={person}
                                   />
                                 </div>
                               </div>
@@ -1337,9 +1336,7 @@ export default function ShareModal({
                   <div className="gd-share-section-label">General access</div>
 
                   <div className="gd-share-link-section">
-                    <div
-                      className={`gd-share-link-row`}
-                    >
+                    <div className={`gd-share-link-row`}>
                       <div
                         className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
                       >
@@ -1357,7 +1354,6 @@ export default function ShareModal({
                           style={{ position: "relative" }}
                         >
                           <button
-          
                             className="gd-share-access-btn"
                             onClick={() =>
                               setShowAccessDropdown(!showAccessDropdown)
