@@ -164,8 +164,8 @@ export const sendOwnershipTransferEmail = async ({
   transferId,
   expiresAt,
 }) => {
-  const acceptUrl = `${process.env.SERVER_URL}/item/ownership-transfer/${transferId}/accept`;
-  const rejectUrl = `${process.env.SERVER_URL}/item/ownership-transfer/${transferId}/reject`;
+  const acceptUrl = `${process.env.ENVIRONMENT === "production" ? process.env.PUBLIC_URL : process.env.SERVER_URL}/item/ownership-transfer/${transferId}/accept`;
+  const rejectUrl = `${process.env.ENVIRONMENT === "production" ? process.env.PUBLIC_URL : process.env.SERVER_URL}/item/ownership-transfer/${transferId}/reject`;
 
   const formattedItemType = itemType === "Directory" ? "folder" : "file";
 
