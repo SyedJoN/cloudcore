@@ -1522,15 +1522,24 @@ export const sendOwnershipMail = async (req, res, next) => {
       let result;
 
       if (existingPermission) {
-        result = drive.permissions.update({
-          fileId: itemId,
-          permissionId: existingPermission.id,
-          requestBody: {
-            role: "writer",
-            pendingOwner: true,
-          },
-          fields: "id,type,emailAddress,role,pendingOwner",
-        });
+        try {
+    result = await drive.permissions.update({
+      fileId: itemId,
+      permissionId: existingPermission.id,
+      requestBody: { role: "writer", pendingOwner: true },
+      fields: "id,type,emailAddress,role,pendingOwner",
+    });
+  } catch (err) {
+    const reason = err?.response?.data?.error?.errors?.[0]?.reason;
+    if (reason === "targetUserCannotBePendingOwnerOnFile") {
+      return res.status(400).json({
+        message:
+          "This account can't receive ownership from a personal Google account. Ask them to make a copy, or use a Gmail account.",
+        reason,
+      });
+    }
+    throw err;
+  }
       } else {
         result = await drive.permissions.create({
           fileId: itemId,
