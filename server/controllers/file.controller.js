@@ -1,6 +1,7 @@
 import { createWriteStream } from "fs";
 import { rename, rm } from "fs/promises";
 import path from "path";
+import { Readable } from "node:stream";
 import { fileURLToPath } from "url";
 import Directory from "../models/directory.model.js";
 import File from "../models/file.model.js";
@@ -34,6 +35,7 @@ import { getCapabilities } from "../utils/permissions/getCapabilities.js";
 import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
+import { getCreateCloudfrontSignedUrl } from "../services/s3/cloudfront.js";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -606,28 +608,31 @@ export const getFileById = async (req, res, next) => {
 
     const s3Key = `${file._id}${file.extension}`;
     if (req.query.action === "download") {
-      const url = await createGetSignedUrl({
-        s3Key,
-        fileName: file.name,
+      const url = getCreateCloudfrontSignedUrl({
+        path: s3Key,
         download: true,
-      });
-      return res.redirect(url);
-    }
-
-    const s3Response = await getFile(s3Key);
-
-    if (!s3Response.ContentType?.startsWith("text/")) {
-      const url = await createGetSignedUrl({
-        s3Key,
         fileName: file.name,
       });
+      return res.redirect(url);
+    }
+    const url = getCreateCloudfrontSignedUrl({
+      path: s3Key,
+      fileName: file.name,
+    });
 
+    const s3Response = await fetch(url);
+    if (!s3Response.ok) {
+      return res.status(s3Response.status).send("Failed to fetch file");
+    }
+    const contentType = s3Response.headers.get("content-type");
+    if (!contentType?.startsWith("text/")) {
       return res.redirect(url);
     }
 
-    res.setHeader("Content-Type", s3Response.ContentType || "text/plain");
+    res.setHeader("Content-Type", contentType || "text/plain");
     await file.save();
-    return s3Response.Body.pipe(res);
+
+    return Readable.fromWeb(s3Response.body).pipe(res);
   } catch (error) {
     next(error);
   }
