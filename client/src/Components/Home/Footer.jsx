@@ -5,7 +5,7 @@ export default function Footer() {
   const columns = [
     {
       title: "Product",
-      links: ["Features", "Pricing", "Security", "FAQ"],
+      links: ["Features", "Pricing", "Security", "FAQ", "How it works"],
     },
     {
       title: "Legal",

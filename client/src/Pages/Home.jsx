@@ -12,6 +12,7 @@ import {
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Contexts/AuthContext.jsx";
+import HowItWorks from "../Components/Home/HowItWorks.jsx";
 
 const FONT_IMPORT = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -95,6 +96,7 @@ export default function Home() {
       <Header/>
       <Hero />
       <Features />
+      <HowItWorks/>
       <Pricing />
       <SecurityBand />
       <FAQ />

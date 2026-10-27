@@ -1,4 +1,4 @@
-import { Globe2, Lock, RefreshCw } from "lucide-react";
+import { Globe2, Lock, Share2 } from "lucide-react";
 
 export default function Features() {
   const items = [
@@ -8,9 +8,9 @@ export default function Features() {
       desc: "Files are encrypted before they leave your device. Only you hold the key.",
     },
     {
-      icon: RefreshCw,
-      title: "Instant sync",
-      desc: "Edits show up everywhere in seconds, across desktop, mobile, and web.",
+      icon: Share2,
+      title: "Easy sharing",
+      desc: "Share files and folders with a link or invite people by email, and choose who can open them.",
     },
     {
       icon: Globe2,
@@ -21,6 +21,9 @@ export default function Features() {
 
   return (
     <section id="features" className="relative border-t border-white/5">
+         <div>
+        <img className="max-w-1xl md:max-w-6xl mx-auto" src="./homepage.png" />
+      </div>
       <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-3 gap-8">
         {items.map(({ icon: Icon, title, desc }) => (
           <div key={title} className="cc-card rounded-2xl p-6">

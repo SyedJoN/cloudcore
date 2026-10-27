@@ -9,21 +9,16 @@ export default function Hero() {
 
       <div className="relative max-w-6xl mx-auto px-6 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-2 gap-14 items-center">
         <div>
-          <div className="inline-flex items-center gap-2 text-xs font-medium text-[#9fd8fb] bg-[#0f1a3d] border border-[#38bdf8]/30 rounded-full px-3 py-1 mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
-            Now with Google Drive integration
-          </div>
-
+         
           <h1 className="cc-display text-4xl md:text-5xl lg:text-6xl font-semibold text-white leading-[1.08] mb-6">
             Your files, held at the core.
           </h1>
-
-          <p className="text-base md:text-lg text-[#a9bbdc] max-w-md mb-9 leading-relaxed">
-            CloudCore keeps every photo, document, and project synced across
-            your devices and encrypted end to end — so it's always where you
-            left it, and nowhere anyone else can reach.
-          </p>
-
+ <div className="inline-flex items-center gap-2 text-xs font-medium text-[#9fd8fb] bg-[#0f1a3d] border border-[#38bdf8]/30 rounded-full px-3 py-1 mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8]" />
+            Now with Google Drive integration
+          </div>
+          <img className="mb-6" src="/background-overlay.png" />
+        
           <div className="flex flex-wrap items-center gap-4">
             <a
               href="/login"
@@ -33,7 +28,7 @@ export default function Hero() {
               <ChevronRight size={16} />
             </a>
             <a
-              href="#features"
+              href="#howitworks"
               className="text-sm font-medium text-[#c3d2ef] hover:text-white transition-colors px-5 py-3 cc-focus rounded-lg"
             >
               See how it works
