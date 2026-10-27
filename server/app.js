@@ -17,6 +17,7 @@ import { validateDeletedUser } from "./middlewares/validateUserMiddleware.js";
 import { optionalAuth } from "./middlewares/optionalAuthMiddleware.js";
 import { config } from "./config/config.js";
 import { LIMITERS } from "./config/limiters.js";
+import { RateLimiterRes } from "rate-limiter-flexible";
 
 import {
   getSharedWithMe,
