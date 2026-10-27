@@ -2697,7 +2697,7 @@ export const copyItem = async (req, res, next) => {
             "id,name,mimeType,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
         });
 
-        const permissions = drive.permissions.list({
+        const permissions = await drive.permissions.list({
           fileId: copiedFile.data.id,
           fields:
             "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
@@ -2882,6 +2882,11 @@ export const copyItem = async (req, res, next) => {
       },
     });
   } catch (error) {
+    if (error?.code === 403) {
+    return res.status(403).json({
+      message: error?.cause?.message || "You can't copy this file",
+    });
+  }
     next(error);
   }
 };
