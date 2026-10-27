@@ -6,7 +6,7 @@ import { useAuth } from "../../Contexts/AuthContext";
 export default function Header() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const {loggedIn} = useAuth();
+  const { loggedIn } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
