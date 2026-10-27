@@ -15,7 +15,7 @@ export default function Features() {
     {
       icon: Globe2,
       title: "Access anywhere",
-      desc: "Reach your files from any device, online or off, with local caching built in.",
+      desc: "Upload from your phone, open it on your laptop. Your files are always a login away.",
     },
   ];
 
