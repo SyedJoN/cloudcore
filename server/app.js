@@ -1,7 +1,6 @@
 import express from "express";
 import helmet from "helmet";
 import cors from "cors";
-import crypto from "crypto";
 
 import readFileRoutes from "./routes/readFileRoutes.js";
 import writeFileRoutes from "./routes/writeFileRoutes.js";
@@ -31,10 +30,7 @@ import {
   copyItem,
   moveItem,
 } from "./controllers/directory.controller.js";
-import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
-import { execSync, spawn } from "child_process";
-
 const app = express();
 
 const PORT = config.port || 4000;
@@ -58,25 +54,35 @@ app.use(
 
 app.use(cookieParser(process.env.SESSION_SECRET));
 
+const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export const rateLimitMiddleware = (limiter, getKey) => {
   return async (req, res, next) => {
-    try {
-      const key = getKey ? getKey(req) : req.user?._id || req.ip;
+    const key = getKey ? getKey(req) : req.user?._id?.toString() || req.ip;
 
+    try {
       await limiter.consume(key);
-      next();
+      return next();
     } catch (err) {
-      res.status(429).json({
-        error: "Too many requests",
-      });
+      // Real rate-limit rejection
+      if (err instanceof RateLimiterRes) {
+        res.set("Retry-After", Math.ceil(err.msBeforeNext / 1000));
+        return res.status(429).json({ error: "Too many requests" });
+      }
+
+      // Store failure (Redis/Mongo down or slow): log it and fail open
+      console.error("Rate limiter error:", err);
+      return next();
     }
   };
 };
-
-app.get("/healthz", (req, res) => {
-  return res.status(200).json({ message: "SERVING" });
-});
-
+// Picks ONE limiter per request based on HTTP method
+export const rateLimitByMethod = (readLimiter, writeLimiter) => {
+  const read = rateLimitMiddleware(readLimiter);
+  const write = rateLimitMiddleware(writeLimiter);
+  return (req, res, next) =>
+    (READ_METHODS.has(req.method) ? read : write)(req, res, next);
+};
 app.use((req, res, next) => {
   if (
     req.method === "POST" &&
@@ -89,35 +95,30 @@ app.use((req, res, next) => {
   express.json()(req, res, next);
 });
 
+app.get("/healthz", (req, res) => {
+  return res.status(200).json({ message: "SERVING" });
+});
+
 app.use(
   "/file",
-  rateLimitMiddleware(LIMITERS.readFileOps),
+  rateLimitByMethod(LIMITERS.readFileOps, LIMITERS.writeFileOps),
   optionalAuth,
   readFileRoutes,
-);
-app.use(
-  "/file",
-  rateLimitMiddleware(LIMITERS.writeFileOps),
-  optionalAuth,
   writeFileRoutes,
 );
 
 app.use(
   "/directory",
-  rateLimitMiddleware(LIMITERS.readDirOps),
+  rateLimitByMethod(LIMITERS.readDirOps, LIMITERS.writeDirOps),
   checkAuth,
   readDirRoutes,
-);
-app.use(
-  "/directory",
-  rateLimitMiddleware(LIMITERS.writeDirOps),
-  checkAuth,
   writeDirRoutes,
 );
 
+app.use("/auth", rateLimitMiddleware(LIMITERS.auth), authRoutes);
+
 app.use("/subscription", subscriptionRoutes);
 app.use("/user", checkAuth, validateDeletedUser, userRoutes);
-app.use("/auth", rateLimitMiddleware(LIMITERS.auth), authRoutes);
 app.get("/shared", checkAuth, getSharedWithMe);
 app.get("/starred", checkAuth, getStarredItems);
 app.get("/trash/{:id}", checkAuth, getTrashItems);
