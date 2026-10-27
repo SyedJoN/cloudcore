@@ -2694,7 +2694,7 @@ export const copyItem = async (req, res, next) => {
             name: `Copy of ${item.name}`,
           },
           fields:
-            "id,name,mimeType,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+            "id,name,mimeType,webViewLink,owners,createdTime, modifiedTime,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
         });
 
         const permissions = await drive.permissions.list({

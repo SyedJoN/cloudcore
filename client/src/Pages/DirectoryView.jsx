@@ -431,7 +431,7 @@ export default function DirectoryView({ route }) {
           navigate(`/directory/${directoryId}`);
         }
         if (isGoogleDriveRoute) {
-          navigate('/');
+          navigate("/");
         }
       } catch (err) {
         console.error("Resumed Drive upload failed:", err);
@@ -1680,6 +1680,8 @@ export default function DirectoryView({ route }) {
         owners,
         capabilities,
         permissions,
+        sortName: item.name,
+        sortModifiedTime: item.modifiedTime || item.updatedAt,
         isDirectory: type === "folder",
       };
 
@@ -1939,8 +1941,8 @@ export default function DirectoryView({ route }) {
 
             {error && (
               <div className="gd-error-banner">
-                <IconInfo size={16} />{error?.message || String(error)}
-
+                <IconInfo size={16} />
+                {error?.message || String(error)}
               </div>
             )}
             {moveItem && (

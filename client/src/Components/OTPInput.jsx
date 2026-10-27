@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useState, useRef } from "react";
 
 function OTPInput({
-  length = 4,
+  length = 6,
   onChange,
   otpError,
   handleOtpSubmit,
@@ -54,7 +54,7 @@ function OTPInput({
       <div style={{ textAlign: "center", marginTop: "18px" }} className="container">
         <h2 className="heading">Verify OTP</h2>
         <p className="otp-label">
-          Enter 4-digit OTP sent to your email-address
+          Enter {length}-digit OTP sent to your email-address
         </p>
       </div>
       <div

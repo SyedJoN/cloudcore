@@ -70,29 +70,33 @@ const Login = () => {
       setServerError("");
       setOtpError("");
     } catch (err) {
-      const cause = err.response?.data?.cause;
+  const data = err.response?.data || {};
+  const error = data.message || err.message;
+  const { cause, timeLeft } = data;
 
-      if (cause === "cooldown") {
-        const timeLeft = err.response.data.timeLeft;
+  if (cause === "otp_expiry") {
+    setOtpError(error + ". Resend OTP to get new OTP");
+    return;
+  }
 
-        setServerError(err.message);
-        setisCooldown(true);
+ 
+    const wait = timeLeft || 60;
+    setOtpError(`${error}. Redirecting to the login page`);
+    setisCooldown(true);
+    setTimeout(() => {
+      setShowOtp(false);
+      setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
+      // keep the button disabled for the full wait, not just 2 seconds
+      setTimeout(() => {
+        setisCooldown(false);
+        setServerError("");
+      }, wait * 1000);
+    }, 2000);
+    return;
+  
 
-        const ms = timeLeft * 1000;
-
-        const expiresAt = Date.now() + ms;
-        localStorage.setItem("cooldownExpiry", expiresAt);
-
-        setTimeout(() => {
-          setisCooldown(false);
-          localStorage.removeItem("cooldownExpiry");
-          setServerError("");
-        }, ms);
-        return;
-      }
-      setServerError(err.message || "Something went wrong. Please try again.");
-      console.error("Error:", err.message);
-    } finally {
+  // setOtpError(error);
+} finally {
       setLoading(false);
     }
   };
@@ -133,21 +137,22 @@ const Login = () => {
     } catch (err) {
       const error = err.message;
       const cause = err.response?.data?.cause;
+      const timeLeft = err.response?.data?.timeLeft;
+      
       if (cause === "otp_expiry") {
         setOtpError(error + ". Resend OTP to get new OTP");
         return;
       }
-      if (cause === "otp_limit") {
-        setOtpError(
-          `${error || "Something went wrong during OTP"} redirecting to the login page`,
-        );
-        setisCooldown(true);
-        setServerError("You are on cooldown wait 60s before retrying");
-        setTimeout(() => {
-          setShowOtp(false);
-          setisCooldown(false);
-        }, 2000);
-      }
+  if (cause === "otp_limit") {
+  const wait = timeLeft || 60; 
+  setOtpError(`${error || "Too many attempts"}. Redirecting to the login page`);
+  setisCooldown(true);
+  setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
+  setTimeout(() => {
+    setShowOtp(false);
+    setisCooldown(false);
+  }, 2000);
+}
       setOtpError(error);
       console.error(err);
     } finally {
@@ -170,6 +175,7 @@ const Login = () => {
     setResendLoading(true);
     try {
       await sendOtp({
+        caller: "login",
         email: formData.email,
       });
       setOtpError("");
@@ -180,7 +186,7 @@ const Login = () => {
       } else if (err.response?.data?.cause === "smtp_failed") {
         alert(err.message);
       } else {
-        setOtpError(err.message || "Something went wrong");
+      setOtpError(err.response?.data?.message || err.message || "Something went wrong");
       }
     } finally {
       setResendLoading(false);
