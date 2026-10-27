@@ -102,7 +102,7 @@ app.get("/healthz", (req, res) => {
 
 app.use(
   "/file",
-  // rateLimitByMethod(LIMITERS.readFileOps, LIMITERS.writeFileOps),
+  rateLimitByMethod(LIMITERS.readFileOps, LIMITERS.writeFileOps),
   optionalAuth,
   readFileRoutes,
   writeFileRoutes,
@@ -110,7 +110,7 @@ app.use(
 
 app.use(
   "/directory",
-  // rateLimitByMethod(LIMITERS.readDirOps, LIMITERS.writeDirOps),
+  rateLimitByMethod(LIMITERS.readDirOps, LIMITERS.writeDirOps),
   checkAuth,
   readDirRoutes,
   writeDirRoutes,
