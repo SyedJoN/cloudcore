@@ -100,21 +100,21 @@ app.get("/healthz", (req, res) => {
   return res.status(200).json({ message: "SERVING" });
 });
 
-// app.use(
-//   "/file",
-//   rateLimitByMethod(LIMITERS.readFileOps, LIMITERS.writeFileOps),
-//   optionalAuth,
-//   readFileRoutes,
-//   writeFileRoutes,
-// );
+app.use(
+  "/file",
+  // rateLimitByMethod(LIMITERS.readFileOps, LIMITERS.writeFileOps),
+  optionalAuth,
+  readFileRoutes,
+  writeFileRoutes,
+);
 
-// app.use(
-//   "/directory",
-//   rateLimitByMethod(LIMITERS.readDirOps, LIMITERS.writeDirOps),
-//   checkAuth,
-//   readDirRoutes,
-//   writeDirRoutes,
-// );
+app.use(
+  "/directory",
+  // rateLimitByMethod(LIMITERS.readDirOps, LIMITERS.writeDirOps),
+  checkAuth,
+  readDirRoutes,
+  writeDirRoutes,
+);
 
 app.use("/auth", rateLimitMiddleware(LIMITERS.auth), authRoutes);
 
