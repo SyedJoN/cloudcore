@@ -22,7 +22,7 @@ export default function Features() {
   return (
     <section id="features" className="relative border-t border-white/5">
          <div>
-        <img className="max-w-1xl md:max-w-6xl pt-20 mx-auto" src="./homepage.png" />
+        <img alt="drive-view" className="max-w-1xl md:max-w-6xl pt-20 mx-auto" src="./homepage.png" />
       </div>
       <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-3 gap-8">
         {items.map(({ icon: Icon, title, desc }) => (
