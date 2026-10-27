@@ -33,7 +33,7 @@ import {
 } from "./controllers/directory.controller.js";
 import { createSubscription } from "./controllers/subscriptionController.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
-import { spawn } from "child_process";
+import { execSync, spawn } from "child_process";
 
 const app = express();
 
@@ -112,33 +112,59 @@ app.post(
         });
       }
 
+      const payload = JSON.parse(req.body.toString("utf8"));
+
+    
+
+      if (payload.ref !== "refs/heads/main") {
+        return res.status(200).json({ message: "Ignored branch" });
+      }
       res.status(200).json({ message: "OK" });
 
-      const bashChildProcess = spawn(
-        "bash",
-        ["/home/ubuntu/deploy-backend.sh"],
-        { detached: true },
-      );
+      const { before, after } = payload;
 
-      bashChildProcess.stdout.on("data", (data) => {
-        process.stdout.write(data);
+        if (
+        !/^[a-f0-9]{40}$/i.test(before || "") ||
+        !/^[a-f0-9]{40}$/i.test(after || "") ||
+        /^0+$/.test(before)
+      ) {
+        console.log(
+          "Invalid commit range or initial push. Skipping deployment.",
+        );
+        return;
+      }
+
+      const changed = execSync(`git diff ${before} ${after} --name-only`, {
+        cwd: "/home/ubuntu/cloudcore",
+        encoding: "utf8",
       });
 
-      bashChildProcess.stderr.on("data", (data) => {
-        process.stderr.write(data);
-      });
+      const scripts = [];
+      if (changed.includes("client/")) {
+        scripts.push("/home/ubuntu/deploy-frontend.sh");
+      }
 
-      bashChildProcess.on("close", (code) => {
-        if (code === 0) {
-          console.log("Script executed successfully!");
-        } else {
-          console.error("Script failed with exit code:", code);
-        }
-      });
+      if (changed.includes("server/")) {
+        scripts.push("/home/ubuntu/deploy-backend.sh");
+      }
 
-      bashChildProcess.on("error", (err) => {
-        console.error("Error spawning the process:", err);
-      });
+      for (const script of scripts) {
+        const child = spawn("bash", [script], {
+          stdio: "inherit",
+        });
+
+        child.on("close", (code) => {
+          if (code === 0) {
+            console.log(`${script} executed successfully!`);
+          } else {
+            console.error(`${script} failed with exit code:`, code);
+          }
+        });
+
+        child.on("error", (err) => {
+          console.error(`Error spawning ${script}:`, err);
+        });
+      }
     } catch (error) {
       console.error("GitHub webhook error:", error);
 
