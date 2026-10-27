@@ -58,7 +58,7 @@ export default function Footer() {
               ].map(({ icon: Icon, href, label }) => (
                 <a
                   key={label}
-                  href={href}
+                  href={decodeURIComponent(href).replaceAll(" ", "")}
                   aria-label={label}
                   target={label === "Email" ? undefined : "_blank"}
                   rel={label === "Email" ? undefined : "noopener noreferrer"}
