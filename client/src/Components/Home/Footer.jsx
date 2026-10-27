@@ -58,7 +58,7 @@ export default function Footer() {
               ].map(({ icon: Icon, href, label }) => (
                 <a
                   key={label}
-                  href={decodeURIComponent(href).replaceAll(" ", "")}
+                  href={href}
                   aria-label={label}
                   target={label === "Email" ? undefined : "_blank"}
                   rel={label === "Email" ? undefined : "noopener noreferrer"}
@@ -83,7 +83,7 @@ export default function Footer() {
                   const href =
                     typeof item === "string"
                       ? col.title === "Product"
-                        ? `#${item.toLowerCase()}`
+                        ? `#${decodeURIComponent(item).toLowerCase().replaceAll(" ", "")}`
                         : `/${item.toLowerCase()}`
                       : item.href;
 
