@@ -12,18 +12,19 @@ redisClient.on("error", (err) => {
   console.error("Redis error:", err.message);
 });
 
-export const createLimiter = ({ points, duration, keyPrefix }) => {
+export const createLimiter = ({ points, duration, blockDuration = 0, keyPrefix }) => {
   return new RateLimiterRedis({
     storeClient: redisClient,
     keyPrefix,
     points,
     duration,
+    blockDuration,
 
     // Once a key is over the limit, block it locally without calling Redis
     inMemoryBlockOnConsumed: points + 1,
-    inMemoryBlockDuration: duration,
+    inMemoryBlockDuration: blockDuration || duration,
 
     // If Redis is down or slow, fall back to per-instance memory limiting
-    insuranceLimiter: new RateLimiterMemory({ points, duration, keyPrefix }),
+    insuranceLimiter: new RateLimiterMemory({ points, duration, blockDuration, keyPrefix }),
   });
 };

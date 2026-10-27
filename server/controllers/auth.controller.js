@@ -1,15 +1,13 @@
 import User from "../models/user.model.js";
 import Directory from "../models/directory.model.js";
 import mongoose, { Types } from "mongoose";
-import { sendOtpMail } from "../services/sendOtpService.js";
+import { hashOtp, sendOtpMail } from "../services/sendOtpService.js";
 import OTP from "../models/otp.model.js";
 import {
   fetchTokenForDrive,
   fetchUserUsingIdToken,
 } from "../services/googleAuthService.js";
 import { fetchGithubUser } from "../services/githubAuthService.js";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
 import { fgaClient } from "../services/openFGAService.js";
 import redisClient from "../config/redis.js";
 import {
@@ -19,53 +17,32 @@ import {
 } from "../validators/authSchema.js";
 import z from "zod";
 import { sanitizeText } from "../utils/sanitizeText.js";
-import Subscription from "../models/subscription.model.js";
 import { getDriveClient } from "../services/googleDriveClient.js";
+import { LIMITERS } from "../config/limiters.js";
 
-let MAX_TRIES = 2;
 let isProduction = process.env.NODE_ENV === "production";
 
 export const registerUser = async (req, res, next) => {
-  const { success, data, error } = registerSchema.safeParse(req.body);
-
-  if (!success) {
-    console.log(z.flattenError(error).fieldErrors);
-    return res.status(400).json({
-      error:
-        error.issues.map((i) => i.message) ||
-        "Invalid input, please enter valid details",
-    });
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: parsed.error.issues.map((i) => i.message) });
   }
-  const { name, email, password } = data;
+  const { name, email, password } = parsed.data; 
 
+  const safeName = sanitizeText(name);
+  const verifiedKey = `verified:${email}`;
   const session = await mongoose.startSession();
 
   try {
-    if (
-      ![email, name, password].every((v) => typeof v === "string" && v.trim())
-    ) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-    const safeName = sanitizeText(name);
-    const safeEmail = sanitizeText(email);
-    const existingUser = await User.findOne({ email: safeEmail });
 
-    if (existingUser) {
-      return res.status(409).json({
-        message: "Email already exists",
-      });
-    }
-
-    const otp = await OTP.findOne({ email: safeEmail });
-    if (!otp) {
-      return res.status(404).json({
-        message: "OTP is expired or not found",
-      });
-    }
-    const verified = await redisClient.get(`verified:${safeEmail}`);
-
-    if (!verified) {
+    if (!(await redisClient.get(verifiedKey))) {
       return res.status(403).json({ message: "OTP not verified" });
+    }
+
+    if (await User.findOne({ email })) {
+      return res.status(409).json({ message: "Email already exists" });
     }
 
     await session.withTransaction(async () => {
@@ -73,14 +50,7 @@ export const registerUser = async (req, res, next) => {
       const dirId = new Types.ObjectId();
 
       await Directory.create(
-        [
-          {
-            _id: dirId,
-            name: `root-${safeEmail}`,
-            parentDirId: null,
-            userId,
-          },
-        ],
+        [{ _id: dirId, name: `root-${email}`, parentDirId: null, userId }],
         { session },
       );
 
@@ -89,7 +59,7 @@ export const registerUser = async (req, res, next) => {
           {
             _id: userId,
             name: safeName,
-            email: safeEmail,
+            email,
             password,
             provider: "local",
             parentDirId: dirId,
@@ -109,34 +79,23 @@ export const registerUser = async (req, res, next) => {
       });
     });
 
-    await redisClient.del(`verified:${safeEmail}`);
-    await otp.deleteOne();
+    await redisClient.del(verifiedKey);
+
     return res.status(201).json({ message: "User Registered" });
   } catch (error) {
-    console.log("FULL ERROR:", error);
-    // Mongoose validation error
     if (error?.name === "ValidationError" && error?.errors) {
       const msg = Object.values(error.errors)
         .map((e) => e.message)
         .join(", ");
-
       return res.status(400).json({ message: msg });
     }
-
-    // MongoDB schema validation
     if (error?.code === 121) {
       return res.status(400).json({ message: "Invalid input data" });
     }
-
-    // Duplicate key
     if (error?.code === 11000) {
-      return res.status(409).json({ message: "Duplicate entry" });
+      return res.status(409).json({ message: "Email already exists" });
     }
-
-    // fallback
-    return res.status(500).json({
-      message: error?.message || "Internal Server Error",
-    });
+    next(error);
   } finally {
     session.endSession();
   }
@@ -144,51 +103,56 @@ export const registerUser = async (req, res, next) => {
 
 export const loginUser = async (req, res, next) => {
   try {
-    const { success, data, error } = loginSchema.safeParse(req.body);
-
-    if (!success) {
-      console.log(z.flattenError(error).fieldErrors);
-
-      return res.status(400).json({
-        error:
-          error.issues.map((i) => i.message) ||
-          "Invalid input, please enter valid details",
-      });
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: parsed.error.issues.map((i) => i.message) });
     }
-    const { email, password } = data;
+    const { email, password } = parsed.data;
+
+    // email + IP: a stranger can't lock the real user out
+    const key = `${email.toLowerCase()}_${req.ip}`;
+
+    const state = await LIMITERS.authAccount.get(key).catch(() => null);
+    if (state && state.remainingPoints <= 0) {
+      res.set("Retry-After", Math.ceil(state.msBeforeNext / 1000));
+      return res
+        .status(429)
+        .json({ message: "Too many attempts. Try again later." });
+    }
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: "user not found" });
+    const isPasswordValid = user ? await user.comparePassword(password) : false;
+
+    if (!isPasswordValid) {
+      await LIMITERS.authAccount.consume(key).catch(() => {}); // count failures only
+      return res.status(401).json({ message: "Invalid credentials" });
     }
-    if (user.isDeleted)
+
+    await LIMITERS.authAccount.delete(key).catch(() => {});
+
+    if (user.isDeleted) {
       return res.status(403).json({
         message: "Account deleted. To recover, contact owner.",
         code: "ACCOUNT_DELETED",
       });
-    if (user.cooldown && user.cooldown > new Date()) {
-      const remaining = Math.ceil(
-        (user.cooldown.getTime() - Date.now()) / 1000,
-      );
-
+    }
+    await redisClient.set(`login-pending:${email}`, "1", { EX: 600 });
+    const mail = await sendOtpMail(email, "login");
+    if (mail.rateLimited) {
+      res.set("Retry-After", mail.retryAfter);
       return res.status(429).json({
-        message: `Wait ${remaining} seconds before retrying`,
         cause: "cooldown",
-        timeLeft: remaining,
+        message: mail.error,
+        timeLeft: mail.retryAfter,
       });
     }
-    const isPasswordValid = await user.comparePassword(password);
+    if (mail.error) return res.status(400).json({ message: mail.error });
 
-    if (!isPasswordValid) {
-      return res.status(409).json({ message: "Invalid credentials" });
-    }
-    const mail = await sendOtpMail(email);
-    if (mail.error) {
-      return res.status(409).json({ message: mail.error });
-    }
     return res
       .status(200)
-      .json({ success: true, message: "Login process iniated, verify" });
+      .json({ success: true, message: "Login process initiated, verify" });
   } catch (error) {
     next(error);
   }
@@ -254,182 +218,169 @@ export const logoutAll = async (req, res, next) => {
   }
 };
 
-export const sendOtp = async (req, res, next) => {
-  try {
-    const { email, caller } = req.body;
-    if (typeof email !== "string" || !email.trim()) {
-      return res.status(400).json({ message: "email should not be empty" });
-    }
-    if (caller === "register") {
-      const ttl = await redisClient.ttl(`cooldown:${email}`);
+const sendOtpSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(254),
+  caller: z.enum(["register", "login"]),
+});
 
-      if (ttl > 0) {
-        return res.status(429).json({
-          message: `Wait ${ttl} seconds before retrying`,
-          cause: "cooldown",
-          timeLeft: ttl,
-        });
-      }
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
+export const sendOtp = async (req, res) => {
+  try {
+    const parsed = sendOtpSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid email" });
+    }
+    const { email, caller } = parsed.data;
+
+    if (caller === "register") {
+      if (await User.findOne({ email })) {
         return res
           .status(409)
           .json({ cause: "duplicate_email", message: "Email already exists!" });
       }
+    } else {
+      // login resend: only allowed right after a correct password
+      if (!(await redisClient.get(`login-pending:${email}`))) {
+        return res.status(403).json({ message: "Please log in again" });
+      }
     }
-    // const otp = Math.floor(1000 + Math.random() * 9000);
-    await sendOtpMail(email);
+
+    const mail = await sendOtpMail(email, caller);
+    if (mail.rateLimited) {
+      res.set("Retry-After", mail.retryAfter);
+      return res.status(429).json({
+        cause: "cooldown",
+        message: mail.error,
+        timeLeft: mail.retryAfter,
+      });
+    }
+    if (mail.error) return res.status(400).json({ message: mail.error });
+
     return res.status(201).json({ message: "OTP sent successfully" });
   } catch (error) {
+    console.error("sendOtp failed:", error);
     return res
       .status(500)
       .json({ cause: "smtp_failed", message: "Failed to send OTP" });
   }
 };
+
+const MAX_TRIES = 5;
+const SESSION_TTL = 60 * 60 * 24 * 7;
+
+// Atomic: count the try, compare, delete on success or when tries run out
+const VERIFY_LUA = `
+local h = redis.call('HGET', KEYS[1], 'hash')
+if not h then return 'expired' end
+local tries = redis.call('HINCRBY', KEYS[1], 'tries', 1)
+if h == ARGV[1] then redis.call('DEL', KEYS[1]) return 'ok' end
+if tries >= tonumber(ARGV[2]) then redis.call('DEL', KEYS[1]) return 'locked' end
+return tostring(tries)
+`;
+
+const createSession = async (res, user) => {
+  const sessions = await redisClient.ft.search(
+    "userIdIdx",
+    `@userId:{${user._id}}`,
+    { RETURN: [] },
+  );
+  if (sessions.total >= 2) await redisClient.del(sessions.documents[0].id);
+
+  const sessionId = crypto.randomUUID();
+  const redisKey = `session:${sessionId}`;
+
+  await redisClient.hSet(redisKey, {
+    userId: user._id.toString(),
+    name: user.name,
+    email: user.email,
+    picture: user.avatar || "",
+    role: user.role,
+    plan: user.plan,
+    uploadLimit: user.uploadLimit,
+    totalStorage: user.totalStorage,
+    parentDirId: user.parentDirId ? user.parentDirId.toString() : "",
+  });
+  await redisClient.expire(redisKey, SESSION_TTL);
+
+  res.cookie("sid", sessionId, {
+    httpOnly: true,
+    signed: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    maxAge: SESSION_TTL * 1000,
+  });
+};
+
 export const verifyOtp = async (req, res, next) => {
-  const { success, data, error } = OTPSchema.safeParse(req.body);
-
-  if (!success) {
-    console.log(z.flattenError(error).fieldErrors);
-
+  const parsed = OTPSchema.safeParse(req.body);
+  if (!parsed.success) {
     return res
       .status(400)
       .json({ message: "Invalid input, please enter valid details" });
   }
-  const { email, otp, caller } = data;
+  const { email, otp, caller } = parsed.data;
 
   try {
-    const otpDoc = await OTP.findOne({ email });
-
-    if (!otpDoc) {
-      return res.status(401).json({
-        cause: "otp_expiry",
-        message: "Invalid or expired OTP.",
+    const state = await LIMITERS.otpVerifyEmail.get(email).catch(() => null);
+    if (state && state.remainingPoints <= 0) {
+      const wait = Math.ceil(state.msBeforeNext / 1000);
+      res.set("Retry-After", wait);
+      return res.status(429).json({
+        cause: "otp_limit",
+        message: "Too many attempts",
+        timeLeft: wait,
       });
     }
 
-    if (otpDoc.expires.getTime() < Date.now()) {
-      await otpDoc.deleteOne();
+    const result = await redisClient.eval(VERIFY_LUA, {
+      keys: [`otp:${email}`],
+      arguments: [hashOtp(email, otp, caller), String(MAX_TRIES)],
+    });
 
-      return res.status(401).json({
-        cause: "otp_expiry",
-        message: "OTP expired",
-      });
-    }
+    if (result !== "ok") {
+      await LIMITERS.otpVerifyEmail.consume(email).catch(() => {});
 
-    // -------------------------
-    // WRONG OTP CASE
-    // -------------------------
-    if (otpDoc.otp !== Number(otp)) {
-      const nextTries = otpDoc.tries + 1;
+      if (result === "expired") {
+        return res
+          .status(401)
+          .json({ cause: "otp_expiry", message: "Invalid or expired OTP" });
+      }
+      if (result === "locked") {
+        const key = `otp-cooldown:${email}`;
 
-      await OTP.updateOne({ _id: otpDoc._id }, { $inc: { tries: 1 } });
+        await redisClient.set(key, "1", { EX: 60 });
 
-      const triesLeft = MAX_TRIES - nextTries;
-
-      // OTP LIMIT REACHED
-      if (nextTries >= MAX_TRIES) {
-        if (caller === "login") {
-          await User.updateOne(
-            { email },
-            {
-              $set: {
-                cooldown: new Date(Date.now() + 60 * 1000),
-              },
-            },
-          );
-        } else {
-          await redisClient.set(`cooldown:${email}`, "1", {
-            EX: 60,
-          });
-        }
-
-        await otpDoc.deleteOne();
+        const secondsLeft = await redisClient.ttl(key);
 
         return res.status(429).json({
           cause: "otp_limit",
-          message: "OTP max limit reached",
-          timeLeft: 60,
+          message: "OTP max limit reached. Request a new code.",
+          timeLeft: secondsLeft,
         });
       }
-
-      return res.status(409).json({
+      const triesLeft = MAX_TRIES - Number(result);
+      return res.status(400).json({
         cause: "otp_verification",
-        message: `Invalid OTP. You have ${
-          triesLeft === 1 ? "1 final" : triesLeft
-        } tries left to enter valid OTP`,
+        message: `Invalid OTP. ${triesLeft === 1 ? "1 final" : triesLeft} tries left`,
       });
     }
 
-    // -------------------------
-    // SUCCESS CASE
-    // -------------------------
-    if (caller === "login") {
-      const user = await User.findOne({ email });
-
-      if (!user) {
-        return res.status(404).json({
-          message: "User not found",
-        });
-      }
-
-      const userSessions = await redisClient.ft.search(
-        "userIdIdx",
-        `@userId:{${user._id}}`,
-        { RETURN: [] },
-      );
-
-      if (userSessions.total >= 2) {
-        await redisClient.del(userSessions.documents[0].id);
-      }
-
-      const sessionId = crypto.randomUUID();
-      const redisKey = `session:${sessionId}`;
-      await redisClient.hSet(redisKey, {
-        userId: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        picture: user.avatar || "",
-        role: user.role,
-        plan: user.plan,
-        uploadLimit: user.uploadLimit,
-        totalStorage: user.totalStorage,
-        parentDirId: user.parentDirId ? user.parentDirId.toString() : "",
-      });
-
-      const sessionExpirySeconds = 60 * 60 * 24 * 7;
-
-      await redisClient.expire(redisKey, sessionExpirySeconds);
-
-      res.cookie("sid", sessionId, {
-        httpOnly: true,
-        signed: true,
-        secure: isProduction,
-        sameSite: isProduction ? "none" : "lax",
-        maxAge: sessionExpirySeconds * 1000,
-      });
-
-      await otpDoc.deleteOne();
-    }
+    await LIMITERS.otpVerifyEmail.delete(email).catch(() => {});
 
     if (caller === "register") {
-      const savedOtp = await redisClient.get(`otp:${email}`);
-
-      if (savedOtp !== otp) {
-        return res.status(400).json({
-          cause: "otp_invalid",
-          message: "Invalid OTP",
-        });
-      }
-
-      await redisClient.set(`verified:${email.trim().toLowerCase()}`, "1", {
-        EX: 600,
-      });
+      await redisClient.set(`verified:${email}`, "1", { EX: 600 });
+      return res.status(200).json({ message: "OTP Verified!" });
     }
 
-    return res.status(200).json({
-      message: "OTP Verified!",
-    });
+    // caller === "login"
+    const user = await User.findOne({ email });
+    if (!user || user.isDeleted) {
+      return res
+        .status(401)
+        .json({ cause: "authentication_failed", message: "Unable to authenticate" });
+    }
+
+    await createSession(res, user);
+    return res.status(200).json({ message: "OTP Verified!" });
   } catch (error) {
     next(error);
   }
