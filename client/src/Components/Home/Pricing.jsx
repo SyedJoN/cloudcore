@@ -57,7 +57,7 @@ export default function Pricing() {
         "Share files with anyone",
         "24/7 Support"
       ],
-      cta: "Talk to sales",
+      cta: "Subscribe Now",
       highlight: false,
     },
   ];
