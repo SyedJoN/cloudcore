@@ -20,7 +20,7 @@ function DirectoryHeader({
   handleFileSelect,
   disabled = false,
 }) {
-  const { user, refreshUser, loggedIn, logout, logoutAll } = useAuth();
+  const { user, loggedIn, logout, logoutAll } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const [hasError, setHasError] = useState(null);

@@ -79,8 +79,7 @@ const Login = () => {
     return;
   }
 
- 
-    const wait = timeLeft || 60;
+   const wait = timeLeft || 60;
     setOtpError(`${error}. Redirecting to the login page`);
     setisCooldown(true);
     setTimeout(() => {
