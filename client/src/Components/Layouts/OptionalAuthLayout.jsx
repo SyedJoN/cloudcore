@@ -9,7 +9,7 @@ const OptionalAuth = () => {
   const { pathname } = useLocation();
 
   const labels = {
-    "/main": "Homepage",
+    "/": "Homepage",
     "/privacy": "Privacy policy",
     "/terms": "Terms and conditions",
     "/cookies": "Cookies policy",

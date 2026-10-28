@@ -54,7 +54,7 @@ const NAV_ITEMS = [
   {
     key: "root",
     label: "My Drive",
-    path: "/",
+    path: "/drive",
     Icon: InboxStackIcon,
     IconSolid: InboxStackIconSolid,
     isActive: ({ dirContext, dirId }) => dirContext === "root" && !dirId,
@@ -330,7 +330,7 @@ export default function DriveSidebar({
         </div>
         {user.plan !== "business" && (
           <button
-            onClick={() => navigate("/main#pricing")}
+            onClick={() => navigate("/#pricing")}
             className="gd-storage-btn"
           >
             Get more storage

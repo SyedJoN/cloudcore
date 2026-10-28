@@ -66,7 +66,7 @@ export default function Pricing() {
 
   async function handlePlanClick(plan) {
     if (plan.monthly === 0) {
-       navigate("/")
+       navigate("/login")
     }
     try {
       const data = await createSubscription({ priceId: plan.priceId });

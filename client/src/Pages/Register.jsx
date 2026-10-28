@@ -10,11 +10,7 @@ import { OTPSchema, registerSchema } from "../../validators/authSchema";
 import { registerUser, sendOtp, verifyOtp } from "../../apis/authApi";
 
 const Register = () => {
-  const [formData, setFormData] = useState({
-    name: "Syed Jon",
-    email: "m@gmail.com",
-    password: "abcd",
-  });
+  const [formData, setFormData] = useState({});
   const [showOtp, setShowOtp] = useState(false);
 
   // serverError will hold the error message from the server

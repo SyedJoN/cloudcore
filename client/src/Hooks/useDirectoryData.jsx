@@ -108,7 +108,7 @@ export function useDirectoryData({
           navigate("/login");
         } else {
           console.log(err);
-          navigate("/");
+          navigate("/drive");
         }
       } finally {
         setIsLoading(false);

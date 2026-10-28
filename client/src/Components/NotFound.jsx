@@ -119,7 +119,7 @@ const NotFound = () => {
 
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
-            to="/main"
+            to="/"
             className="inline-flex items-center justify-center rounded-lg bg-linear-to-r from-[#3b6bf6] to-[#38bdf8] px-5 py-3 text-sm font-semibold text-white transition-all hover:brightness-110"
           >
             Back to home

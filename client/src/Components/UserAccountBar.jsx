@@ -10,16 +10,13 @@ import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
 import GoogleDriveBtn from "./ThirdPartyButtons/GoogleDrive";
 import { UseAvatar } from "../Hooks/useAvatar";
 
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
-
 function UserAccountBar() {
   const { user, loggedIn, logout, logoutAll } = useAuth();
   const { isGoogleDrive } = useGDrive();
   const navigate = useNavigate();
   const userMenuRef = useRef(null);
   const isMongoId = /\/[a-fA-F0-9]{24}$/.test(window.location.pathname);
-  const isMainPage = window.location.pathname.endsWith("/main");
-  const [hasImgError, setHasImgError] = useState(false);
+  const isMainPage = window.location.pathname === "/"
 
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -82,9 +79,9 @@ function UserAccountBar() {
                   {user.plan !== "business" && (
                     <a
                       onClick={() =>
-                        location.pathname.endsWith("/main")
+                        isMainPage
                           ? navigate("#pricing")
-                          : navigate("/main#pricing")
+                          : navigate("/#pricing")
                       }
                       className="btn hover:bg-blue-200 hover:text-blue-500 flex items-center rounded-md text-xs text-gray-500 capitalize font-medium py-2.5 cursor-pointer"
                     >

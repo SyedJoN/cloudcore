@@ -111,7 +111,7 @@ export default function LegalLayout({ title, summary, sections }) {
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-white/10 bg-[#050b1f]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link to="/main" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <span className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-linear-to-br from-[#38bdf8] to-[#2f5cf5]">
             <Cloud
               className="w-4.5 h-4.5 text-white"
@@ -124,7 +124,7 @@ export default function LegalLayout({ title, summary, sections }) {
             </span>
           </Link>
           <Link
-            to="/main"
+            to="/"
             className="text-sm text-[#c3d2ef] transition-colors hover:text-white"
           >
             &larr; Back to home

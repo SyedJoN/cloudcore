@@ -24,7 +24,7 @@ export default function GridItem({
   const {isGoogleDrive} = useGDrive();
 
   const location = useLocation();
-  const isDriveRoute = location.pathname.endsWith("/");
+  const isDriveRoute = location.pathname.endsWith("/drive");
   const isRecentRoute = location.pathname.endsWith("/recent");
   const isSharedRoute = location.pathname.endsWith('/shared')
   const isTrashRoute = location.pathname.endsWith('/trash')

@@ -9,10 +9,7 @@ import { loginUser, sendOtp, verifyOtp } from "../../apis/authApi";
 import { createSubscription } from "../../apis/subscriptionApi";
 
 const Login = () => {
-  const [formData, setFormData] = useState({
-    email: "m@gmail.com",
-    password: "abcd",
-  });
+  const [formData, setFormData] = useState({});
 
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);

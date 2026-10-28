@@ -23,7 +23,7 @@ export const ROUTE_CONFIG = {
   },
   root: {
     label: "My Drive",
-    path: "/",
+    path: "/drive",
     flatBreadcrumb: false,
     fetch: getDirectory,
   },
