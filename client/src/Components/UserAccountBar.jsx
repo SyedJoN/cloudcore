@@ -112,7 +112,7 @@ function UserAccountBar() {
                   <button
                     className="gd-user-menu-item"
                     onClick={() => {
-                      navigate("/");
+                      navigate("/drive");
                       setShowUserMenu(false);
                     }}
                   >

@@ -11,7 +11,7 @@ export const optionalAuthRoutes = [
     element: <OptionalAuth />,
     children: [
       {
-        path: "/main",
+        path: "/",
         element: <Home />,
       },
       {

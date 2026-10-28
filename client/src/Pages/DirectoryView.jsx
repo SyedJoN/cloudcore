@@ -431,7 +431,7 @@ export default function DirectoryView({ route }) {
           navigate(`/directory/${directoryId}`);
         }
         if (isGoogleDriveRoute) {
-          navigate("/");
+          navigate("/drive");
         }
       } catch (err) {
         console.error("Resumed Drive upload failed:", err);

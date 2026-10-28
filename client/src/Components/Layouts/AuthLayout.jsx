@@ -43,7 +43,7 @@ function Protected() {
     return <GlobalLoader fullScreen />;
   }
   if (loggedIn === false) {
-    return <Navigate to={"/main"} />;
+    return <Navigate to={"/login"} />;
   }
 
   return <Outlet/>

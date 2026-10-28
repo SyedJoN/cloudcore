@@ -7,7 +7,7 @@ export const protectedRoutes = [
     element: <Protected />,
     children: [
       {
-        path: "/",
+        path: "/drive",
         element: <DirectoryView />,
       },
       {

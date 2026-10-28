@@ -40,15 +40,15 @@ export default function DriveHeader({ searchQuery, onSearchChange }) {
       ) : (
         <>
           <a
-            className="gd-logo min-w-12 md:min-w-[180px]"
-            onClick={() => navigate("/")}
+            className="gd-logo min-w-12 md:min-w-45"
+            onClick={() => navigate("/drive")}
             style={{ cursor: "pointer", textDecoration: "none" }}
           >
             <Cloud width="44" height="44" color="#2f5cf5" />
             <span className="gd-logo-text hidden md:block">Cloud Drive</span>
           </a>
           <a
-            className="hover:bg-[var(--btn-bg-medium)] md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
+            className="hover:bg-(--btn-bg-medium) md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
             onClick={toggleSidebar}
           >
             <Bars3Icon width="25" height="25" color="var(--text-secondary)" />
