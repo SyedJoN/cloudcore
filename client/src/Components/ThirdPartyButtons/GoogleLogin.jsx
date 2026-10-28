@@ -32,7 +32,7 @@ function GoogleLoginBtn({ setServerError, priceId }) {
               window.location.href = data.url;
               return;
             }
-            navigate("/");
+            navigate("/drive");
           }
         } catch (error) {
           const status = error.response?.status;

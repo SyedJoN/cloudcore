@@ -132,7 +132,7 @@ const Login = () => {
         window.location.href = data.url;
         return;
       }
-      navigate("/");
+      navigate("/drive");
     } catch (err) {
       const error = err.message;
       const cause = err.response?.data?.cause;
