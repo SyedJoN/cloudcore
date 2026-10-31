@@ -8,7 +8,7 @@ import {
   updateUser,
 } from "../../apis/userApi.js";
 import { useNavigate } from "react-router-dom";
-import canAccess from "../../utils/canAccess.js";
+import canAccess from "../../Utils/canAccess.js";
 import CircularLoader from "../Components/Loaders/CircularLoader.jsx";
 import "../Styles/UsersPage.css";
 import { getColor } from "../../utils/getProfileColor.js";
