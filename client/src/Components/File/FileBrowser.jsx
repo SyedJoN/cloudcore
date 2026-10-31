@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { deleteFile, fetchUserFiles } from "../../../apis/fileApi";
 import "./FileBrowser.css";
-import { getFileIcon } from "../../../utils/displayUtils";
+import { getFileIcon } from "../../../Utils/displayUtils";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 

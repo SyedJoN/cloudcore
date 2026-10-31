@@ -5,7 +5,7 @@ import {
   completeFolderUpload,
 } from "../../apis/directoryApi.js";
 
-import { formatSize } from "../../utils/formatHelpers";
+import { formatSize } from "../../Utils/formatHelpers";
 import { useAuth } from "../Contexts";
 
 export function useFolderUploadQueue({ dirId, showError, onQueueComplete }) {

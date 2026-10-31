@@ -4,7 +4,7 @@ import {
   getSignedUploadUrl,
   notifyBackend,
 } from "../../apis/fileApi";
-import { formatSize } from "../../utils/formatHelpers";
+import { formatSize } from "../../Utils/formatHelpers";
 import { useAuth } from "../Contexts";
 
 export function useUploadQueue({ dirId, showError, onQueueComplete }) {

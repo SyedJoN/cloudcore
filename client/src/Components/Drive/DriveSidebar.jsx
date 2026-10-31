@@ -27,7 +27,7 @@ import {
   IconNewFolder,
   IconUpload,
 } from "../Icons/Icons";
-import { formatSize } from "../../../utils/formatHelpers";
+import { formatSize } from "../../../Utils/formatHelpers";
 import { History } from "lucide-react";
 import { useAuth, useGDrive } from "../../Contexts";
 import GoogleDriveSVG from "../Icons/GoogleDriveSVG";

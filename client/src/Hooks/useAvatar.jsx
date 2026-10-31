@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getColor } from "../../utils/getProfileColor";
+import { getColor } from "../../Utils/getProfileColor";
 
 export function UseAvatar({ name, avatar, size = 36, fontSize = 18 }) {
   const [hasImgError, setHasImgError] = useState(false);

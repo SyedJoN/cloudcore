@@ -77,7 +77,6 @@ const Login = () => {
         setOtpError(error + ". Resend OTP to get new OTP");
         return;
       }
-
     
       if (cause === "cooldown") {
         const wait = timeLeft || 60;

@@ -1,6 +1,6 @@
 import { IconClose } from "../Icons/Icons.jsx";
 import FileBadge from "../File/FileBadge.jsx";
-import { getFileIcon } from "../../../utils/displayUtils.js";
+import { getFileIcon } from "../../../Utils/displayUtils.js";
 
 export default function DownloadTray({
   downloads,

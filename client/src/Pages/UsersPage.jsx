@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import canAccess from "../../Utils/canAccess.js";
 import CircularLoader from "../Components/Loaders/CircularLoader.jsx";
 import "../Styles/UsersPage.css";
-import { getColor } from "../../utils/getProfileColor.js";
+import { getColor } from "../../Utils/getProfileColor.js";
 import FileBrowser from "../Components/File/FileBrowser.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import { useAuth, useSidebar } from "../Contexts";

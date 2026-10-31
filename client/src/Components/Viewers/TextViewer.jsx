@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import getExt from "../../../utils/getExtension";
+import getExt from "../../../Utils/getExtension";
 
 function TextViewer({ url, name }) {
   const [content, setContent] = useState(null);
