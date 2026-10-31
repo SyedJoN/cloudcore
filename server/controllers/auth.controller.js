@@ -29,14 +29,13 @@ export const registerUser = async (req, res, next) => {
       .status(400)
       .json({ error: parsed.error.issues.map((i) => i.message) });
   }
-  const { name, email, password } = parsed.data; 
+  const { name, email, password } = parsed.data;
 
   const safeName = sanitizeText(name);
   const verifiedKey = `verified:${email}`;
   const session = await mongoose.startSession();
 
   try {
-
     if (!(await redisClient.get(verifiedKey))) {
       return res.status(403).json({ message: "OTP not verified" });
     }
@@ -123,6 +122,19 @@ export const loginUser = async (req, res, next) => {
     }
 
     const user = await User.findOne({ email });
+if (!user) {
+    return res.status(401).json({
+        message: "Invalid credentials"
+    });
+}
+
+if (user.provider !== "local") {
+    return res.status(401).json({
+        code: "GOOGLE_EMAIL",
+        message: "Please login using Google"
+    });
+}
+
     const isPasswordValid = user ? await user.comparePassword(password) : false;
 
     if (!isPasswordValid) {
@@ -376,7 +388,10 @@ export const verifyOtp = async (req, res, next) => {
     if (!user || user.isDeleted) {
       return res
         .status(401)
-        .json({ cause: "authentication_failed", message: "Unable to authenticate" });
+        .json({
+          cause: "authentication_failed",
+          message: "Unable to authenticate",
+        });
     }
 
     await createSession(res, user);

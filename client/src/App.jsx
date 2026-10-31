@@ -7,6 +7,9 @@ import BreadcrumbProvider from "./Contexts/BreadcrumbContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
 import { GDriveAuthProvider } from "./Contexts/GoogleDriveAuthContext";
 import { SidebarProvider } from "./Contexts/SidebarContext";
+import { useEffect } from "react";
+import { useDeviceType } from "../Utils/useDeviceType";
+import { DeviceProvider } from "./Contexts/DeviceContext";
 
 const router = createBrowserRouter(allRoutes);
 
@@ -18,7 +21,9 @@ function App() {
         <SidebarProvider>
       <ToastProvider>
         <BreadcrumbProvider>
+        <DeviceProvider>
           <RouterProvider router={router} />
+          </DeviceProvider>
         </BreadcrumbProvider>
       </ToastProvider>
       </SidebarProvider>

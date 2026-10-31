@@ -9,7 +9,7 @@ import { loginUser, sendOtp, verifyOtp } from "../../apis/authApi";
 import { createSubscription } from "../../apis/subscriptionApi";
 
 const Login = () => {
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({ email: "", password: "" });
 
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -67,32 +67,36 @@ const Login = () => {
       setServerError("");
       setOtpError("");
     } catch (err) {
-  const data = err.response?.data || {};
-  const error = data.message || err.message;
-  const { cause, timeLeft } = data;
+      const data = err.response?.data || {};
+      const error = data.message || err.message;
+      const { cause, timeLeft } = data;
 
-  if (cause === "otp_expiry") {
-    setOtpError(error + ". Resend OTP to get new OTP");
-    return;
-  }
+      setServerError(error);
 
-   const wait = timeLeft || 60;
-    setOtpError(`${error}. Redirecting to the login page`);
-    setisCooldown(true);
-    setTimeout(() => {
-      setShowOtp(false);
-      setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
-      // keep the button disabled for the full wait, not just 2 seconds
-      setTimeout(() => {
-        setisCooldown(false);
-        setServerError("");
-      }, wait * 1000);
-    }, 2000);
-    return;
-  
+      if (cause === "otp_expiry") {
+        setOtpError(error + ". Resend OTP to get new OTP");
+        return;
+      }
 
-  // setOtpError(error);
-} finally {
+    
+      if (cause === "cooldown") {
+        const wait = timeLeft || 60;
+        setOtpError(`${error}. Redirecting to the login page`);
+        setisCooldown(true);
+        setTimeout(() => {
+          setShowOtp(false);
+          setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
+          // keep the button disabled for the full wait, not just 2 seconds
+          setTimeout(() => {
+            setisCooldown(false);
+            setServerError("");
+          }, wait * 1000);
+        }, 2000);
+        return;
+      }
+
+      // setOtpError(error);
+    } finally {
       setLoading(false);
     }
   };
@@ -134,21 +138,23 @@ const Login = () => {
       const error = err.message;
       const cause = err.response?.data?.cause;
       const timeLeft = err.response?.data?.timeLeft;
-      
+
       if (cause === "otp_expiry") {
         setOtpError(error + ". Resend OTP to get new OTP");
         return;
       }
-  if (cause === "otp_limit") {
-  const wait = timeLeft || 60; 
-  setOtpError(`${error || "Too many attempts"}. Redirecting to the login page`);
-  setisCooldown(true);
-  setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
-  setTimeout(() => {
-    setShowOtp(false);
-    setisCooldown(false);
-  }, 2000);
-}
+      if (cause === "otp_limit") {
+        const wait = timeLeft || 60;
+        setOtpError(
+          `${error || "Too many attempts"}. Redirecting to the login page`,
+        );
+        setisCooldown(true);
+        setServerError(`You are on cooldown. Wait ${wait}s before retrying`);
+        setTimeout(() => {
+          setShowOtp(false);
+          setisCooldown(false);
+        }, 2000);
+      }
       setOtpError(error);
       console.error(err);
     } finally {
@@ -182,7 +188,9 @@ const Login = () => {
       } else if (err.response?.data?.cause === "smtp_failed") {
         alert(err.message);
       } else {
-      setOtpError(err.response?.data?.message || err.message || "Something went wrong");
+        setOtpError(
+          err.response?.data?.message || err.message || "Something went wrong",
+        );
       }
     } finally {
       setResendLoading(false);
