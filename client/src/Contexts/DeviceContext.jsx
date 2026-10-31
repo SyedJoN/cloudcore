@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
-import { useDeviceType } from "../../Utils/useDeviceType";
+import { useDeviceType } from "../../Utils/useDeviceType.js";
 
 const DeviceContext = createContext(null);
 
