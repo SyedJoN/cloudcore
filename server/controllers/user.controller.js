@@ -218,11 +218,11 @@ export const deleteUser = async (req, res, next) => {
     }
     const userFiles = await File.find({ userId }).select("extension");
     await session.withTransaction(async () => {
-      await Promise.all([
-        User.deleteOne({ _id: userId }, { session }),
-        Directory.deleteMany({ userId }, { session }),
-        File.deleteMany({ userId }, { session }),
-      ]);
+      await User.deleteOne({ _id: userId }, { session });
+
+  await Directory.deleteMany({ userId }, { session });
+
+  await File.deleteMany({ userId }, { session });
     });
     const sessions = await redisClient.ft.search(
       "userIdIdx",
