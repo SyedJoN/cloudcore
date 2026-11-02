@@ -17,8 +17,10 @@ import { useGDrive } from "../../Contexts/GoogleDriveAuthContext.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import SearchBar from "../SearchBar.jsx";
 import { useSidebar } from "../../Contexts/SidebarContext.jsx";
+import { useDevice } from "../../Contexts/DeviceContext.jsx";
 
 export default function DriveHeader({ searchQuery, onSearchChange }) {
+  const {device } = useDevice();
   const { windowWidth, toggleSidebar } = useSidebar();
   const [showSearchBar, setShowSearchBar] = useState(false);
 
@@ -48,7 +50,7 @@ export default function DriveHeader({ searchQuery, onSearchChange }) {
             <span className="gd-logo-text hidden md:block">Cloud Drive</span>
           </a>
           <a
-            className="hover:bg-(--btn-bg-medium) md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer"
+            className={`${device === "mobile" ? "hidden" : ""} hover:bg-(--btn-bg-medium) md:hidden flex items-center decoration-0 p-2 rounded-full cursor-pointer`}
             onClick={toggleSidebar}
           >
             <Bars3Icon width="25" height="25" color="var(--text-secondary)" />

@@ -34,7 +34,7 @@ import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import GoogleDriveBrowser from "./GoogleDriveBrowser";
 import CircularLoader from "../Loaders/CircularLoader";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   {
     key: "google-drive",
     label: "Google Drive",

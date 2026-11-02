@@ -1,5 +1,6 @@
 export { default as DriveHeader } from "./DriveHeader";
 export { default as DriveSidebar } from "./DriveSidebar";
+export { default as DriveBottomBar } from "./DriveBottomBar";
 export { default as DriveToolbar } from "./DriveToolbar";
 export { default as GridItem } from "./GridItem";
 export { default as ListRow } from "./ListRow";

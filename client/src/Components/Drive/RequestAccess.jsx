@@ -51,10 +51,11 @@ function RequestAccess({ dirId }) {
         justifyContent: "center",
         height: "100vh",
         fontFamily: "sans-serif",
+        background: "var(--surface-white)"
       }}
     >
       <div style={{ maxWidth: 400, width: "100%", padding: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 400, marginBottom: 8 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 400, marginBottom: 8, color: "var(--text-primary)" }}>
           You need access
         </h1>
         <p style={{ color: "#5f6368", marginBottom: 24 }}>

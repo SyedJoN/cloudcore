@@ -5,6 +5,7 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   DriveHeader,
   DriveSidebar,
+  DriveBottomBar,
   DriveToolbar,
   ContextMenu,
   ShareModal,
@@ -61,11 +62,13 @@ import { GDrivePicker, NewMenu } from "../Components/Drive/DriveSidebar";
 import CreateMenu from "../Components/Drive/CreateMenu";
 import ConfirmationModal from "../Components/Modals/ConfirmationModal";
 import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationModal";
+import { useDevice } from "../Contexts/DeviceContext";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function DirectoryView({ route }) {
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
+  const {device} = useDevice();
   const { user, refreshUser } = useAuth();
   const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
     useGDrive();
@@ -1879,22 +1882,39 @@ export default function DirectoryView({ route }) {
       />
 
       <div className="gd-body">
-        {user.email && (
-          <DriveSidebar
-            enqueueItem={enqueueItem}
-            setItemProgress={setItemProgress}
-            completeItem={completeItem}
-            handleCancelUpload={handleCancelUpload}
-            setDbFileId={setDbFileId}
-            refreshCurrentDirectory={refreshCurrentDirectory}
-            showError={showError}
-            dirId={dirId}
-            dirContext={dirContext}
-            onCreateFolder={() => setShowCreateDir(true)}
-            onUploadFiles={() => fileInputRef.current?.click()}
-            onUploadFolders={() => folderInputRef.current?.click()}
-          />
-        )}
+   {device === "mobile" ? (
+  <DriveBottomBar
+    enqueueItem={enqueueItem}
+    setItemProgress={setItemProgress}
+    completeItem={completeItem}
+    handleCancelUpload={handleCancelUpload}
+    setDbFileId={setDbFileId}
+    refreshCurrentDirectory={refreshCurrentDirectory}
+    showError={showError}
+    dirId={dirId}
+    dirContext={dirContext}
+    onCreateFolder={() => setShowCreateDir(true)}
+    onUploadFiles={() => fileInputRef.current?.click()}
+    onUploadFolders={() => folderInputRef.current?.click()}
+  />
+) : (
+  user.email && (
+    <DriveSidebar
+      enqueueItem={enqueueItem}
+      setItemProgress={setItemProgress}
+      completeItem={completeItem}
+      handleCancelUpload={handleCancelUpload}
+      setDbFileId={setDbFileId}
+      refreshCurrentDirectory={refreshCurrentDirectory}
+      showError={showError}
+      dirId={dirId}
+      dirContext={dirContext}
+      onCreateFolder={() => setShowCreateDir(true)}
+      onUploadFiles={() => fileInputRef.current?.click()}
+      onUploadFolders={() => folderInputRef.current?.click()}
+    />
+  )
+)}
         <div className="gd-main-container">
           <main
             style={{ userSelect: "none" }}

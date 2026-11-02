@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
@@ -22,6 +22,7 @@ export default function GridItem({
   const { user } = useAuth();
   const [hasImgError, setHasImgError] = useState(false);
   const {isGoogleDrive} = useGDrive();
+  const lastTap = useRef(0);
 
   const location = useLocation();
   const isDriveRoute = location.pathname.endsWith("/drive");
@@ -78,12 +79,27 @@ export default function GridItem({
     : 0;
   const isOpened = viewed > modified;
 
+  // for mobile double click
+  const handleTouchEnd = () => {
+  const now = Date.now();
+
+  if (now - lastTap.current < 300) {
+    onDoubleClick?.(type, itemId, item.isDeleted);
+    lastTap.current = 0;
+  } else {
+    lastTap.current = now;
+  }
+};
+
   return (
     <div
       className={`gd-grid-item ${selected ? "selected" : ""} ${showActiviyBar ? "h-[260.5px]" : ""}`}
       data-id={itemId}
       onClick={() => onRowClick(itemId)}
-      onDoubleClick={async () => await onDoubleClick?.(type, itemId, item.isDeleted)}
+     onDoubleClick={() =>
+    onDoubleClick?.(type, itemId, item.isDeleted)
+  }
+  onTouchEnd={handleTouchEnd}
       onContextMenu={(e) => {
         e.preventDefault();
         onSelect?.(itemId);
