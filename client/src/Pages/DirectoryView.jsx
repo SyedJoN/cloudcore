@@ -392,6 +392,7 @@ export default function DirectoryView({ route }) {
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef });
 
+
   useEffect(() => {
     if (!isStarredRoute) return;
     setIsStarred((prev) => {
@@ -702,6 +703,10 @@ export default function DirectoryView({ route }) {
       showError(err.message);
     }
   }
+
+  useEffect(() => {
+    console.log("contextItem", contextItem);
+  }, [contextItem]);
 
   async function handleCreateDirectory(e) {
     e.preventDefault();
@@ -2045,7 +2050,7 @@ export default function DirectoryView({ route }) {
                   />
                 ) : (
                   <DefaultView
-                  setSelectedItems={setSelectedItems}
+                    setSelectedItems={setSelectedItems}
                     isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
                     items={combinedItems}
@@ -2151,6 +2156,7 @@ export default function DirectoryView({ route }) {
             setContextItem(null);
           }}
           onDownload={() => {
+            setContextItem(null);
             selectedItems.forEach((id) => {
               const item = combinedItems.find((i) => (i.id ?? i._id) === id);
               if (item && item.isDirectory) {
@@ -2162,6 +2168,8 @@ export default function DirectoryView({ route }) {
             clearSelection();
           }}
           onCopy={() => {
+            setContextItem(null);
+
             selectedItems.forEach((id) => {
               const item = combinedItems.find((i) => (i.id ?? i._id) === id);
               if (item) {
@@ -2171,17 +2179,23 @@ export default function DirectoryView({ route }) {
             clearSelection();
           }}
           onRename={() => {
+            setContextItem(null);
+
             selectedItems.forEach((id) => {
               const item = combinedItems.find((i) => (i.id ?? i._id) === id);
               if (item) openRename(item);
             });
           }}
           onShare={() => {
+            setContextItem(null);
+
             const id = [...selectedItems][0];
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
             if (item) setShareItem(item);
           }}
           onTrash={async () => {
+            setContextItem(null);
+
             const items = combinedItems.filter((item) =>
               selectedItems.has(item.id ?? item._id),
             );
@@ -2190,6 +2204,8 @@ export default function DirectoryView({ route }) {
             await handleMoveToTrash(items);
           }}
           onRestore={async () => {
+            setContextItem(null);
+
             const items = combinedItems.filter((item) =>
               selectedItems.has(item.id ?? item._id),
             );
@@ -2197,6 +2213,8 @@ export default function DirectoryView({ route }) {
             await handleRestoreItem(items);
           }}
           onDeleteForever={async (type) => {
+            setContextItem(null);
+
             const items = combinedItems.filter((item) =>
               selectedItems.has(item.id ?? item._id),
             );
@@ -2290,88 +2308,92 @@ export default function DirectoryView({ route }) {
           onPreview={(item) => setViewItem(item)}
         />
       ) : (
-        <ContextMenu
-          open={open}
-          openLeft={openLeft}
-          setShowCreateMenu={setShowCreateMenu}
-          item={contextItem}
-          position={contextPos}
-          route={route}
-          isStarred={isStarred}
-          dirId={dirId}
-          viewMode={viewMode}
-          setContextItem={setContextItem}
-          onClose={() => {
-            setOpen(false);
-            setContextItem(null);
-            clearSelection();
-          }}
-          onDownload={() => {
-            selectedItems.forEach((id) => {
+        contextItem && (
+          <ContextMenu
+            open={open}
+            openLeft={openLeft}
+            setShowCreateMenu={setShowCreateMenu}
+            item={contextItem}
+            position={contextPos}
+            route={route}
+            isStarred={isStarred}
+            dirId={dirId}
+            viewMode={viewMode}
+            setContextItem={setContextItem}
+            onClose={() => {
+              setOpen(false);
+              setContextItem(null);
+              clearSelection();
+            }}
+            onDownload={() => {
+              selectedItems.forEach((id) => {
+                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+                if (item && item.isDirectory) {
+                  handleDownloadFolder(item);
+                } else {
+                  handleDownload(item);
+                }
+              });
+              clearSelection();
+            }}
+            onCopy={() => {
+              selectedItems.forEach((id) => {
+                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+                if (item) {
+                  handleCopyItem(item);
+                }
+              });
+              clearSelection();
+            }}
+            onMove={(itemId) => {
+              const item = combinedItems.find(
+                (i) => (i.id ?? i._id) === itemId,
+              );
+              if (item) setMoveItem(item);
+            }}
+            onStar={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+              if (!items.length) return;
+              await handleToggleStar(items);
+            }}
+            onRename={() => {
+              selectedItems.forEach((id) => {
+                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+                if (item) openRename(item);
+              });
+            }}
+            onShare={() => {
+              const id = [...selectedItems][0];
               const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-              if (item && item.isDirectory) {
-                handleDownloadFolder(item);
-              } else {
-                handleDownload(item);
-              }
-            });
-            clearSelection();
-          }}
-          onCopy={() => {
-            selectedItems.forEach((id) => {
-              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-              if (item) {
-                handleCopyItem(item);
-              }
-            });
-            clearSelection();
-          }}
-          onMove={(itemId) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
-            if (item) setMoveItem(item);
-          }}
-          onStar={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleToggleStar(items);
-          }}
-          onRename={() => {
-            selectedItems.forEach((id) => {
-              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-              if (item) openRename(item);
-            });
-          }}
-          onShare={() => {
-            const id = [...selectedItems][0];
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) setShareItem(item);
-          }}
-          onTrash={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
+              if (item) setShareItem(item);
+            }}
+            onTrash={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
 
-            if (!items.length) return;
-            await handleMoveToTrash(items);
-          }}
-          onRestore={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleRestoreItem(items);
-          }}
-          onDeleteForever={async (type) => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleDelete(items, type);
-          }}
-          onPreview={(item) => setViewItem(item)}
-        />
+              if (!items.length) return;
+              await handleMoveToTrash(items);
+            }}
+            onRestore={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+              if (!items.length) return;
+              await handleRestoreItem(items);
+            }}
+            onDeleteForever={async (type) => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+              if (!items.length) return;
+              await handleDelete(items, type);
+            }}
+            onPreview={(item) => setViewItem(item)}
+          />
+        )
       )}
 
       {viewItem && device === "mobile" ? (

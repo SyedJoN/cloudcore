@@ -142,7 +142,8 @@ function ContextMenuContent({
     function handleClick(e) {
       if (
         !e.target.closest(".gd-context-menu") &&
-        !e.target.closest(".gd-context-submenu")
+        !e.target.closest(".gd-context-submenu") &&
+        !e.target.closest(".gd-selection-bar")
       ) {
         onClose();
       }
@@ -526,7 +527,9 @@ function ContextMenuContent({
             <button
               className="gd-context-item danger"
               disabled={isDeleted || !canDelete}
-              onClick={close(() => onDeleteForever(isGoogle ? "google" : "local"))}
+              onClick={close(() =>
+                onDeleteForever(isGoogle ? "google" : "local"),
+              )}
             >
               <IconTrash size={18} />
               Delete forever

@@ -3,10 +3,10 @@ import {
   EllipsisVerticalIcon,
   StarIcon,
 } from "@heroicons/react/24/solid";
-import { IconFolder } from "../Icons/Icons";
+import { IconDots, IconFolder } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import { getFileType } from "../../../Utils/displayUtils";
-import { MdOutlineSelectAll, MdClose  } from "react-icons/md";
+import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import { useAuth, useGDrive } from "../../Contexts";
 import { Divider } from "../Divider";
 import { useCallback, useEffect, useRef } from "react";
@@ -67,7 +67,6 @@ export default function MobileListRow({
   const handleToggle = useCallback(
     (id) => {
       setSelectedItems((prev) => {
-        console.log("prev selection:", [...prev], "tapped:", id);
         const next = new Set(prev);
         if (next.has(id)) next.delete(id);
         else next.add(id);
@@ -133,36 +132,35 @@ export default function MobileListRow({
       lastTap.current = now;
     }
   };
-
-  useEffect(()=> {
+   useEffect(() => {
     if (selectedItemsSize === 0) {
       setShowInputCircle(false);
     }
-  }, [selectedItemsSize])
-
+  }, [selectedItemsSize]);
   return (
     <>
       {showInputCircle && (
         <div className="gd-mobile-selected-header w-full h-16 flex items-center fixed top-0 left-0 bg-(--surface-container) z-400">
           <button
-            onClick={() => setShowInputCircle(false)}
+           onClick={() => {setSelectedItems(new Set());setShowInputCircle(false)}}
             aria-label="Back"
             className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
           >
-             {selectedItemsSize >= (combinedItems.length - 1) ? 
-                  <MdClose className="h-6 w-6" />
-                 : 
-            <ChevronLeftIcon className="h-6 w-6" />}
+            {selectedItemsSize >= combinedItems.length ? (
+              <MdClose className="h-6 w-6" />
+            ) : (
+              <ChevronLeftIcon className="h-6 w-6" />
+            )}
           </button>
           <div className="flex items-center justify-between flex-1">
-           {selectedItemsSize > 0 && <p>{selectedItemsSize} Selected</p>} 
+            <p>{selectedItemsSize} Selected</p>
             <div className="flex">
               <button
                 onClick={() => handleSelectAll?.()}
                 aria-label="Back"
                 className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
               >
-            <MdOutlineSelectAll className="h-6 w-6" />
+                <MdOutlineSelectAll className="h-6 w-6" />
               </button>
               <button
                 onClick={(e) => onContextMenu?.(e, itemId)}
@@ -238,28 +236,29 @@ export default function MobileListRow({
           className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
         >
           {showInputCircle ? (
-         <div
-  className={`h-5 w-5 rounded-full border-2 flex items-center justify-center
-    ${selected
-      ? "border-blue-600 bg-blue-600"
-      : "border-gray-400 bg-transparent"
+            <div
+              className={`h-5 w-5 rounded-full border-2 flex items-center justify-center
+    ${
+      selected
+        ? "border-blue-600 bg-blue-600"
+        : "border-gray-400 bg-transparent"
     }`}
->
-  {selected && (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-white">
-      <path
-        d="m5 12 4 4L19 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )}
-</div>
+            >
+              {selected && (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-white">
+                  <path
+                    d="m5 12 4 4L19 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </div>
           ) : (
-            <EllipsisVerticalIcon className="h-6 w-6" />
+            <IconDots className="h-6 w-6" />
           )}
         </button>
       </div>

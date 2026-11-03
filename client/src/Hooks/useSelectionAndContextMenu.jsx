@@ -53,7 +53,7 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     (e) => {
       if (
         e.target.closest(
-          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay",
+          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay, .gd-icon-btn, .sort-btn",
         )
       ) {
         return;

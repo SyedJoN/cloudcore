@@ -36,24 +36,6 @@ import { Divider } from "../Divider";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
-function formatSize(size) {
-  if (!size) return "";
-  return size > 1024 * 1024
-    ? `${(size / 1024 / 1024).toFixed(1)} MB`
-    : `${(size / 1024).toFixed(1)} KB`;
-}
-
-function formatDate(value) {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 
 export default function FileViewerMobile({
   item,

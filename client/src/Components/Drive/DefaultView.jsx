@@ -128,6 +128,8 @@ const DefaultView = ({
 
   const isGoogleDriveRoute = route === "google-drive";
 
+ 
+
   return (
     <div className="gd-drive">
       {device === "windows" && (
@@ -141,7 +143,7 @@ const DefaultView = ({
       {device === "windows"
         ? viewMode === "grid"
         : true && (
-            <div className="pb-2">
+            <div className="sort-btn pb-2">
               <SortButton
                 viewMode={viewMode}
                 onToggleView={onToggleView}
@@ -166,9 +168,9 @@ const DefaultView = ({
                 .filter((s) => s.isDirectory)
                 .map((item) => (
                   <ItemComponent
-                  key={item._id ?? item.id}
-                  item={item}
-                  combinedItems={combinedItems}
+                    key={item._id ?? item.id}
+                    item={item}
+                    combinedItems={combinedItems}
                     dirId={dirId}
                     avatar={
                       isGoogleDrive
@@ -181,6 +183,8 @@ const DefaultView = ({
                     setSelectedItems={setSelectedItems}
                     selectedItemsSize={selectedItems.size}
                     handleSelectAll={handleSelectAll}
+                    showInputCircle={showInputCircle}
+                    setShowInputCircle={setShowInputCircle}
                     onSelect={onSelect}
                     onDownload={onDownload}
                     onRename={onRename}
@@ -203,10 +207,10 @@ const DefaultView = ({
               .filter((s) => (FoldersOnTop ? !s.isDirectory : s))
               .map((item) => (
                 <ItemComponent
-                key={item._id ?? item.id}
-                item={item}
-                combinedItems={combinedItems}
-                dirId={dirId}
+                  key={item._id ?? item.id}
+                  item={item}
+                  combinedItems={combinedItems}
+                  dirId={dirId}
                   avatar={
                     isGoogleDriveRoute
                       ? user.avatar
