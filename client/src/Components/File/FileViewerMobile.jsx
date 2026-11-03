@@ -32,7 +32,7 @@ import {
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { BottomSheet, SheetItem } from "../Drive/BottomSheet";
 import DetailsPageMobile from "../Drive/DetailsPageMobile";
-import { Divider } from "../divider";
+import { Divider } from "../Divider";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 

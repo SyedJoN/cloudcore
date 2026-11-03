@@ -22,7 +22,7 @@ import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
-import { Divider } from "../divider";
+import { Divider } from "../Divider";
 
 /* File name at the top; becomes a back row inside the "Open with" view */
 function SheetHeader({ title, onBack }) {
