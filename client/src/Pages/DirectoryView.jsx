@@ -375,12 +375,14 @@ export default function DirectoryView({ route }) {
   };
   const {
     selectedItems,
+    setSelectedItems,
     contextItem,
     setContextItem,
     contextPos,
     openLeft,
     dragBox,
     handleSelect,
+    handleSelectAll,
     clearSelection,
     handleContextMenu,
     open,
@@ -1928,22 +1930,24 @@ export default function DirectoryView({ route }) {
             onContextMenu={(e) => handleCreateNewMenu(e)}
             onMouseLeave={handleMainMouseUp}
           >
-            <DriveToolbar
-              dirId={dirId}
-              crumbs={crumbs}
-              setCrumbs={setCrumbs}
-              dirContext={dirContext}
-              directoryName={directoryName}
-              isSharedRoute={isSharedRoute}
-              breadcrumbs={breadcrumbs}
-              setBreadcrumbs={setBreadcrumbs}
-              disabled={isUploading}
-              viewMode={viewMode}
-              onToggleView={() =>
-                setViewMode((v) => (v === "grid" ? "list" : "grid"))
-              }
-              toggleDetailsBar={() => setShowDetails((prev) => !prev)}
-            />
+            {device === "windows" && (
+              <DriveToolbar
+                dirId={dirId}
+                crumbs={crumbs}
+                setCrumbs={setCrumbs}
+                dirContext={dirContext}
+                directoryName={directoryName}
+                isSharedRoute={isSharedRoute}
+                breadcrumbs={breadcrumbs}
+                setBreadcrumbs={setBreadcrumbs}
+                disabled={isUploading}
+                viewMode={viewMode}
+                onToggleView={() =>
+                  setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                }
+                toggleDetailsBar={() => setShowDetails((prev) => !prev)}
+              />
+            )}
 
             {dragBox && (
               <div
@@ -2041,6 +2045,7 @@ export default function DirectoryView({ route }) {
                   />
                 ) : (
                   <DefaultView
+                  setSelectedItems={setSelectedItems}
                     isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
                     items={combinedItems}
@@ -2049,7 +2054,11 @@ export default function DirectoryView({ route }) {
                     viewMode={viewMode}
                     dirId={dirId}
                     selectedItems={selectedItems}
+                    handleSelectAll={handleSelectAll}
                     onSelect={handleSelect}
+                    onToggleView={() =>
+                      setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                    }
                     onRowClick={handleRowClick}
                     onDoubleClick={handleRowDoubleClick}
                     onShare={(itemId) => {
@@ -2092,6 +2101,7 @@ export default function DirectoryView({ route }) {
 
                       await handleToggleStar(items);
                     }}
+                    clearSelection={clearSelection}
                   />
                 )}
               </>
@@ -2129,73 +2139,73 @@ export default function DirectoryView({ route }) {
           onClose={() => setShowRename(false)}
         />
       )}
-{device === "windows" && 
-  <SelectionBar
-        dirId={dirId}
-        combinedItems={combinedItems}
-        selectedItems={selectedItems}
-        hasFileSelected={hasFileSelected}
-        route={route}
-        onClear={() => {
-          clearSelection();
-          setContextItem(null);
-        }}
-        onDownload={() => {
-          selectedItems.forEach((id) => {
+      {device === "windows" && (
+        <SelectionBar
+          dirId={dirId}
+          combinedItems={combinedItems}
+          selectedItems={selectedItems}
+          hasFileSelected={hasFileSelected}
+          route={route}
+          onClear={() => {
+            clearSelection();
+            setContextItem(null);
+          }}
+          onDownload={() => {
+            selectedItems.forEach((id) => {
+              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+              if (item && item.isDirectory) {
+                handleDownloadFolder(item);
+              } else {
+                handleDownload(item);
+              }
+            });
+            clearSelection();
+          }}
+          onCopy={() => {
+            selectedItems.forEach((id) => {
+              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+              if (item) {
+                handleCopyItem(item);
+              }
+            });
+            clearSelection();
+          }}
+          onRename={() => {
+            selectedItems.forEach((id) => {
+              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+              if (item) openRename(item);
+            });
+          }}
+          onShare={() => {
+            const id = [...selectedItems][0];
             const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item && item.isDirectory) {
-              handleDownloadFolder(item);
-            } else {
-              handleDownload(item);
-            }
-          });
-          clearSelection();
-        }}
-        onCopy={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) {
-              handleCopyItem(item);
-            }
-          });
-          clearSelection();
-        }}
-        onRename={() => {
-          selectedItems.forEach((id) => {
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) openRename(item);
-          });
-        }}
-        onShare={() => {
-          const id = [...selectedItems][0];
-          const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-          if (item) setShareItem(item);
-        }}
-        onTrash={async () => {
-          const items = combinedItems.filter((item) =>
-            selectedItems.has(item.id ?? item._id),
-          );
+            if (item) setShareItem(item);
+          }}
+          onTrash={async () => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
 
-          if (!items.length) return;
-          await handleMoveToTrash(items);
-        }}
-        onRestore={async () => {
-          const items = combinedItems.filter((item) =>
-            selectedItems.has(item.id ?? item._id),
-          );
-          if (!items.length) return;
-          await handleRestoreItem(items);
-        }}
-        onDeleteForever={async (type) => {
-          const items = combinedItems.filter((item) =>
-            selectedItems.has(item.id ?? item._id),
-          );
-          if (!items.length) return;
-          await handleDelete(items, type);
-        }}
-      />
-}
-    
+            if (!items.length) return;
+            await handleMoveToTrash(items);
+          }}
+          onRestore={async () => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
+            if (!items.length) return;
+            await handleRestoreItem(items);
+          }}
+          onDeleteForever={async (type) => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
+            if (!items.length) return;
+            await handleDelete(items, type);
+          }}
+        />
+      )}
+
       {device === "mobile" ? (
         <MobileContextMenu
           open={open}
@@ -2364,10 +2374,9 @@ export default function DirectoryView({ route }) {
         />
       )}
 
-      {viewItem && 
-      
-      device === "mobile" ? 
-      (<FileViewerMobile key={viewItem?._id}
+      {viewItem && device === "mobile" ? (
+        <FileViewerMobile
+          key={viewItem?._id}
           item={viewItem}
           isStarred={isStarred}
           onClose={() => setViewItem(null)}
@@ -2414,8 +2423,8 @@ export default function DirectoryView({ route }) {
             await handleRestoreItem(items);
           }}
           onDownload={handleDownload}
-        />):
-      (
+        />
+      ) : (
         <FileViewer
           key={viewItem?._id}
           item={viewItem}

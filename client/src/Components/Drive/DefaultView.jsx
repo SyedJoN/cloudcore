@@ -21,7 +21,10 @@ const DefaultView = ({
   isHomeRoute,
   dirId,
   selectedItems,
+  setSelectedItems,
+  handleSelectAll,
   onSelect,
+  onToggleView,
   onRowClick,
   onDoubleClick,
   onDownload,
@@ -33,10 +36,12 @@ const DefaultView = ({
   setIsStarred,
   route,
   onStar,
+  clearSelection,
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
-  const {device} = useDevice();
+  const { device } = useDevice();
+  const [showInputCircle, setShowInputCircle] = useState(false);
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -108,7 +113,14 @@ const DefaultView = ({
     return data;
   }, [filteredItems, sortConfig]);
 
-  const ItemComponent = device === "windows" ? (viewMode === "grid" ? GridItem : ListRow) : (viewMode === "grid" ? GridItem : MobileListRow);
+  const ItemComponent =
+    device === "windows"
+      ? viewMode === "grid"
+        ? GridItem
+        : ListRow
+      : viewMode === "grid"
+        ? GridItem
+        : MobileListRow;
 
   const FoldersOnTop = viewMode === "grid" && sortConfig.folders === "top";
 
@@ -118,25 +130,28 @@ const DefaultView = ({
 
   return (
     <div className="gd-drive">
-     { device === "windows" &&
-     <RecentFilters
-        items={items}
-        filters={filters}
-        onChange={setFilters}
-        user={user}
-      />
-     } 
-      {device === "windows" ? (viewMode === "grid") : true && (
-        <div className="pb-2">
-          <SortButton
-            viewMode={viewMode}
-            sortConfig={sortConfig}
-            setSortConfig={setSortConfig}
-          />
-        </div>
+      {device === "windows" && (
+        <RecentFilters
+          items={items}
+          filters={filters}
+          onChange={setFilters}
+          user={user}
+        />
       )}
+      {device === "windows"
+        ? viewMode === "grid"
+        : true && (
+            <div className="pb-2">
+              <SortButton
+                viewMode={viewMode}
+                onToggleView={onToggleView}
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+              />
+            </div>
+          )}
 
-      {device === "windows" ? (viewMode === "list" && listHeaderRow) : null}
+      {device === "windows" ? viewMode === "list" && listHeaderRow : null}
 
       {sortedItems.length === 0 ? (
         <div className="gd-empty">
@@ -151,8 +166,9 @@ const DefaultView = ({
                 .filter((s) => s.isDirectory)
                 .map((item) => (
                   <ItemComponent
-                    key={item._id ?? item.id}
-                    item={item}
+                  key={item._id ?? item.id}
+                  item={item}
+                  combinedItems={combinedItems}
                     dirId={dirId}
                     avatar={
                       isGoogleDrive
@@ -162,6 +178,9 @@ const DefaultView = ({
                     owner={item.userId?.name || item.owners?.[0]?.displayName}
                     email={item.userId?.email || item.owners?.[0]?.emailAddress}
                     selected={selectedItems.has(item.id ?? item._id)}
+                    setSelectedItems={setSelectedItems}
+                    selectedItemsSize={selectedItems.size}
+                    handleSelectAll={handleSelectAll}
                     onSelect={onSelect}
                     onDownload={onDownload}
                     onRename={onRename}
@@ -174,6 +193,7 @@ const DefaultView = ({
                     route={route}
                     onShare={onShare}
                     onStar={onStar}
+                    clearSelection={clearSelection}
                   />
                 ))}
             </div>
@@ -183,9 +203,10 @@ const DefaultView = ({
               .filter((s) => (FoldersOnTop ? !s.isDirectory : s))
               .map((item) => (
                 <ItemComponent
-                  key={item._id ?? item.id}
-                  item={item}
-                  dirId={dirId}
+                key={item._id ?? item.id}
+                item={item}
+                combinedItems={combinedItems}
+                dirId={dirId}
                   avatar={
                     isGoogleDriveRoute
                       ? user.avatar
@@ -194,6 +215,11 @@ const DefaultView = ({
                   owner={item.userId?.name || item.owners?.[0]?.displayName}
                   email={item.userId?.email || item.owners?.[0]?.emailAddress}
                   selected={selectedItems.has(item.id ?? item._id)}
+                  setSelectedItems={setSelectedItems}
+                  selectedItemsSize={selectedItems.size}
+                  handleSelectAll={handleSelectAll}
+                  showInputCircle={showInputCircle}
+                  setShowInputCircle={setShowInputCircle}
                   onSelect={onSelect}
                   onDownload={onDownload}
                   onRename={onRename}
@@ -206,6 +232,7 @@ const DefaultView = ({
                   route={route}
                   onShare={onShare}
                   onStar={onStar}
+                  clearSelection={clearSelection}
                 />
               ))}
           </div>

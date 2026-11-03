@@ -20,7 +20,7 @@ function Row({ label, children }) {
       <span className="shrink-0 text-[14px] text-(--text-secondary)">
         {label}
       </span>
-      <span className="min-w-0 break-words text-right text-[14px] text-(--text-primary)">
+      <span className="min-w-0 wrap-break-word text-right text-[14px] text-(--text-primary)">
         {children}
       </span>
     </div>

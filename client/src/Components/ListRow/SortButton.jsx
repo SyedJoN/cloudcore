@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import SortMenu from "./SortMenu";
 import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/solid";
+
 import { useDevice } from "../../Contexts/DeviceContext";
+import { IconGrid, IconInfo, IconList } from "../Icons/Icons";
 
 const sortLabels = {
   name: "Name",
@@ -10,7 +12,7 @@ const sortLabels = {
   trashedTime: "Date trashed",
 };
 
-const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
+const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView }) => {
   const [open, setOpen] = useState(false);
   const { device } = useDevice();
   const menuRef = useRef(null);
@@ -37,7 +39,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
   };
 
   return (
-    <div ref={menuRef} className="relative ml-auto">
+    <div ref={menuRef} className="relative ml-auto flex justify-between items-center py-2 ">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -52,7 +54,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
         `}
       >
         {/* Sort icon */}
-        {viewMode === "list" && (
+      {viewMode === "list" && device === "windows" && (
           <svg
             viewBox="0 0 24 24"
             className="h-5 w-5"
@@ -105,6 +107,19 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
           />
         </div>
       )}
+      {device === "mobile" && 
+         <div className="gd-toolbar-actions">
+              <button
+                className="gd-icon-btn"
+                title={viewMode === "grid" ? "List view" : "Grid view"}
+                onClick={onToggleView}
+              >
+                {viewMode === "grid" ? <IconList /> : <IconGrid />}
+              </button>
+            
+            </div>
+      }
+     
     </div>
   );
 };

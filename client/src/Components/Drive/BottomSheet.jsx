@@ -152,7 +152,7 @@ export function SheetItem({ icon, label, onClick, disabled, active }) {
       onClick={onClick}
       disabled={disabled}
       className={`flex w-full items-center gap-5 px-6 py-3.5 text-left text-[15px] text-(--text-primary) disabled:opacity-40 ${
-        active ? "bg-[#d3e3fd] font-medium" : ""
+        active ? "bg-(--accent-blue-light) font-medium" : ""
       }`}
     >
       <span className="flex h-6 w-6 items-center justify-center text-(--border-inverse)">

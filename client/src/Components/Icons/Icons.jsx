@@ -279,3 +279,4 @@ export const IconHome = ({ size = 24 }) => (
     <path d="M9 21V14H15V21" />
   </svg>
 );
+

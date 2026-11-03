@@ -17,7 +17,6 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     setSelectedItems(new Set(combinedItems.map((i) => i.id ?? i._id)));
   }, [combinedItems]);
 
-  
   const handleContextMenu = useCallback(
     (e, id) => {
       e.stopPropagation();
@@ -50,31 +49,30 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     [combinedItems],
   );
 
-const handleMainMouseDown = useCallback(
-  (e) => {
-    if (
-      e.target.closest(
-        ".gd-grid-item, .gd-list-row, .gd-context-menu, .gd-modal-overlay"
-      )
-    ) {
-      return;
-    }
+  const handleMainMouseDown = useCallback(
+    (e) => {
+      if (
+        e.target.closest(
+          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay",
+        )
+      ) {
+        return;
+      }
 
-    clearSelection();
-    setContextItem(null);
+      clearSelection();
+      setContextItem(null);
 
-    const { clientX, clientY } = e;
+      const { clientX, clientY } = e;
 
-    setDragBox({
-      x1: clientX,
-      y1: clientY,
-      x2: clientX,
-      y2: clientY,
-    });
-  },
-  [clearSelection],
-);
-
+      setDragBox({
+        x1: clientX,
+        y1: clientY,
+        x2: clientX,
+        y2: clientY,
+      });
+    },
+    [clearSelection],
+  );
 
   const handleMainMouseMove = useCallback(
     (e) => {
