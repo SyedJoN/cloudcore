@@ -25,12 +25,14 @@ import { useAuth, useToast } from "../../Contexts";
 
 import {
   ChevronLeftIcon,
-  ChevronRightIcon,
+    InformationCircleIcon,
   EllipsisVerticalIcon,
   StarIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { BottomSheet, SheetItem } from "../Drive/BottomSheet";
+import DetailsPageMobile from "../Drive/DetailsPageMobile";
+import { Divider } from "../divider";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -52,9 +54,6 @@ function formatDate(value) {
   });
 }
 
-function Divider() {
-  return <div className="my-2 ml-6 h-px bg-(--border)" />;
-}
 
 export default function FileViewerMobile({
   item,
@@ -88,6 +87,19 @@ export default function FileViewerMobile({
   const [animating, setAnimating] = useState(false);
 
   const route = location.pathname.startsWith("/google-drive");
+
+    // details sheet
+    const [detailsItem, setDetailsItem] = useState(null);
+  
+    const detailsSheet = (
+      <DetailsPageMobile
+        open={Boolean(detailsItem)}
+        item={detailsItem}
+        onClose={() => setDetailsItem(null)}
+        onShare={onShare}
+      />
+    );
+  
 
   /* ---------- item info ---------- */
 
@@ -272,6 +284,8 @@ export default function FileViewerMobile({
   }, [item?._id, item?.id]);
 
   /* ---------- everything below needs an item ---------- */
+    if (!item) return detailsSheet;
+
 
   if (!item) return null;
 
@@ -348,6 +362,7 @@ export default function FileViewerMobile({
   /* ---------- render ---------- */
 
   return (
+    <>
     <div className="fixed inset-0 z-500 flex flex-col bg-(--surface-white)">
       {/* ── Top bar ── */}
       <div
@@ -411,7 +426,7 @@ export default function FileViewerMobile({
         >
           {/* previous */}
           <div
-            className="fv-body pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+            className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
             style={{ flex: "0 0 33.3333%" }}
             aria-hidden="true"
           >
@@ -420,7 +435,7 @@ export default function FileViewerMobile({
 
           {/* current */}
           <div
-            className="fv-body relative h-full overflow-hidden bg-(--surface-white)"
+            className="relative h-full overflow-hidden bg-(--surface-white)"
             style={{ flex: "0 0 33.3333%" }}
           >
             {renderViewer()}
@@ -428,7 +443,7 @@ export default function FileViewerMobile({
 
           {/* next */}
           <div
-            className="fv-body pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+            className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
             style={{ flex: "0 0 33.3333%" }}
             aria-hidden="true"
           >
@@ -454,6 +469,7 @@ export default function FileViewerMobile({
                   icon={<IconRestore size={22} />}
                   label="Restore"
                   onClick={run(() => onRestore?.())}
+                  
                 />
                 <SheetItem
                   icon={<IconTrash size={22} />}
@@ -481,6 +497,16 @@ export default function FileViewerMobile({
               )}
 
               {(canShare || canRead) && <Divider />}
+
+               <SheetItem
+  icon={<InformationCircleIcon className="h-6 w-6" />}
+  label="View Information"
+  onClick={() => {
+    setDetailsItem(item);
+    setSheetOpen(false); // close only the actions sheet, not the viewer
+  }}
+/>
+              <Divider />
 
               {canDownload && (
                 <SheetItem
@@ -557,5 +583,7 @@ export default function FileViewerMobile({
         </div>
       </BottomSheet>
     </div>
+      {detailsSheet}
+    </>
   );
 }

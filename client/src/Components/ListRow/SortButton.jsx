@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import SortMenu from "./SortMenu";
 import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/solid";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 const sortLabels = {
   name: "Name",
@@ -11,6 +12,7 @@ const sortLabels = {
 
 const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
   const [open, setOpen] = useState(false);
+  const { device } = useDevice();
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -39,15 +41,15 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="
+        className={`
           flex items-center gap-2
-          rounded-full
-          px-4 py-2
+          rounded-full ${device === "mobile" ? "px-0" : "px-4"}
+           py-2
           text-sm
           text-(--text-secondary)
           hover:bg-(--surface-container-dark)
           cursor-pointer
-        "
+        `}
       >
         {/* Sort icon */}
         {viewMode === "list" && (
@@ -84,27 +86,25 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list" }) => {
         </span>
       </button>
 
-    {open && (
-  <div
-    className={`
+      {open && (
+        <div
+          className={`
       absolute
       top-full
       z-50
       mt-2
       origin-top
       animate-[sortDropdown_100ms_ease-out]
-      ${viewMode === "list" ? "right-0" : "left-0"}
+      ${device === "mobile" ? "left-0" : viewMode === "list" ? "right-0" : "left-0"}
     `}
-  >
-    <SortMenu
-        setOpen={setOpen}
-
-      sortConfig={sortConfig}
-      onSortChange={handleSortChange}
-    />
-  </div>
-)}
-
+        >
+          <SortMenu
+            setOpen={setOpen}
+            sortConfig={sortConfig}
+            onSortChange={handleSortChange}
+          />
+        </div>
+      )}
     </div>
   );
 };

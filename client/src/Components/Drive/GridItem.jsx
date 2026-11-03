@@ -162,17 +162,7 @@ export default function GridItem({
             {formatDate(isOpened ? item.viewedByMeTime : item.modifiedTime)}
           </span>
         </span>
-        <div className="gd-grid-item-menu">
-          <button
-            className="gd-icon-btn"
-            style={{ width: 28, height: 28 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect?.(itemId);
-              onContextMenu(e, itemId);
-            }}
-          ></button>
-        </div>
+   
       </div>
     </div>
   );

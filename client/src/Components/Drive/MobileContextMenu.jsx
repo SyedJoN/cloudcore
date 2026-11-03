@@ -22,6 +22,7 @@ import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
+import { Divider } from "../divider";
 
 /*
   Mobile (Google Drive style) context menu.
@@ -30,9 +31,6 @@ import DetailsPageMobile from "./DetailsPageMobile";
   setShowCreateMenu, which are not needed on mobile.
 */
 
-function Divider() {
-  return <div className="my-2 h-px bg-(--border) ml-6" />;
-}
 
 /* File name at the top; becomes a back row inside the "Open with" view */
 function SheetHeader({ title, onBack }) {
@@ -74,8 +72,6 @@ export default function MobileContextMenu({
 }) {
   const { toast } = useToast();
 
-
-
   // "main" = full menu, "openWith" = Preview / Open in new tab
   const [view, setView] = useState("main");
 
@@ -86,19 +82,19 @@ export default function MobileContextMenu({
     return () => clearTimeout(t);
   }, [open]);
 
-   // details sheet
-const [detailsItem, setDetailsItem] = useState(null);
+  // details sheet
+  const [detailsItem, setDetailsItem] = useState(null);
 
-const detailsSheet = (
-  <DetailsPageMobile
-    open={Boolean(detailsItem)}
-    item={detailsItem}
-    onClose={() => setDetailsItem(null)}
-    onShare={onShare}
-  />
-);
+  const detailsSheet = (
+    <DetailsPageMobile
+      open={Boolean(detailsItem)}
+      item={detailsItem}
+      onClose={() => setDetailsItem(null)}
+      onShare={onShare}
+    />
+  );
 
-if (!item) return detailsSheet;
+  if (!item) return detailsSheet;
 
   /* ---------- flags ---------- */
 
@@ -160,166 +156,165 @@ if (!item) return detailsSheet;
 
   return (
     <>
-     <BottomSheet open={open} onClose={onClose}>
-      <SheetHeader
-        title={view === "openWith" ? "Open with" : item.name}
-        onBack={view === "openWith" ? () => setView("main") : undefined}
-      />
+      <BottomSheet open={open} onClose={onClose}>
+        <SheetHeader
+          title={view === "openWith" ? "Open with" : item.name}
+          onBack={view === "openWith" ? () => setView("main") : undefined}
+        />
 
-      <div className="max-h-[70vh] overflow-y-auto py-2">
-        {view === "openWith" ? (
-          /* ---------- OPEN WITH ---------- */
-          <>
-            <SheetItem
-              icon={<IconPreview size={22} />}
-              label="Preview"
-              disabled={isDeleted || !canRead}
-              onClick={run(() => onPreview(item))}
-            />
-            <SheetItem
-              icon={<IconNewTab size={22} />}
-              label="Open in new tab"
-              disabled={isDeleted || !canRead}
-              onClick={handleOpenInNewTab}
-            />
-          </>
-        ) : showDeleteActions ? (
-          /* ---------- TRASH ---------- */
-          <>
-            <SheetItem
-              icon={<IconRestore size={22} />}
-              label="Restore"
-              disabled={!canDelete}
-              onClick={run(() => onRestore(item))}
-            />
-            <SheetItem
-              icon={<IconTrash size={22} />}
-              label="Delete forever"
-              disabled={!canDelete}
-              onClick={run(() =>
-                onDeleteForever(isGoogle ? "google" : "local"),
-              )}
-            />
-          </>
-        ) : (
-          /* ---------- NORMAL ---------- */
-          <>
-            {/* Open with: files only */}
-            {isFile && (
-              <>
-                <SheetItem
-                  icon={<IconOpenWith size={22} />}
-                  label={
-                    <span className="flex flex-1 items-center justify-between">
-                      Open with
-                      <IconChevronRight size={16} />
-                    </span>
-                  }
-                  disabled={isDeleted || !canRead}
-                  onClick={() => setView("openWith")}
-                />
-                <Divider />
-              </>
-            )}
-
-            <SheetItem
-              icon={<IconShare size={22} />}
-              label="Share"
-              disabled={isDeleted || !canShare}
-              onClick={run(() => onShare(item))}
-            />
-            <SheetItem
-              icon={<IconLink size={22} />}
-              label="Copy link"
-              disabled={isDeleted || !canRead}
-              onClick={handleCopyLink}
-            />
-
-            <Divider />
-<SheetItem
-  icon={<InformationCircleIcon className="h-6 w-6" />}
-  label="View details"
-  onClick={() => {
-    setDetailsItem(item); // keep our own copy so it survives the menu closing
-    onClose();
-  }}
-/>
-            <Divider />
-
-            <SheetItem
-              icon={<IconDownload size={22} />}
-              label="Download"
-              disabled={isDeleted || !canDownload}
-              onClick={run(() => onDownload(item))}
-            />
-            <SheetItem
-              icon={<IconRename size={22} />}
-              label="Rename"
-              disabled={isDeleted || !canRename}
-              onClick={run(() => onRename(item))}
-            />
-            <SheetItem
-              icon={<DocumentDuplicateIcon className="h-6 w-6" />}
-              label="Make a copy"
-              disabled={isSharedRoute || !canCopy}
-              onClick={run(() => onCopy(item))}
-            />
-
-            <Divider />
-
-            {/* Organize: flattened into Move + Star */}
-            <SheetItem
-              icon={<FolderInput width={22} height={22} />}
-              label="Move"
-              disabled={
-                isSharedRoute || isDeleted || !canMove || isGoogleDriveRoute
-              }
-              onClick={run(() => onMove(item._id))}
-            />
-            <SheetItem
-              icon={
-                starred ? (
-                  <StarIconSolid className="h-6 w-6" />
-                ) : (
-                  <StarIcon className="h-6 w-6" />
-                )
-              }
-              label={starred ? "Remove from starred" : "Add to starred"}
-              disabled={isDeleted || isGoogleDriveRoute}
-              onClick={run(() => onStar(item))}
-            />
-
-            {(!isDeleted && !isGoogleDriveRoute) || isGoogleDriveRoute ? (
-              <Divider />
-            ) : null}
-
-            {/* Move to trash */}
-            {!isDeleted && !isGoogleDriveRoute && (
+        <div className="max-h-[70vh] overflow-y-auto py-2">
+          {view === "openWith" ? (
+            /* ---------- OPEN WITH ---------- */
+            <>
               <SheetItem
-                icon={<IconTrash size={22} />}
-                label="Move to trash"
-                disabled={!canDelete || !canTrash}
-                onClick={run(() => onTrash(item))}
+                icon={<IconPreview size={22} />}
+                label="Preview"
+                disabled={isDeleted || !canRead}
+                onClick={run(() => onPreview(item))}
               />
-            )}
-
-            {/* Google Drive delete */}
-            {isGoogleDriveRoute && (
+              <SheetItem
+                icon={<IconNewTab size={22} />}
+                label="Open in new tab"
+                disabled={isDeleted || !canRead}
+                onClick={handleOpenInNewTab}
+              />
+            </>
+          ) : showDeleteActions ? (
+            /* ---------- TRASH ---------- */
+            <>
+              <SheetItem
+                icon={<IconRestore size={22} />}
+                label="Restore"
+                disabled={!canDelete}
+                onClick={run(() => onRestore(item))}
+              />
               <SheetItem
                 icon={<IconTrash size={22} />}
                 label="Delete forever"
-                disabled={isDeleted || !canDelete}
+                disabled={!canDelete}
                 onClick={run(() =>
                   onDeleteForever(isGoogle ? "google" : "local"),
                 )}
               />
-            )}
-          </>
-        )}
-      </div>
-    </BottomSheet>
-    {detailsSheet}
+            </>
+          ) : (
+            /* ---------- NORMAL ---------- */
+            <>
+              {/* Open with: files only */}
+              {isFile && (
+                <>
+                  <SheetItem
+                    icon={<IconOpenWith size={22} />}
+                    label={
+                      <span className="flex flex-1 items-center justify-between">
+                        Open with
+                        <IconChevronRight size={16} />
+                      </span>
+                    }
+                    disabled={isDeleted || !canRead}
+                    onClick={() => setView("openWith")}
+                  />
+                  <Divider />
+                </>
+              )}
+
+              <SheetItem
+                icon={<IconShare size={22} />}
+                label="Share"
+                disabled={isDeleted || !canShare}
+                onClick={run(() => onShare(item))}
+              />
+              <SheetItem
+                icon={<IconLink size={22} />}
+                label="Copy link"
+                disabled={isDeleted || !canRead}
+                onClick={handleCopyLink}
+              />
+
+              <Divider />
+              <SheetItem
+                icon={<InformationCircleIcon className="h-6 w-6" />}
+                label="View Information"
+                onClick={() => {
+                  setDetailsItem(item); 
+                  onClose();
+                }}
+              />
+              <Divider />
+
+              <SheetItem
+                icon={<IconDownload size={22} />}
+                label="Download"
+                disabled={isDeleted || !canDownload}
+                onClick={run(() => onDownload(item))}
+              />
+              <SheetItem
+                icon={<IconRename size={22} />}
+                label="Rename"
+                disabled={isDeleted || !canRename}
+                onClick={run(() => onRename(item))}
+              />
+              <SheetItem
+                icon={<DocumentDuplicateIcon className="h-6 w-6" />}
+                label="Make a copy"
+                disabled={isSharedRoute || !canCopy}
+                onClick={run(() => onCopy(item))}
+              />
+
+              <Divider />
+
+              {/* Organize: flattened into Move + Star */}
+              <SheetItem
+                icon={<FolderInput width={22} height={22} />}
+                label="Move"
+                disabled={
+                  isSharedRoute || isDeleted || !canMove || isGoogleDriveRoute
+                }
+                onClick={run(() => onMove(item._id))}
+              />
+              <SheetItem
+                icon={
+                  starred ? (
+                    <StarIconSolid className="h-6 w-6" />
+                  ) : (
+                    <StarIcon className="h-6 w-6" />
+                  )
+                }
+                label={starred ? "Remove from starred" : "Add to starred"}
+                disabled={isDeleted || isGoogleDriveRoute}
+                onClick={run(() => onStar(item))}
+              />
+
+              {(!isDeleted && !isGoogleDriveRoute) || isGoogleDriveRoute ? (
+                <Divider />
+              ) : null}
+
+              {/* Move to trash */}
+              {!isDeleted && !isGoogleDriveRoute && (
+                <SheetItem
+                  icon={<IconTrash size={22} />}
+                  label="Move to trash"
+                  disabled={!canDelete || !canTrash}
+                  onClick={run(() => onTrash(item))}
+                />
+              )}
+
+              {/* Google Drive delete */}
+              {isGoogleDriveRoute && (
+                <SheetItem
+                  icon={<IconTrash size={22} />}
+                  label="Delete forever"
+                  disabled={isDeleted || !canDelete}
+                  onClick={run(() =>
+                    onDeleteForever(isGoogle ? "google" : "local"),
+                  )}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </BottomSheet>
+      {detailsSheet}
     </>
-   
   );
 }

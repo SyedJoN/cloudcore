@@ -437,7 +437,7 @@
 .gd-main {
   flex: 1;
   background-color: var(--surface-white);
-  padding: 0 20px 20px 20px;
+  padding: 0 18px 18px 18px;
   display: flex;
   flex-direction: column;
 }
@@ -649,7 +649,7 @@
 .gd-list-row.selected {
   background: var(--accent-blue-light);
 }
-.gd-list-row.selected:hover {
+.gd-list-row.selected:hover{
   background: var(--accent-blue-hover-dark);
 }
 .gd-list-row:hover:not(.selected) {
@@ -1565,7 +1565,7 @@ body.gd-overlay-open {
 
 /* ── Modal shell ── */
 .mv-modal {
-  background: #fff;
+  background: var(--surface-white);
   border-radius: 8px;
   width: 480px;
   max-width: 95vw;
@@ -1587,7 +1587,7 @@ body.gd-overlay-open {
 .mv-title {
   font-size: 24px;
   font-weight: 400;
-  color: #202124;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1618,14 +1618,15 @@ body.gd-overlay-open {
   font-family: inherit;
 }
 .mv-breadcrumb-btn:hover {
-  background: #e8f0fe;
+   background: var(--surface-container-dark-hover);
+
 }
 .mv-breadcrumb-current {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 16px;
-  color: #202124;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -1647,7 +1648,7 @@ body.gd-overlay-open {
   position: relative;
 }
 .mv-folder-row:hover {
-  background: #f1f3f4;
+  background: var(--surface-container-dark-hover);
 }
 .mv-folder-row:hover .mv-open-btn {
   opacity: 1;
@@ -1656,7 +1657,7 @@ body.gd-overlay-open {
 .mv-folder-name {
   flex: 1;
   font-size: 14px;
-  color: #202124;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1664,7 +1665,7 @@ body.gd-overlay-open {
 .mv-file-name {
   flex: 1;
   font-size: 14px;
-  color: var(--text-bright);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1688,7 +1689,7 @@ body.gd-overlay-open {
     background 0.1s;
 }
 .mv-open-btn:hover {
-  background: #e0e0e0;
+  background: var(--surface-container-dark);
   color: #202124;
 }
 
@@ -1716,7 +1717,7 @@ body.gd-overlay-open {
   align-items: center;
   gap: 12px;
   padding: 6px 20px;
-  background: #f8f9fa;
+  background: var(--surface-container-dark);
   border-top: 1px solid #e0e0e0;
   border-bottom: 1px solid #e0e0e0;
 }
@@ -1726,7 +1727,7 @@ body.gd-overlay-open {
   border-bottom: 2px solid #1a73e8;
   outline: none;
   font-size: 14px;
-  color: #202124;
+  color: var(--text-primary);
   background: transparent;
   padding: 2px 0;
   font-family: inherit;

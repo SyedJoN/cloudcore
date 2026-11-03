@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import SortButton from "../ListRow/SortButton";
 import { useAuth } from "../../Contexts";
 import { useDevice } from "../../Contexts/DeviceContext";
+import MobileListRow from "./MobileListRow";
 
 const DefaultView = ({
   items,
@@ -107,7 +108,7 @@ const DefaultView = ({
     return data;
   }, [filteredItems, sortConfig]);
 
-  const ItemComponent = viewMode === "grid" ? GridItem : ListRow;
+  const ItemComponent = device === "windows" ? (viewMode === "grid" ? GridItem : ListRow) : (viewMode === "grid" ? GridItem : MobileListRow);
 
   const FoldersOnTop = viewMode === "grid" && sortConfig.folders === "top";
 
@@ -125,7 +126,7 @@ const DefaultView = ({
         user={user}
       />
      } 
-      {viewMode === "grid" && device === "windows" && (
+      {device === "windows" ? (viewMode === "grid") : true && (
         <div className="pb-2">
           <SortButton
             viewMode={viewMode}
@@ -135,7 +136,7 @@ const DefaultView = ({
         </div>
       )}
 
-      {viewMode === "list" && listHeaderRow}
+      {device === "windows" ? (viewMode === "list" && listHeaderRow) : null}
 
       {sortedItems.length === 0 ? (
         <div className="gd-empty">

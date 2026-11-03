@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { IconGrid, IconList, IconInfo } from "../Icons/Icons";
 import { useAuth } from "../../Contexts/AuthContext";
-import { getRouteConfig } from "../../../Utils/routeConfig"; 
+import { getRouteConfig } from "../../../Utils/routeConfig";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 export default function DriveToolbar({
   dirContext,
@@ -14,8 +15,12 @@ export default function DriveToolbar({
 }) {
   const navigate = useNavigate();
   const { loggedIn } = useAuth();
-
-  const { label: rootLabel, path: rootPath, flatBreadcrumb } = getRouteConfig(dirContext);
+const {device} = useDevice();
+  const {
+    label: rootLabel,
+    path: rootPath,
+    flatBreadcrumb,
+  } = getRouteConfig(dirContext);
 
   return (
     <div className="gd-toolbar" onMouseDown={(e) => e.stopPropagation()}>
@@ -97,7 +102,11 @@ export default function DriveToolbar({
         >
           {viewMode === "grid" ? <IconList /> : <IconGrid />}
         </button>
-        <button onClick={toggleDetailsBar} className="gd-icon-btn" title="Info">
+        <button
+          onClick={toggleDetailsBar}
+          className={`gd-icon-btn ${device === "mobile" ? "hidden!" : ""}`}
+          title="Info"
+        >
           <IconInfo />
         </button>
       </div>

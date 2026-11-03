@@ -100,16 +100,21 @@ export default function DriveBottomBar({
                   active ? "bg-(--accent-blue-light)" : ""
                 }`}
               >
-                <DisplayIcon className="h-6 w-6 text-(--text-primary)" size={24} />
+                <DisplayIcon
+                  className="h-6 w-6 text-(--text-primary)"
+                  size={24}
+                />
               </span>
               <span
                 className={`text-[12px] ${
-                  active ? "font-semibold text-(--accent-blue)" : "text-(--text-primary)"
+                  active
+                    ? "font-semibold text-(--accent-blue)"
+                    : "text-(--text-primary)"
                 }`}
               >
-              {(TAB_LABELS[key] || label) === "Shared with me"
-  ? "Shared"
-  : (TAB_LABELS[key] || label)}
+                {(TAB_LABELS[key] || label) === "Shared with me"
+                  ? "Shared"
+                  : TAB_LABELS[key] || label}
               </span>
             </button>
           );
@@ -133,7 +138,9 @@ export default function DriveBottomBar({
           </span>
           <span
             className={`text-[12px] ${
-              moreActive ? "font-semibold text-[#1f1f1f]" : "text-(--text-primary)"
+              moreActive
+                ? "font-semibold text-[#1f1f1f]"
+                : "text-(--text-primary)"
             }`}
           >
             More
@@ -142,18 +149,13 @@ export default function DriveBottomBar({
       </nav>
 
       {/* "Create new" sheet */}
-      <BottomSheet
-        open={showNew}
-        onClose={() => setShowNew(false)}
-      
-      >
-        
+      <BottomSheet open={showNew} onClose={() => setShowNew(false)}>
         <SheetItem
           icon={<FolderPlusIcon className="h-6 w-6" />}
           label="New folder"
           onClick={runAndClose(onCreateFolder)}
         />
-     
+
         <SheetItem
           icon={<ArrowUpOnSquareIcon className="h-6 w-6" />}
           label="File upload"
@@ -192,8 +194,6 @@ export default function DriveBottomBar({
             />
           );
         })}
-
-  
 
         <div className="px-6 py-3">
           <div className="mb-2 h-1 w-full overflow-hidden rounded-full bg-[#e1e3e1]">

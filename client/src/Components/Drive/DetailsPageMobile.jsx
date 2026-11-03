@@ -108,7 +108,7 @@ export default function DetailsPageMobile({
         </button>
 
         <div className="min-w-0 flex-1 truncate px-2 text-[18px] font-medium text-(--text-primary)">
-          {item.name}
+          {shown.name}
         </div>
       </div>
 
