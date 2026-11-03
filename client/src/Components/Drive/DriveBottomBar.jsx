@@ -13,87 +13,13 @@ import { formatSize } from "../../../Utils/formatHelpers";
 import { useAuth, useGDrive } from "../../Contexts";
 import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import { GDrivePicker, NAV_ITEMS } from "./DriveSidebar";
+import { BottomSheet, SheetItem } from "./BottomSheet";
 
 // Tabs shown in the bottom bar (same as the Google Drive app)
 const TAB_KEYS = ["home", "starred", "shared", "root"];
 const TAB_LABELS = { root: "Files" };
 // Everything else goes into the "More" sheet
 const MORE_KEYS = ["recent", "trash", "google-drive"];
-
-/* ---------- Generic bottom sheet ---------- */
-function BottomSheet({ open, onClose, title, children }) {
-  const [mounted, setMounted] = useState(false);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const id = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setVisible(false);
-    const t = setTimeout(() => setMounted(false), 220);
-    return () => clearTimeout(t);
-  }, [open]);
-
-  // lock body scroll while open
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  if (!mounted) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 z-300 ">
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${
-          visible ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      <div
-        className={`absolute bottom-0 left-0 right-0 rounded-t-[28px] bg-(--surface-white) shadow-2xl transition-transform duration-200 ease-out ${
-          visible ? "translate-y-0" : "translate-y-full"
-        }`}
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        {/* drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="h-1 w-8 rounded-full bg-[#c4c7c5]" />
-        </div>
-        {title && (
-          <div className="px-6 pb-2 pt-1 text-[16px] font-medium text-(--text-primary)">
-            {title}
-          </div>
-        )}
-        <div className="pb-3">{children}</div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-function SheetItem({ icon, label, onClick, disabled, active }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex w-full items-center gap-5 px-6 py-3.5 text-left text-[15px] text-(--text-primary) disabled:opacity-40 ${
-        active ? "bg-[#d3e3fd] font-medium" : ""
-      }`}
-    >
-      <span className="flex h-6 w-6 items-center justify-center text-(--border-inverse)">
-        {icon}
-      </span>
-      {label}
-    </button>
-  );
-}
 
 /* ---------- Main mobile component ---------- */
 export default function DriveBottomBar({
@@ -144,13 +70,12 @@ export default function DriveBottomBar({
       <button
         onClick={() => setShowNew(true)}
         aria-label="New"
-        className="fixed right-4 z-150 flex h-14 items-center gap-3 rounded-2xl bg-[#c2e7ff] px-5 text-[15px] font-medium text-[#001d35] shadow-[0_2px_6px_rgba(0,0,0,0.3)] active:scale-95 transition-transform"
+        className="fixed right-4 z-150 flex h-14 items-center gap-3 rounded-2xl bg-(--text-primary) px-5 text-[15px] font-medium text-[#001d35] shadow-[0_2px_6px_rgba(0,0,0,0.3)] active:scale-95 transition-transform"
         style={{ bottom: "calc(80px + env(safe-area-inset-bottom) + 16px)" }}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
         </svg>
-        New
       </button>
 
       {/* Bottom navigation bar */}
@@ -182,7 +107,9 @@ export default function DriveBottomBar({
                   active ? "font-semibold text-(--accent-blue)" : "text-(--text-primary)"
                 }`}
               >
-                {TAB_LABELS[key] || label}
+              {(TAB_LABELS[key] || label) === "Shared with me"
+  ? "Shared"
+  : (TAB_LABELS[key] || label)}
               </span>
             </button>
           );

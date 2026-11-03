@@ -27,6 +27,7 @@ import getExt from "../../../Utils/getExtension";
 
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -49,6 +50,7 @@ export default function FileViewer({
 }) {
   const { refreshUser } = useAuth();
   const { toast } = useToast();
+  const {device} = useDevice();
 
   const location = useLocation();
 
@@ -56,7 +58,7 @@ export default function FileViewer({
 
   // BASIC ITEM INFO
 
-  const isGoogle = Boolean(item.webViewLink);
+  const isGoogle = Boolean(item?.webViewLink);
 
   const isDeleted = item?.isDeleted;
 
@@ -313,165 +315,167 @@ export default function FileViewer({
 
         {/* ── Action bar ── */}
 
-        <div className="fv-topbar-actions">
-          {/* Download */}
+        {device === "windows" && 
+          <div className="fv-topbar-actions">
+            {/* Download */}
 
-          {!isDeleted && canDownload && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Download"
-              onClick={() => onDownload?.(item)}
-            >
-              <IconDownload size={20} />
-            </button>
-          )}
+            {!isDeleted && canDownload && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Download"
+                onClick={() => onDownload?.(item)}
+              >
+                <IconDownload size={20} />
+              </button>
+            )}
 
-          {/* Share */}
+            {/* Share */}
 
-          {!isDeleted && canShare && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Share"
-              onClick={() => onShare?.()}
-            >
-              <IconShare size={20} />
-            </button>
-          )}
-          {!isGoogle && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Star"
-              onClick={onStar}
-            >
-              {isStarred[item?._id || ""] ? (
-                <StarIconSolid className="w-5 h-5" />
-              ) : (
-                <StarIcon className="w-5 h-5" />
-              )}
-            </button>
-          )}
-          {/* Copy link */}
+            {!isDeleted && canShare && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Share"
+                onClick={() => onShare?.()}
+              >
+                <IconShare size={20} />
+              </button>
+            )}
+            {!isGoogle && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Star"
+                onClick={onStar}
+              >
+                {isStarred[item?._id || ""] ? (
+                  <StarIconSolid className="w-5 h-5" />
+                ) : (
+                  <StarIcon className="w-5 h-5" />
+                )}
+              </button>
+            )}
+            {/* Copy link */}
 
-          {!isDeleted && canRead && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Copy link"
-              onClick={handleCopyLink}
-            >
-              <IconLink size={20} />
-            </button>
-          )}
+            {!isDeleted && canRead && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Copy link"
+                onClick={handleCopyLink}
+              >
+                <IconLink size={20} />
+              </button>
+            )}
 
-          {/* Rename */}
+            {/* Rename */}
 
-          {!isDeleted && canRename && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Rename"
-              onClick={() => onRename?.(item)}
-            >
-              <IconRename size={20} />
-            </button>
-          )}
+            {!isDeleted && canRename && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Rename"
+                onClick={() => onRename?.(item)}
+              >
+                <IconRename size={20} />
+              </button>
+            )}
 
-          {/* Move local item to trash */}
+            {/* Move local item to trash */}
 
-          {!isGDrive && !isDeleted && canTrash && (
-            <button
-              className="fv-action-btn gd-icon-btn fv-action-danger"
-              title="Move to trash"
-              onClick={async () => {
-                await onTrash?.();
+            {!isGDrive && !isDeleted && canTrash && (
+              <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Move to trash"
+                onClick={async () => {
+                  await onTrash?.();
 
-                onDeleteSuccess?.(item?._id);
+                  onDeleteSuccess?.(item?._id);
 
-                onClose?.();
-              }}
-            >
-              <IconTrash size={20} />
-            </button>
-          )}
+                  onClose?.();
+                }}
+              >
+                <IconTrash size={20} />
+              </button>
+            )}
 
-          {/* Restore */}
+            {/* Restore */}
 
-          {isDeleted && canDelete && (
-            <button
-              className="fv-action-btn gd-icon-btn"
-              title="Restore"
-              onClick={() => onRestore?.()}
-            >
-              <IconRestore size={20} />
-            </button>
-          )}
+            {isDeleted && canDelete && (
+              <button
+                className="fv-action-btn gd-icon-btn"
+                title="Restore"
+                onClick={() => onRestore?.()}
+              >
+                <IconRestore size={20} />
+              </button>
+            )}
 
-          {/* Delete forever */}
+            {/* Delete forever */}
 
-          {isDeleted && canDelete && (
-            <button
-              className="fv-action-btn gd-icon-btn fv-action-danger"
-              title="Delete Forever"
-              onClick={() => onDeleteForever?.()}
-            >
-              <IconTrash size={20} />
-            </button>
-          )}
+            {isDeleted && canDelete && (
+              <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Delete Forever"
+                onClick={() => onDeleteForever?.()}
+              >
+                <IconTrash size={20} />
+              </button>
+            )}
 
-          {/* Google Drive delete */}
+            {/* Google Drive delete */}
 
-          {isGDrive && !isDeleted && canDelete && (
-            <button
-              className="fv-action-btn gd-icon-btn fv-action-danger"
-              title="Delete Forever"
-              onClick={() => onDeleteForever?.()}
-            >
-              <IconTrash size={20} />
-            </button>
-          )}
+            {isGDrive && !isDeleted && canDelete && (
+              <button
+                className="fv-action-btn gd-icon-btn fv-action-danger"
+                title="Delete Forever"
+                onClick={() => onDeleteForever?.()}
+              >
+                <IconTrash size={20} />
+              </button>
+            )}
 
-          {/* Open in Google Drive */}
+            {/* Open in Google Drive */}
 
-          {isGDrive && item?.webViewLink && (
-            <a
-              className="fv-action-btn gd-icon-btn"
-              href={item.webViewLink}
-              target="_blank"
-              rel="noreferrer"
-              title="Open in Google Drive"
-            >
-              <svg viewBox="0 0 87.3 78" width="20" height="20">
-                <path
-                  d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-                  fill="#0066da"
-                />
+            {isGDrive && item?.webViewLink && (
+              <a
+                className="fv-action-btn gd-icon-btn"
+                href={item.webViewLink}
+                target="_blank"
+                rel="noreferrer"
+                title="Open in Google Drive"
+              >
+                <svg viewBox="0 0 87.3 78" width="20" height="20">
+                  <path
+                    d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                    fill="#0066da"
+                  />
 
-                <path
-                  d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z"
-                  fill="#00ac47"
-                />
+                  <path
+                    d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z"
+                    fill="#00ac47"
+                  />
 
-                <path
-                  d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-                  fill="#ea4335"
-                />
+                  <path
+                    d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+                    fill="#ea4335"
+                  />
 
-                <path
-                  d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-                  fill="#00832d"
-                />
+                  <path
+                    d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                    fill="#00832d"
+                  />
 
-                <path
-                  d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-                  fill="#2684fc"
-                />
+                  <path
+                    d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                    fill="#2684fc"
+                  />
 
-                <path
-                  d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-                  fill="#ffba00"
-                />
-              </svg>
-            </a>
-          )}
-        </div>
+                  <path
+                    d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                    fill="#ffba00"
+                  />
+                </svg>
+              </a>
+            )}
+          </div>
+        }
 
         {/* ── Viewer area ── */}
 

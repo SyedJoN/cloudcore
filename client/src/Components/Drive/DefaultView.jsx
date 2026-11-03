@@ -8,6 +8,7 @@ import RecentFilters from "./Recent/RecentFilters";
 import { useNavigate } from "react-router-dom";
 import SortButton from "../ListRow/SortButton";
 import { useAuth } from "../../Contexts";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 const DefaultView = ({
   items,
@@ -34,6 +35,7 @@ const DefaultView = ({
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
+  const {device} = useDevice();
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -115,13 +117,15 @@ const DefaultView = ({
 
   return (
     <div className="gd-drive">
-      <RecentFilters
+     { device === "windows" &&
+     <RecentFilters
         items={items}
         filters={filters}
         onChange={setFilters}
         user={user}
       />
-      {viewMode === "grid" && (
+     } 
+      {viewMode === "grid" && device === "windows" && (
         <div className="pb-2">
           <SortButton
             viewMode={viewMode}

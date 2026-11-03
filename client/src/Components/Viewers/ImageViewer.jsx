@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 function ImageViewer({ url, name }) {
   const [zoom, setZoom] = useState(1);
+  const {device} = useDevice();
   const [drag, setDrag] = useState(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const stageRef = useRef(null);
@@ -51,6 +53,7 @@ function ImageViewer({ url, name }) {
         }}
         draggable={false}
       />
+      {device === "windows" && 
       <div className="fv-zoom-controls">
         <button
           className="fv-zoom-btn"
@@ -76,6 +79,7 @@ function ImageViewer({ url, name }) {
           ⊙
         </button>
       </div>
+}
     </div>
   );
 }
