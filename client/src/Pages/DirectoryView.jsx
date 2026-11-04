@@ -313,7 +313,7 @@ export default function DirectoryView({ route }) {
 
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
-      type === "google"
+      (type === "google" || isGoogleDrive)
         ? "google-drive"
         : isSharedRoute
           ? "shared"
@@ -438,9 +438,7 @@ export default function DirectoryView({ route }) {
         if (directoryId) {
           navigate(`/directory/${directoryId}`);
         }
-        if (isGoogleDriveRoute) {
-          navigate("/drive");
-        }
+
       } catch (err) {
         console.error("Resumed Drive upload failed:", err);
         showError("Couldn't finish uploading the file you picked from Drive.");
@@ -1911,6 +1909,8 @@ export default function DirectoryView({ route }) {
             <DriveSidebar
               enqueueItem={enqueueItem}
               setItemProgress={setItemProgress}
+              setDirectoriesList={setDirectoriesList}
+              setFilesList={setFilesList}
               completeItem={completeItem}
               handleCancelUpload={handleCancelUpload}
               setDbFileId={setDbFileId}
@@ -1918,6 +1918,7 @@ export default function DirectoryView({ route }) {
               showError={showError}
               dirId={dirId}
               dirContext={dirContext}
+              isGoogleDriveRoute={isGoogleDriveRoute}
               onCreateFolder={() => setShowCreateDir(true)}
               onUploadFiles={() => fileInputRef.current?.click()}
               onUploadFolders={() => folderInputRef.current?.click()}

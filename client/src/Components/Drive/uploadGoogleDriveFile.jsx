@@ -50,7 +50,7 @@ export async function uploadGoogleDriveFile(
           await notifyBackend(S3fileId);
           await refreshUser();
           completeItem(id);
-          onUploadComplete?.();
+          onUploadComplete?.('google-drive');
           resolve();
         } else {
           console.error("Upload failed:", xhr.status, xhr.responseText);

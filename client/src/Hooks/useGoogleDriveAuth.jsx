@@ -4,7 +4,7 @@ export function redirectToGoogleDriveAuth(dirId = "") {
     redirect_uri: `${import.meta.env.VITE_BACKEND_BASE_URL}/auth/google-drive/callback`,
     response_type: "code",
     access_type: "offline", // allows refresh token
-    scope: "https://www.googleapis.com/auth/drive",
+    scope: "https://www.googleapis.com/auth/drive.file",
     prompt: "consent", // forces consent screen to get refresh token
   });
   if (dirId) {

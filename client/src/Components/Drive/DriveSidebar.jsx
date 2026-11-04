@@ -95,6 +95,7 @@ export const NAV_ITEMS = [
 
 export function NewMenu({
   anchorRef,
+  isGoogleDriveRoute,
   onClose,
   onCreateFolder,
   onUploadFromDrive,
@@ -183,14 +184,25 @@ export function NewMenu({
           <ArrowUpOnSquareStackIcon className="text-(--border-inverse) w-5 h-5" />
           Folder upload
         </button>
-        <button
-          className="gd-context-item"
-          onClick={close(() => onUploadFromDrive())}
-          disabled={disabled}
-        >
-          <GoogleDriveSVG size={18} />
-          Import from Drive
-        </button>
+        {isGoogleDriveRoute ? (
+          <button
+            className="gd-context-item"
+            onClick={close(() => onUploadFromDrive())}
+            disabled={disabled}
+          >
+            <GoogleDriveSVG size={18} />
+            Choose from Drive
+          </button>
+        ) : (
+          <button
+            className="gd-context-item"
+            onClick={close(() => onUploadFromDrive())}
+            disabled={disabled}
+          >
+            <GoogleDriveSVG size={18} />
+            Import from Drive
+          </button>
+        )}
       </div>
     </>,
     document.body,
@@ -202,6 +214,8 @@ export function GDrivePicker({
   setOpen,
   showError,
   refreshCurrentDirectory,
+  setFilesList,
+  isGoogleDriveRoute,
   enqueueItem,
   setItemProgress,
   completeItem,
@@ -214,9 +228,11 @@ export function GDrivePicker({
 
   return createPortal(
     <GoogleDriveBrowser
+    isGoogleDriveRoute={isGoogleDriveRoute}
       enqueueItem={enqueueItem}
       setItemProgress={setItemProgress}
       completeItem={completeItem}
+      setFilesList={setFilesList}
       handleCancelUpload={handleCancelUpload}
       setDbFileId={setDbFileId}
       onUploadComplete={refreshCurrentDirectory}
@@ -234,6 +250,8 @@ export default function DriveSidebar({
   disabled,
   onCreateFolder,
   refreshCurrentDirectory,
+  setFilesList,
+  isGoogleDriveRoute,
   onUploadFolders,
   onUploadFiles,
   showError,
@@ -278,6 +296,7 @@ export default function DriveSidebar({
             onUploadFromDrive={() => setOpen(true)}
             onUploadFiles={onUploadFiles}
             onUploadFolders={onUploadFolders}
+            isGoogleDriveRoute={isGoogleDriveRoute}
             disabled={disabled}
           />
         )}
@@ -286,9 +305,11 @@ export default function DriveSidebar({
             enqueueItem={enqueueItem}
             setItemProgress={setItemProgress}
             completeItem={completeItem}
+            setFilesList={setFilesList}
             handleCancelUpload={handleCancelUpload}
             setDbFileId={setDbFileId}
             refreshCurrentDirectory={refreshCurrentDirectory}
+            isGoogleDriveRoute={isGoogleDriveRoute}
             onClose={() => setShowNewMenu(false)}
             setLoading={setLoading}
             open={open}
