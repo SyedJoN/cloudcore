@@ -27,6 +27,7 @@ export default function DriveBottomBar({
   dirContext,
   disabled,
   onCreateFolder,
+  isGoogleDriveRoute,
   refreshCurrentDirectory,
   onUploadFolders,
   onUploadFiles,
@@ -168,12 +169,21 @@ export default function DriveBottomBar({
           disabled={disabled}
           onClick={runAndClose(onUploadFolders)}
         />
-        <SheetItem
-          icon={<GoogleDriveSVG size={22} />}
-          label="Import from Drive"
-          disabled={disabled}
-          onClick={runAndClose(() => setPickerOpen(true))}
-        />
+        {isGoogleDriveRoute ? (
+          <SheetItem
+            icon={<GoogleDriveSVG size={22} />}
+            label="Choose from Drive"
+            disabled={disabled}
+            onClick={runAndClose(() => setPickerOpen(true))}
+          />
+        ) : (
+          <SheetItem
+            icon={<GoogleDriveSVG size={22} />}
+            label="Import from Drive"
+            disabled={disabled}
+            onClick={runAndClose(() => setPickerOpen(true))}
+          />
+        )}
       </BottomSheet>
 
       {/* "More" sheet: remaining nav + storage */}

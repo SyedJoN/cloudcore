@@ -36,9 +36,9 @@ const DENY_ALL_CAPABILITIES = {
   canDelete: false,
   canAddChildren: false,
 };
- 
-// Gets a fresh OAuth access token (drive.file scope) via Google Identity
-// Services. Nothing is cached or stored: one token per picker session.
+
+
+
 const requestDriveToken = (loginHint) =>
   new Promise((resolve, reject) => {
     if (!window.google?.accounts?.oauth2) {
@@ -56,7 +56,6 @@ const requestDriveToken = (loginHint) =>
     client.requestAccessToken({ prompt: "" }); // no consent screen if already granted
   });
  
-// Map the (small) Picker doc to the same shape your list already uses.
 const toCombinedItem = (doc) => ({
   id: doc.id,
   name: doc.name,
@@ -72,8 +71,6 @@ const toCombinedItem = (doc) => ({
   capabilities: DENY_ALL_CAPABILITIES,
 });
  
-// Full metadata (includes capabilities). Works because picking a file grants
-// the app access to it under the drive.file scope, as long as the same
 // OAuth client/token is used for the picker and for this request.
 const fetchDriveFile = async (id, token) => {
   if (!token) throw new Error("Missing Drive access token");
@@ -88,10 +85,10 @@ const fetchDriveFile = async (id, token) => {
 };
  
 function GoogleDriveBrowser({
-  open = true, // if the parent only mounts this while the picker should show, leave it undefined
+  open = true, 
   isGoogleDriveRoute,
   setOpen,
-  setFilesList, // pass this from the parent
+  setFilesList, 
   showError,
   onUploadComplete,
   enqueueItem,
@@ -106,8 +103,23 @@ function GoogleDriveBrowser({
   const { isGoogleDrive } = useGDrive();
  
   const [pickerToken, setPickerToken] = useState(null);
+
+  //disconnect drive
+const disconnectDrive = async (token) => {
+  await fetch(
+    `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    }
+  );
+
+  setFilesList([]);
+};
+ 
  
   // Request a fresh token each time the picker opens; clear it on close.
+  
   useEffect(() => {
     if (!open) {
       setPickerToken(null);
@@ -127,9 +139,7 @@ function GoogleDriveBrowser({
     return () => {
       cancelled = true;
     };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
- 
-  // ---------- Listing route (show picked files in the UI) ----------
+  }, [open]);
  
   // Adds items without duplicating any that are already in the list.
   const addToList = (items) => {
@@ -154,7 +164,7 @@ function GoogleDriveBrowser({
     addToList(items);
   };
  
-  // ---------- Upload flow (one file after another) ----------
+  //  Upload flow (one file after another) 
  
   const handlePickedForUpload = async (docs) => {
     if (user.uploadLimit != null && user.uploadLimit === 0) {

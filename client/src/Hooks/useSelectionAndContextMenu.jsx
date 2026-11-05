@@ -21,7 +21,6 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
     (e, id) => {
       e.stopPropagation();
       e.preventDefault();
-
       const spaceLeft = e.clientX;
       const spaceRight = window.innerWidth - e.clientX;
 

@@ -65,6 +65,9 @@ import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationMo
 import { useDevice } from "../Contexts/DeviceContext";
 import MobileContextMenu from "../Components/Drive/MobileContextMenu";
 import FileViewerMobile from "../Components/File/FileViewerMobile";
+import DriveToolbarMobile from "../Components/Drive/DriveToolbarMobile";
+import DriveHeaderMobile from "../Components/Drive/DriveHeaderMobile";
+import DriveTopBarMobile from "../Components/Drive/DriveTopbarMobile";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -313,7 +316,7 @@ export default function DirectoryView({ route }) {
 
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
-      (type === "google" || isGoogleDrive)
+      type === "google" || isGoogleDrive
         ? "google-drive"
         : isSharedRoute
           ? "shared"
@@ -392,7 +395,6 @@ export default function DirectoryView({ route }) {
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef });
 
-
   useEffect(() => {
     if (!isStarredRoute) return;
     setIsStarred((prev) => {
@@ -438,7 +440,6 @@ export default function DirectoryView({ route }) {
         if (directoryId) {
           navigate(`/directory/${directoryId}`);
         }
-
       } catch (err) {
         console.error("Resumed Drive upload failed:", err);
         showError("Couldn't finish uploading the file you picked from Drive.");
@@ -701,10 +702,6 @@ export default function DirectoryView({ route }) {
       showError(err.message);
     }
   }
-
-  useEffect(() => {
-    console.log("contextItem", contextItem);
-  }, [contextItem]);
 
   async function handleCreateDirectory(e) {
     e.preventDefault();
@@ -1881,12 +1878,62 @@ export default function DirectoryView({ route }) {
         onUploadFromDrive={() => setShowDrivePicker(true)}
         disabled={isUploading}
       />
+      {device === "mobile" ? (
+        <DriveTopBarMobile
+          dirId={dirId}
+          dirContext={dirContext}
+          crumbs={crumbs}
+          setCrumbs={setCrumbs}
+          disabled={isUploading}
+          currentDir={dirId} // the full folder object, with _id, name, capabilitis
+             onShare={(itemId) => {
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) setShareItem(item);
+                    }}
+                    onRename={(itemId) => {
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) openRename(item);
+                    }}
+                    onDownload={(itemId) => {
+                      const item = combinedItems.find(
+                        (item) => (item.id ?? item._id) === itemId,
+                      );
+                      if (!item) return;
+                      if (item && item.isDirectory) {
+                        handleDownloadFolder(item);
+                      } else {
+                        handleDownload(item);
+                      }
 
-      <DriveHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        disabled={isUploading}
-      />
+                      clearSelection();
+                    }}
+                    onContextMenu={handleContextMenu}
+                    listHeaderRow={listHeaderRow}
+                    isStarred={isStarred}
+                    setIsStarred={setIsStarred}
+                    route={route}
+                    combinedItems={combinedItems}
+                    onStar={async (itemId) => {
+                      const items = combinedItems.filter(
+                        (item) => (item.id ?? item._id) === itemId,
+                      );
+
+                      if (!items.length) return;
+
+                      await handleToggleStar(items);
+                    }}
+        />
+      ) : (
+        <DriveHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          disabled={isUploading}
+        />
+      )}
 
       <div className="gd-body">
         {device === "mobile" ? (
@@ -1899,6 +1946,7 @@ export default function DirectoryView({ route }) {
             refreshCurrentDirectory={refreshCurrentDirectory}
             showError={showError}
             dirId={dirId}
+            isGoogleDriveRoute={isGoogleDriveRoute}
             dirContext={dirContext}
             onCreateFolder={() => setShowCreateDir(true)}
             onUploadFiles={() => fileInputRef.current?.click()}
@@ -1936,8 +1984,8 @@ export default function DirectoryView({ route }) {
             onContextMenu={(e) => handleCreateNewMenu(e)}
             onMouseLeave={handleMainMouseUp}
           >
-            {device === "windows" && (
-              <DriveToolbar
+           {device === "windows" && 
+             <DriveToolbar
                 dirId={dirId}
                 crumbs={crumbs}
                 setCrumbs={setCrumbs}
@@ -1953,7 +2001,9 @@ export default function DirectoryView({ route }) {
                 }
                 toggleDetailsBar={() => setShowDetails((prev) => !prev)}
               />
-            )}
+           }
+            
+            
 
             {dragBox && (
               <div
