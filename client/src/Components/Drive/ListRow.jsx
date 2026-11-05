@@ -216,7 +216,7 @@ export default function ListRow({
       onClick={() => onRowClick(itemId)}
       onMouseEnter={() => setIsListHovered(true)}
       onMouseLeave={() => setIsListHovered(false)}
-      onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
+      onDoubleClick={() => onDoubleClick?.(type, itemId)}
       onContextMenu={(e) => {
         e.preventDefault();
         onSelect?.(itemId);

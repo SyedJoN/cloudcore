@@ -98,7 +98,7 @@ export default function GridItem({
     const now = Date.now();
 
     if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.isDeleted);
+      onDoubleClick?.(type, itemId, item.name, item.path);
       lastTap.current = 0;
     } else {
       lastTap.current = now;
@@ -168,7 +168,7 @@ export default function GridItem({
           }
           onRowClick?.(itemId);
         }}
-        onDoubleClick={() => onDoubleClick?.(type, itemId, item.isDeleted)}
+        onDoubleClick={() => onDoubleClick?.(type, itemId, item.name)}
         onTouchEnd={() => {
           if (showInputCircle) return;
           handleTouchEnd();

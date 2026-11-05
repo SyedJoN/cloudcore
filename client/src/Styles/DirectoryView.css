@@ -40,7 +40,7 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: var(--surface-white);
+  background: var(--surface-container);
 }
 
 /* ===================== HEADER ===================== */
@@ -51,7 +51,7 @@
 }
 .gd-mheader-container {
   display: flex;
-    align-items: center;
+  align-items: center;
   gap: 4px;
 }
 .gd-msearch {
@@ -66,7 +66,11 @@
   background: var(--surface-container-dark);
 }
 
-.gd-msearch-form { flex: 1; min-width: 0; padding: 0 8px 0 4px; }
+.gd-msearch-form {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px 0 4px;
+}
 
 .gd-msearch-form input {
   width: 100%;
@@ -92,19 +96,34 @@
   color: #fff;
   font-weight: 500;
 }
-.gd-mavatar img { width: 100%; height: 100%; object-fit: cover; }
+.gd-mavatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 .gd-drawer-scrim {
-  position: fixed; inset: 0; z-index: 300;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
   background: rgba(0, 0, 0, 0.4);
-  opacity: 0; pointer-events: none;
+  opacity: 0;
+  pointer-events: none;
   transition: opacity 200ms ease;
 }
-.gd-drawer-scrim.open { opacity: 1; pointer-events: auto; }
+.gd-drawer-scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .gd-drawer {
-  position: fixed; top: 0; left: 0; bottom: 0; z-index: 301;
-  display: flex; flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
   width: min(300px, 85vw);
   overflow-y: auto;
   padding-top: 16px;
@@ -112,10 +131,15 @@
   transform: translateX(-100%);
   transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
 }
-.gd-drawer.open { transform: translateX(0); }
+.gd-drawer.open {
+  transform: translateX(0);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .gd-drawer, .gd-drawer-scrim { transition: none; }
+  .gd-drawer,
+  .gd-drawer-scrim {
+    transition: none;
+  }
 }
 
 .gd-header {
@@ -274,7 +298,43 @@
   background-color: var(--surface-container);
   overflow: hidden;
 }
+.gd-body.mobile {
+   border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.gd-body.mobile.animation {
+  animation: scaleIn 100ms ease-in-out normal;
+}
+@keyframes scaleIn {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.gd-mobile-topbar-transition {
+  animation: topbarEnter 220ms cubic-bezier(0.2, 0, 0, 1);
+  will-change: opacity, transform;
+}
 
+@keyframes topbarEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-mobile-topbar-transition {
+    animation: none;
+  }
+}
 /* ===================== SIDEBAR ===================== */
 .gd-sidebar {
   display: flex;
@@ -293,7 +353,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 140;;
+  z-index: 140;
   display: flex;
   background-color: var(--surface-container);
   height: var(--header-height);
@@ -304,7 +364,7 @@
 .gd-btn {
   padding: 10px 24px;
   border-radius: var(--radius-full);
-  
+
   font-size: 14px;
   font-weight: 500;
   font-family: var();
@@ -330,7 +390,6 @@
   background: var(--accent-blue);
   box-shadow: none;
   color: var(--text-btn);
-;
 }
 .gd-btn-primary::before {
   content: "";
@@ -348,7 +407,6 @@
 }
 .gd-btn-primary:hover:not(.disabled) {
   box-shadow: var(--shadow-1);
-  
 }
 .gd-btn-primary:active:not(.disabled) {
   box-shadow: none;
@@ -508,12 +566,19 @@
   width: 100%;
   border-radius: var(--radius-lg);
 }
+.gd-main-container.mobile {
+  scrollbar-width: none;
+}
 .gd-main {
   flex: 1;
   background-color: var(--surface-white);
   padding: 0 18px 18px 18px;
   display: flex;
   flex-direction: column;
+}
+.gd-main.mobile {
+  margin-inline: 8px;
+  border-radius: 16px;
 }
 
 /* ===================== TOOLBAR ===================== */
@@ -531,6 +596,8 @@
 
 .gd-toolbar-mobile {
   display: flex;
+  height: var(--header-height);
+  background-color: var(--surface-container);
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
@@ -741,7 +808,7 @@
 .gd-list-row.selected {
   background: var(--accent-blue-light);
 }
-.gd-list-row.selected:hover{
+.gd-list-row.selected:hover {
   background: var(--accent-blue-hover-dark);
 }
 .gd-list-row:hover:not(.selected) {
@@ -1198,38 +1265,48 @@ body.gd-overlay-open {
   overflow: hidden;
 }
 
-
 .gd-drawer-right {
-  position: fixed; top: 0; right: 0; bottom: 0; z-index: 301;
-  display: flex; flex-direction: column;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
   width: min(340px, 90vw);
   overflow-y: auto;
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--bg-primary, #fff);
+  background: var(--surface-container);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.18);
   transform: translateX(100%);
   transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
 }
-.gd-drawer-right.open { transform: translateX(0); }
+.gd-drawer-right.open {
+  transform: translateX(0);
+}
 
 .gd-drawer-right-head {
-  display: flex; justify-content: flex-end;
+  display: flex;
+  justify-content: flex-end;
   padding: 8px;
 }
 
 .gd-drawer-right .gd-user-menu-profile {
-  align-items: center; text-align: center;
+  align-items: center;
+  text-align: center;
   padding: 8px 16px 20px;
 }
 
 .gd-drawer-right .gd-user-menu-item,
 .gd-drawer-right .gd-user-menu-gdrive {
-  min-height: 48px;     
+  min-height: 48px;
   padding: 0 20px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gd-drawer-right { transition: none; }
+  .gd-drawer-right {
+    transition: none;
+  }
 }
 .gd-user-menu {
   background: var(--surface-container-dark);
@@ -1378,7 +1455,7 @@ body.gd-overlay-open {
   height: 48px;
   background: var(--surface-white);
   border-radius: var(--radius-full);
-  box-shadow:var(--shadow-dynamic);
+  box-shadow: var(--shadow-dynamic);
   position: fixed;
   top: 72px;
   left: 50%;
@@ -1744,8 +1821,7 @@ body.gd-overlay-open {
   font-family: inherit;
 }
 .mv-breadcrumb-btn:hover {
-   background: var(--surface-container-dark-hover);
-
+  background: var(--surface-container-dark-hover);
 }
 .mv-breadcrumb-current {
   display: flex;

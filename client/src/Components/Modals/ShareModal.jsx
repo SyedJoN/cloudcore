@@ -61,6 +61,7 @@ export default function ShareModal({
   isGoogleDriveRoute,
 }) {
   const { user } = useAuth();
+  console.log('item shgare', item)
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
   const [showSuggestions, setShowSuggestions] = useState(false);

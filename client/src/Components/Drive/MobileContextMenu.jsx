@@ -107,7 +107,7 @@ export default function MobileContextMenu({
   if (!item) return detailsSheet;
 
   /* ---------- flags ---------- */
-
+console.log('item', item)
   const isGoogle = Boolean(item.webViewLink);
   const isSharedRoute = route === "shared";
   const isGoogleDriveRoute = route === "google-drive" && isGoogle;
@@ -115,6 +115,7 @@ export default function MobileContextMenu({
   const isFile = !item.isDirectory;
 
   const capabilities = item.capabilities || {};
+  console.log('capa', capabilities)
 
   const canRead = isGoogle ? true : capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
@@ -235,7 +236,7 @@ export default function MobileContextMenu({
                     <SheetItem
                       icon={<IconLink size={22} />}
                       label="Copy link"
-                      disabled={isDeleted || !canRead}
+                      disabled={isDeleted}
                       onClick={handleCopyLink}
                     />
 

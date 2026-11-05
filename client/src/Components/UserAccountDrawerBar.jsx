@@ -67,7 +67,7 @@ export default function UserAccountDrawerMobile({ open, onClose }) {
           <>
             {/* Profile */}
             <div className="gd-user-menu-profile not-empty">
-              <UseAvatar name={user.name} avatar={user.avatar} size={72} />
+              <UseAvatar name={user.name} avatar={user.avatar} size={72} fontSize ={36}/>
               <div className="gd-user-menu-name">{user.name}</div>
               {user.email && (
                 <div className="gd-user-menu-email">{user.email}</div>

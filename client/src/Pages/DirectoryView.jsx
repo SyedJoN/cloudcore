@@ -132,6 +132,24 @@ export default function DirectoryView({ route }) {
   const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [inDirectory, setInDirectory] = useState(false);
+  const [mobileHeaderDirName, setMobileHeaderDirName] = useState("");
+  const [animate, setAnimate] = useState(false);
+
+  const restartAnimation = () => {
+    setAnimate(false);
+
+    requestAnimationFrame(() => {
+      setAnimate(true);
+    });
+  };
+
+  useEffect(() => {
+    if (location.pathname.startsWith("/directory") && device === "mobile") {
+      setAnimate(true);
+      setInDirectory(true);
+    }
+  }, [location.pathname, device]);
 
   const [sortConfig, setSortConfig] = useState({
     key: "name",
@@ -286,6 +304,8 @@ export default function DirectoryView({ route }) {
       refreshUser();
     }
   }, [dirId]);
+
+
   const {
     directoryName,
     isLoading,
@@ -298,6 +318,7 @@ export default function DirectoryView({ route }) {
     setDirectoriesList,
     getDirectoryItems,
     getTrashItems,
+    lastDirectory,
     combinedItems,
     filteredFiles,
   } = useDirectoryData({
@@ -313,7 +334,7 @@ export default function DirectoryView({ route }) {
     navigate,
     searchQuery,
   });
-
+  const [path, setPath] = useState([]);
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
       type === "google" || isGoogleDrive
@@ -393,7 +414,7 @@ export default function DirectoryView({ route }) {
     handleMainMouseDown,
     handleMainMouseMove,
     handleMainMouseUp,
-  } = useSelectionAndContextMenu({ combinedItems, mainRef });
+  } = useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory });
 
   useEffect(() => {
     if (!isStarredRoute) return;
@@ -536,7 +557,7 @@ export default function DirectoryView({ route }) {
     handleSelect(itemId);
   }
 
-  const handleRowDoubleClick = async (type, id) => {
+  const handleRowDoubleClick = async (type, id, name, path) => {
     if (type === "google-directory") {
       window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
       return;
@@ -545,6 +566,9 @@ export default function DirectoryView({ route }) {
       navigate(`/directory/${id}`, {
         state: { dirContext: previousDirContext.current },
       });
+       setPath((prev) => [...prev, { id, name }]);
+      restartAnimation();
+      setMobileHeaderDirName(name);
       return;
     }
     const item = combinedItems.find((i) => (i.id ?? i._id) === id);
@@ -1884,48 +1908,50 @@ export default function DirectoryView({ route }) {
           dirContext={dirContext}
           crumbs={crumbs}
           setCrumbs={setCrumbs}
+          dirName={mobileHeaderDirName}
+          path={path}
+          setPath={setPath}
+          inDirectory={inDirectory}
+          setInDirectory={setInDirectory}
+          restartAnimation={restartAnimation}
           disabled={isUploading}
           currentDir={dirId} // the full folder object, with _id, name, capabilitis
-             onShare={(itemId) => {
-                      const item = combinedItems.find(
-                        (i) => (i.id ?? i._id) === itemId,
-                      );
-                      if (item) setShareItem(item);
-                    }}
-                    onRename={(itemId) => {
-                      const item = combinedItems.find(
-                        (i) => (i.id ?? i._id) === itemId,
-                      );
-                      if (item) openRename(item);
-                    }}
-                    onDownload={(itemId) => {
-                      const item = combinedItems.find(
-                        (item) => (item.id ?? item._id) === itemId,
-                      );
-                      if (!item) return;
-                      if (item && item.isDirectory) {
-                        handleDownloadFolder(item);
-                      } else {
-                        handleDownload(item);
-                      }
+          onShare={(itemId) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
+            if (item) setShareItem(item);
+          }}
+          onRename={(itemId) => {
+            const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
+            if (item) openRename(item);
+          }}
+          onDownload={(itemId) => {
+            const item = combinedItems.find(
+              (item) => (item.id ?? item._id) === itemId,
+            );
+            if (!item) return;
+            if (item && item.isDirectory) {
+              handleDownloadFolder(item);
+            } else {
+              handleDownload(item);
+            }
 
-                      clearSelection();
-                    }}
-                    onContextMenu={handleContextMenu}
-                    listHeaderRow={listHeaderRow}
-                    isStarred={isStarred}
-                    setIsStarred={setIsStarred}
-                    route={route}
-                    combinedItems={combinedItems}
-                    onStar={async (itemId) => {
-                      const items = combinedItems.filter(
-                        (item) => (item.id ?? item._id) === itemId,
-                      );
+            clearSelection();
+          }}
+          onContextMenu={handleContextMenu}
+          listHeaderRow={listHeaderRow}
+          isStarred={isStarred}
+          setIsStarred={setIsStarred}
+          route={route}
+          combinedItems={combinedItems}
+          onStar={async (itemId) => {
+            const items = combinedItems.filter(
+              (item) => (item.id ?? item._id) === itemId,
+            );
 
-                      if (!items.length) return;
+            if (!items.length) return;
 
-                      await handleToggleStar(items);
-                    }}
+            await handleToggleStar(items);
+          }}
         />
       ) : (
         <DriveHeader
@@ -1935,57 +1961,43 @@ export default function DirectoryView({ route }) {
         />
       )}
 
-      <div className="gd-body">
-        {device === "mobile" ? (
-          <DriveBottomBar
+      <div
+        className={`gd-body ${device === "mobile" ? "mobile" : ""} ${animate ? "animation" : ""}`}
+      >
+        {device === "windows" && user.email && (
+          <DriveSidebar
             enqueueItem={enqueueItem}
             setItemProgress={setItemProgress}
+            setDirectoriesList={setDirectoriesList}
+            setFilesList={setFilesList}
             completeItem={completeItem}
             handleCancelUpload={handleCancelUpload}
             setDbFileId={setDbFileId}
             refreshCurrentDirectory={refreshCurrentDirectory}
             showError={showError}
             dirId={dirId}
-            isGoogleDriveRoute={isGoogleDriveRoute}
             dirContext={dirContext}
+            isGoogleDriveRoute={isGoogleDriveRoute}
             onCreateFolder={() => setShowCreateDir(true)}
             onUploadFiles={() => fileInputRef.current?.click()}
             onUploadFolders={() => folderInputRef.current?.click()}
           />
-        ) : (
-          user.email && (
-            <DriveSidebar
-              enqueueItem={enqueueItem}
-              setItemProgress={setItemProgress}
-              setDirectoriesList={setDirectoriesList}
-              setFilesList={setFilesList}
-              completeItem={completeItem}
-              handleCancelUpload={handleCancelUpload}
-              setDbFileId={setDbFileId}
-              refreshCurrentDirectory={refreshCurrentDirectory}
-              showError={showError}
-              dirId={dirId}
-              dirContext={dirContext}
-              isGoogleDriveRoute={isGoogleDriveRoute}
-              onCreateFolder={() => setShowCreateDir(true)}
-              onUploadFiles={() => fileInputRef.current?.click()}
-              onUploadFolders={() => folderInputRef.current?.click()}
-            />
-          )
         )}
-        <div className="gd-main-container">
+        <div
+          className={`gd-main-container ${device === "mobile" ? "mobile" : ""}`}
+        >
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className="gd-main"
+            className={`gd-main ${device === "mobile" ? "mobile" : ""}`}
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
             onContextMenu={(e) => handleCreateNewMenu(e)}
             onMouseLeave={handleMainMouseUp}
           >
-           {device === "windows" && 
-             <DriveToolbar
+            {device === "windows" && (
+              <DriveToolbar
                 dirId={dirId}
                 crumbs={crumbs}
                 setCrumbs={setCrumbs}
@@ -2001,9 +2013,7 @@ export default function DirectoryView({ route }) {
                 }
                 toggleDetailsBar={() => setShowDetails((prev) => !prev)}
               />
-           }
-            
-            
+            )}
 
             {dragBox && (
               <div
@@ -2175,6 +2185,23 @@ export default function DirectoryView({ route }) {
           />
         )}
       </div>
+      {device === "mobile" && (
+        <DriveBottomBar
+          enqueueItem={enqueueItem}
+          setItemProgress={setItemProgress}
+          completeItem={completeItem}
+          handleCancelUpload={handleCancelUpload}
+          setDbFileId={setDbFileId}
+          refreshCurrentDirectory={refreshCurrentDirectory}
+          showError={showError}
+          dirId={dirId}
+          isGoogleDriveRoute={isGoogleDriveRoute}
+          dirContext={dirContext}
+          onCreateFolder={() => setShowCreateDir(true)}
+          onUploadFiles={() => fileInputRef.current?.click()}
+          onUploadFolders={() => folderInputRef.current?.click()}
+        />
+      )}
 
       {showCreateDir && (
         <CreateDirectoryModal
@@ -2329,9 +2356,7 @@ export default function DirectoryView({ route }) {
               if (item) openRename(item);
             });
           }}
-          onShare={() => {
-            const id = [...selectedItems][0];
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+          onShare={(item) => {
             if (item) setShareItem(item);
           }}
           onTrash={async () => {

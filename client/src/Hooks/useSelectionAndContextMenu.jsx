@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 
 const CONTEXT_MENU_WIDTH = 300;
 
-export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
+export function useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory }) {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [contextItem, setContextItem] = useState(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
@@ -42,8 +42,15 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef }) {
       setOpen(true);
       setContextPos({ x, y: e.clientY });
 
-      const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-      setContextItem(item || null);
+ const parentMatch = combinedItems.find(
+  (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id
+);
+
+const itemMatch = combinedItems.find(
+  (i) => (i.id ?? i._id) === id
+);
+console.log('parent', parentMatch)
+setContextItem(parentMatch ? lastDirectory : itemMatch ?? lastDirectory);
     },
     [combinedItems],
   );

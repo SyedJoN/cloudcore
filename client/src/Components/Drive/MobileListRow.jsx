@@ -126,7 +126,7 @@ export default function MobileListRow({
     const now = Date.now();
 
     if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.isDeleted);
+      onDoubleClick?.(type, itemId, item.name);
       lastTap.current = 0;
     } else {
       lastTap.current = now;

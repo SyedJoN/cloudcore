@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { getDirectory } from "../../apis/directoryApi";
 import { useGDrive } from "../Contexts";
@@ -21,6 +21,7 @@ export function useDirectoryData({
   const { isGoogleDrive } = useGDrive();
   const [directoryName, setDirectoryName] = useState("My Drive");
   const [directoriesList, setDirectoriesList] = useState([]);
+  const [lastDirectory, setLastDirectory] = useState([]);
   const [filesList, setFilesList] = useState([]);
   const [crumbs, setCrumbs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,17 +39,17 @@ export function useDirectoryData({
         const { fetch } = ROUTE_CONFIG[dirType];
 
         const { data } = await fetch(dirId || "");
-
+        setLastDirectory({...data, isDirectory: true});
         const name =
           isSharedRoute && !dirId
             ? ROUTE_CONFIG["shared"].label
             : route === "google-drive"
-              ? ROUTE_CONFIG[route].label :
-              route === "starred" ? ROUTE_CONFIG[route].label
-              : data?.name;
+              ? ROUTE_CONFIG[route].label
+              : route === "starred"
+                ? ROUTE_CONFIG[route].label
+                : data?.name;
 
         setDirectoryName(name);
-
         const cleanPath = Array.isArray(data?.path)
           ? data?.path
               .filter((p) => !isRootName(p.name))
@@ -93,7 +94,7 @@ export function useDirectoryData({
           setFilesList(files);
           return;
         }
-       
+
         if (!isRecentRoute) {
           setDirectoriesList([...data.directories].reverse());
         }
@@ -155,12 +156,15 @@ export function useDirectoryData({
 
   const combinedItems = useMemo(
     () => [
-      ...directoriesList.map((d) => ({ ...d, isDirectory: true })).filter((item)=> !q || item.name.toLowerCase().includes(q)),
-      ...filesList.map((f) => ({ ...f, isDirectory: false })).filter((item)=> !q || item.name.toLowerCase().includes(q)),
+      ...directoriesList
+        .map((d) => ({ ...d, isDirectory: true }))
+        .filter((item) => !q || item.name.toLowerCase().includes(q)),
+      ...filesList
+        .map((f) => ({ ...f, isDirectory: false }))
+        .filter((item) => !q || item.name.toLowerCase().includes(q)),
     ],
     [directoriesList, filesList, q],
   );
-
 
   const filteredFiles = useMemo(
     () =>
@@ -173,6 +177,7 @@ export function useDirectoryData({
   return {
     directoryName,
     directoriesList,
+    lastDirectory,
     filesList,
     setFilesList,
     setDirectoriesList,

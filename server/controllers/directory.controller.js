@@ -410,11 +410,13 @@ export const getDirectory = async (req, res, next) => {
         File.find({ parentDirId: parentDir._id, isDeleted: false })
           .populate("userId", "name email avatar")
           .populate("path", "name")
+          .populate("parentDirId")
           .populate("lastModifyingUser")
           .lean(),
         Directory.find({ parentDirId: parentDir._id, isDeleted: false })
           .populate("userId", "name email avatar")
           .populate("path", "name")
+          .populate("parentDirId")
           .populate("lastModifyingUser")
           .lean(),
       ]);
@@ -541,6 +543,7 @@ export const getDirectory = async (req, res, next) => {
       })
         .populate("userId", "name email avatar")
         .populate("path", "name")
+        .populate("parentDirId")
         .populate("lastModifyingUser")
 
         .lean(),
@@ -550,6 +553,7 @@ export const getDirectory = async (req, res, next) => {
         isDeleted: false,
       })
         .populate("userId", "name email avatar")
+        .populate("parentDirId")
         .populate("path", "name")
         .populate("lastModifyingUser")
 
@@ -592,9 +596,21 @@ export const getDirectory = async (req, res, next) => {
         };
       }),
     );
+    const { owners, capabilities, permissions } = await resolveRole(
+      parentDir,
+      "folder",
+      userId,
+      parentDir,
+    );
 
-    return res.status(200).json({
+    const parentDirectoryWithRoles = {
       ...parentDir,
+      owners,
+      capabilities,
+      permissions,
+    };
+    return res.status(200).json({
+      ...parentDirectoryWithRoles,
       files: filesWithRoles,
       directories: directoriesWithRoles,
       totalUsage: rootDir.size,
@@ -774,28 +790,28 @@ export const getSharedWithMe = async (req, res, next) => {
     });
 
     const filesWithRoles = await Promise.all(
-  topLevelFiles.map(async (file) => {
-    let parentDir = null;
+      topLevelFiles.map(async (file) => {
+        let parentDir = null;
 
-    const parentId = getParentId(file.parentDirId);
-    if (parentId) {
-      parentDir = await Directory.findById(parentId)
-        .select("_id name parentDirId isPublic publicRole")
-        .lean();
-    }
+        const parentId = getParentId(file.parentDirId);
+        if (parentId) {
+          parentDir = await Directory.findById(parentId)
+            .select("_id name parentDirId isPublic publicRole")
+            .lean();
+        }
 
-    const { owners, capabilities, permissions, sharedWithMeTime } =
-      await resolveRole(file, "file", userId, parentDir, true);
+        const { owners, capabilities, permissions, sharedWithMeTime } =
+          await resolveRole(file, "file", userId, parentDir, true);
 
-    return {
-      ...file,
-      owners,
-      capabilities,
-      permissions,
-      sharedWithMeTime,
-    };
-  }),
-);
+        return {
+          ...file,
+          owners,
+          capabilities,
+          permissions,
+          sharedWithMeTime,
+        };
+      }),
+    );
 
     const directoriesWithRoles = await Promise.all(
       topLevelDirectories.map(async (directory) => {
@@ -1523,23 +1539,23 @@ export const sendOwnershipMail = async (req, res, next) => {
 
       if (existingPermission) {
         try {
-    result = await drive.permissions.update({
-      fileId: itemId,
-      permissionId: existingPermission.id,
-      requestBody: { role: "writer", pendingOwner: true },
-      fields: "id,type,emailAddress,role,pendingOwner",
-    });
-  } catch (err) {
-    const reason = err?.response?.data?.error?.errors?.[0]?.reason;
-    if (reason === "targetUserCannotBePendingOwnerOnFile") {
-      return res.status(400).json({
-        message:
-          "This account can't receive ownership from a personal Google account. Ask them to make a copy, or use a Gmail account.",
-        reason,
-      });
-    }
-    throw err;
-  }
+          result = await drive.permissions.update({
+            fileId: itemId,
+            permissionId: existingPermission.id,
+            requestBody: { role: "writer", pendingOwner: true },
+            fields: "id,type,emailAddress,role,pendingOwner",
+          });
+        } catch (err) {
+          const reason = err?.response?.data?.error?.errors?.[0]?.reason;
+          if (reason === "targetUserCannotBePendingOwnerOnFile") {
+            return res.status(400).json({
+              message:
+                "This account can't receive ownership from a personal Google account. Ask them to make a copy, or use a Gmail account.",
+              reason,
+            });
+          }
+          throw err;
+        }
       } else {
         result = await drive.permissions.create({
           fileId: itemId,
@@ -2883,10 +2899,10 @@ export const copyItem = async (req, res, next) => {
     });
   } catch (error) {
     if (error?.code === 403) {
-    return res.status(403).json({
-      message: error?.cause?.message || "You can't copy this file",
-    });
-  }
+      return res.status(403).json({
+        message: error?.cause?.message || "You can't copy this file",
+      });
+    }
     next(error);
   }
 };
