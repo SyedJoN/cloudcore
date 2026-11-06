@@ -199,7 +199,7 @@ export default function FileViewer({
       case "office-word":
       case "office-excel":
       case "office-ppt":
-        return <OfficeViewer item={item} category={category} />;
+        return <OfficeViewer BASE_URL={BASE_URL} item={item} category={category} />;
 
       default:
         return <UnknownViewer item={item} />;

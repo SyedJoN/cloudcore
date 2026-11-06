@@ -42,6 +42,7 @@ import { getDriveClient } from "../services/googleDriveClient.js";
 import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
+import mongoose from "mongoose";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -1102,74 +1103,73 @@ export const editDirectory = async (req, res, next) => {
 
 export const softDeleteDirectory = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user?._id;
+    const user = req.user;
+    const ids = req.body?.ids ?? [req.params.id];
 
-    const currentDirectory = await Directory.findOne({
-      _id: id,
-      isDeleted: false,
-    })
+    const dirs = await Directory.find({ _id: { $in: ids }, isDeleted: false })
       .select("parentDirId userId size")
       .lean();
+    if (!dirs.length) return res.status(404).json({ message: "Directory not found" });
 
-    if (!currentDirectory)
-      return res.status(404).json({ message: "Directory not found" });
+    const checks = await Promise.all(
+      dirs.map((d) =>
+        fgaClient.check({
+          user: getFgaObject("user", user._id),
+          relation: "can_trash",
+          object: getFgaObject("folder", d._id),
+        }),
+      ),
+    );
+    const allowed = dirs.filter(
+      (_, i) => user.role === "superuser" || checks[i].allowed,
+    );
+    if (!allowed.length) return res.status(403).json({ message: "Unauthorized!" });
 
-    const canTrash = await fgaClient.check({
-      user: getFgaObject("user", userId),
-      relation: "can_trash",
-      object: getFgaObject("folder", id),
-    });
-
-    if (req.user.role !== "superuser" && !canTrash.allowed) {
-      return res.status(403).json({ message: "Unauthorized!" });
-    }
-
-    const queue = [currentDirectory._id];
-    const allDirIds = [id];
+    // collect every nested folder + file, one query per level
+    let frontier = allowed.map((d) => d._id);
+    const allDirIds = [...frontier];
     const allFileIds = [];
 
-    while (queue.length) {
-      const currentId = queue.shift();
+    while (frontier.length) {
       const [childDirs, childFiles] = await Promise.all([
-        Directory.find({ parentDirId: currentId, isDeleted: false })
+        Directory.find({ parentDirId: { $in: frontier }, isDeleted: false })
           .select("_id")
           .lean(),
-        File.find({ parentDirId: currentId, isDeleted: false })
+        File.find({ parentDirId: { $in: frontier }, isDeleted: false })
           .select("_id")
           .lean(),
       ]);
-      childDirs.forEach((d) => {
-        allDirIds.push(d._id);
-        queue.push(d._id);
-      });
-      childFiles.forEach((f) => allFileIds.push(f._id));
+      frontier = childDirs.map((d) => d._id);
+      allDirIds.push(...frontier);
+      allFileIds.push(...childFiles.map((f) => f._id));
     }
 
+    const trashedTime = Date.now();
     await Promise.all([
       allFileIds.length
-        ? File.updateMany(
-            { _id: { $in: allFileIds } },
-            { isDeleted: true, trashedTime: Date.now() },
-          )
-        : Promise.resolve(),
-      Directory.updateMany(
-        { _id: { $in: allDirIds } },
-        { isDeleted: true, trashedTime: Date.now() },
-      ),
+        ? File.updateMany({ _id: { $in: allFileIds } }, { isDeleted: true, trashedTime })
+        : null,
+      Directory.updateMany({ _id: { $in: allDirIds } }, { isDeleted: true, trashedTime }),
     ]);
-    await updateParentDirSize(
-      currentDirectory.parentDirId,
-      -currentDirectory.size,
+
+    // one size update per parent folder
+    const sizeByParent = {};
+    allowed.forEach((d) => {
+      const key = String(d.parentDirId);
+      sizeByParent[key] = (sizeByParent[key] ?? 0) + d.size;
+    });
+    await Promise.all(
+      Object.entries(sizeByParent).map(([dirId, size]) =>
+        updateParentDirSize(dirId, -size),
+      ),
     );
 
     return res.status(200).json({
-      message: "Directory moved to trash",
-      deleted: { directories: allDirIds.length, files: allFileIds.length },
+      message: "Moved to trash",
+      trashedIds: allowed.map((d) => String(d._id)),
     });
   } catch (error) {
     next(error);
-    console.dir(error.errInfo, { depth: null });
   }
 };
 export const deleteDirectory = async (req, res, next) => {
@@ -1306,63 +1306,70 @@ export const deleteDirectory = async (req, res, next) => {
     next(error);
   }
 };
-
 export const restoreDirectory = async (req, res, next) => {
   try {
-    const { id } = req.params;
     const userId = req.user?._id;
-    const totalStorage = req.user.totalStorage;
-
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const currentDirectory = await Directory.findOne({
-      _id: id,
-      isDeleted: true,
-    });
-    if (!currentDirectory)
-      return res.status(404).json({ message: "Directory not found" });
-    const rootDir = await Directory.findOne({
-      userId,
-    }).lean();
+    const ids = (req.body?.ids ?? [req.params.id]).filter((id) =>
+      mongoose.isValidObjectId(id),
+    );
+    if (!ids.length) return res.status(400).json({ message: "No valid ids" });
 
-    const totalStorageLeft = totalStorage - rootDir.size;
-    const needed = currentDirectory.size - totalStorageLeft;
-    if (currentDirectory.size > totalStorageLeft) {
-      return res.status(413).json({
-        message: `Storage is full. You need ${formatSize(needed)} more storage`,
+    const dirs = await Directory.find({ _id: { $in: ids }, isDeleted: true });
+    if (!dirs.length) {
+      return res.status(404).json({ message: "Directory not found" });
+    }
+
+    // storage check for ALL folders together
+    const rootDir = await Directory.findOne({ userId }).lean();
+    const totalNeeded = dirs.reduce((sum, d) => sum + d.size, 0);
+    const storageLeft = req.user.totalStorage - rootDir.size;
+
+    if (totalNeeded > storageLeft) {
+      return res.status(507).json({
+        message: `Storage is full. You need ${formatSize(totalNeeded - storageLeft)} more storage`,
       });
     }
-    const queue = [currentDirectory._id];
-    const allDirIds = [id];
+
+    // collect every nested folder + file, one query per level
+    let frontier = dirs.map((d) => d._id);
+    const allDirIds = [...frontier];
     const allFileIds = [];
 
-    while (queue.length) {
-      const currentId = queue.shift();
-
+    while (frontier.length) {
       const [childDirs, childFiles] = await Promise.all([
-        Directory.find({ parentDirId: currentId }).select("_id").lean(),
-        File.find({ parentDirId: currentId }).select("_id").lean(),
+        Directory.find({ parentDirId: { $in: frontier } }).select("_id").lean(),
+        File.find({ parentDirId: { $in: frontier } }).select("_id").lean(),
       ]);
-
-      childDirs.forEach((d) => {
-        allDirIds.push(d._id);
-        queue.push(d._id);
-      });
-
-      childFiles.forEach((f) => allFileIds.push(f._id));
+      frontier = childDirs.map((d) => d._id);
+      allDirIds.push(...frontier);
+      allFileIds.push(...childFiles.map((f) => f._id));
     }
 
     await Promise.all([
       Directory.updateMany({ _id: { $in: allDirIds } }, { isDeleted: false }),
       allFileIds.length
         ? File.updateMany({ _id: { $in: allFileIds } }, { isDeleted: false })
-        : Promise.resolve(),
+        : null,
     ]);
-    await updateParentDirSize(
-      currentDirectory.parentDirId,
-      currentDirectory.size,
+
+    // one size update per parent folder
+    const sizeByParent = {};
+    dirs.forEach((d) => {
+      const key = String(d.parentDirId);
+      sizeByParent[key] = (sizeByParent[key] ?? 0) + d.size;
+    });
+    await Promise.all(
+      Object.entries(sizeByParent).map(([dirId, size]) =>
+        updateParentDirSize(dirId, size),
+      ),
     );
-    return res.status(200).json({ message: "Directory restored successfully" });
+
+    return res.status(200).json({
+      message: "Restored successfully",
+      restoredIds: dirs.map((d) => String(d._id)),
+    });
   } catch (error) {
     next(error);
   }

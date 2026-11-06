@@ -1,3 +1,4 @@
+import { RateLimiterRes } from "rate-limiter-flexible";
 export const rateLimitMiddleware = (limiter, getKey) => {
   return async (req, res, next) => {
     const key = getKey ? getKey(req) : req.user?._id?.toString() || req.ip;

@@ -18,21 +18,16 @@ const router = express.Router();
 router.param("id", validateIdMiddleware);
 
 // Write
-router.route("/{:id}").patch(editDirectory).delete(deleteDirectory);
+router.patch(["/soft-delete", "/soft-delete/:id"], softDeleteDirectory);
 router.post("/:id/request-access", requestAccess);
-router.patch("/:id/restore", restoreDirectory);
-router.post("/{:parentDirId}", addDirectory);
-router.delete("/soft-delete/:id", softDeleteDirectory);
+router.patch(["/restore", "/:id/restore"], restoreDirectory);
 
 //upload
-router.post(
-  "/uploads/initiate",
-  initiateFolderUpload,
-);
+router.post("/uploads/initiate", initiateFolderUpload);
 
-router.post(
-  "/uploads/complete",
-  completeFolderUpload,
-);
+router.post("/uploads/complete", completeFolderUpload);
+
+router.route("/{:id}").patch(editDirectory).delete(deleteDirectory);
+router.post("/{:parentDirId}", addDirectory);
 
 export default router;

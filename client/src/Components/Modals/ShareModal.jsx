@@ -59,9 +59,43 @@ function getCountLabel(list) {
   return `${list.length} ${noun}`;
 }
 
+const getAnyonePermission = (it) =>
+  it?.permissions?.find((p) => p?.type === "anyone");
+
+const hasAnyone = (it) => Boolean(getAnyonePermission(it));
+
+const emailOf = (p) => (p?.emailAddress ?? p?.email ?? "").toLowerCase();
+
+// People who have access to EVERY selected item (lowest role wins)
+function getCommonPermissions(list) {
+  const people = (it) =>
+    (it?.permissions ?? []).filter((p) => p?.type !== "anyone");
+
+  const [first, ...rest] = list;
+  if (!first) return [];
+
+  return people(first)
+    .filter((p) => {
+      const email = emailOf(p);
+      return (
+        email && rest.every((it) => people(it).some((q) => emailOf(q) === email))
+      );
+    })
+    .map((p) => {
+      const email = emailOf(p);
+      const roles = list.map(
+        (it) => people(it).find((q) => emailOf(q) === email)?.role,
+      );
+      const lowest = [...roles].sort(
+        (a, b) => (ROLE_PRIORITY[a] ?? 0) - (ROLE_PRIORITY[b] ?? 0),
+      )[0];
+      return { ...p, role: lowest };
+    });
+}
+
 export default function ShareModal({
   item: itemProp = null, // single item (backward compatible)
-  items = null, // NEW: array of items
+  items = null, // array of items
   setItem = null,
   allUsers,
   setUserRole,
@@ -90,6 +124,7 @@ export default function ShareModal({
   const shareItems = items?.length ? items : itemProp ? [itemProp] : [];
   const isMulti = shareItems.length > 1;
   const item = shareItems[0];
+  const idsKey = shareItems.map(getItemId).join(",");
 
   const [emailInput, setEmailInput] = useState("");
   const [inviteRole, setInviteRole] = useState("viewer");
@@ -121,11 +156,14 @@ export default function ShareModal({
 
   const type = getItemType(item);
   const isOwner = item?.owners?.[0]?.me === true;
-  const capabilities = item?.capabilities || {};
 
-  const canChangeRole = capabilities?.canChangeRole ?? true;
-  // For multiple items the user must be able to share ALL of them
-  const canShare = shareItems.every((it) => it?.capabilities?.canShare === true);
+  // For multiple items, every one must allow the action
+  const canChangeRole = shareItems.every(
+    (it) => (it?.capabilities?.canChangeRole ?? true) === true,
+  );
+  const canShare = shareItems.every(
+    (it) => it?.capabilities?.canShare === true,
+  );
 
   const { toast } = useToast();
 
@@ -152,34 +190,32 @@ export default function ShareModal({
     const element = modalContentRef.current;
     if (!element) return;
 
-    setModalHeight(element.scrollHeight);
+    const update = () => {
+      const h = element.scrollHeight;
+      if (h > 0) setModalHeight(h);
+    };
+    update();
 
-    const observer = new ResizeObserver(() => {
-      setModalHeight(element.scrollHeight);
-    });
+    const observer = new ResizeObserver(update);
     observer.observe(element);
 
     return () => observer.disconnect();
   }, []);
 
+  // Sync permissions + link access whenever the selected items change
   useEffect(() => {
-    // Multi-select: permissions differ per item, so we only invite.
-    if (isMulti) {
-      setPeopleWithAccess([]);
-      setPrevPermissions([]);
-      setLinkAccess("restricted");
-      setLinkRole("reader");
-      return;
-    }
+    const permissions = isMulti
+      ? getCommonPermissions(shareItems)
+      : (item?.permissions ?? []);
 
-    const permissions = item?.permissions ?? [];
-    const linkPermission = permissions.find((p) => p?.type === "anyone");
+    const allPublic = shareItems.length > 0 && shareItems.every(hasAnyone);
+    const linkPermission = shareItems.map(getAnyonePermission).find(Boolean);
 
     setPeopleWithAccess(permissions);
     setPrevPermissions(permissions);
-    setLinkAccess(linkPermission ? "anyone" : "restricted");
+    setLinkAccess(allPublic ? "anyone" : "restricted");
     setLinkRole(linkPermission?.role || "reader");
-  }, [item, isMulti]);
+  }, [idsKey]);
 
   useEffect(() => {
     const previous = prevPermissions ?? [];
@@ -223,11 +259,11 @@ export default function ShareModal({
   )?.filter((u) => !selectedUsers.find((s) => s.id === u.id));
 
   // Emails that should NOT be suggested (already owner / already has access).
-  // With multiple items access differs per item, so only single mode excludes.
+  // With multiple items access differs per item, so only people who have
+  // access to ALL items are excluded.
   function getExcludedEmails() {
-    if (isMulti) return [];
     return [
-      ...(item?.owners || []).map((o) => o.emailAddress),
+      ...(isMulti ? [] : (item?.owners || []).map((o) => o.emailAddress)),
       ...(peopleWithAccess ?? []).map((p) => p.emailAddress),
     ]
       .filter(Boolean)
@@ -657,16 +693,28 @@ export default function ShareModal({
     }
   }
 
+  // Copies one link, or all links (one per line) when several items are open
   function handleCopyLink() {
-    // Only shown for a single item
+    const text = shareItems.map(getItemUrl).join("\n");
+
     navigator.clipboard
-      .writeText(getItemUrl(item))
+      .writeText(text)
       .then(() => {
-        toast({ message: "Link copied to clipboard", type: "success" });
+        toast({
+          message: isMulti
+            ? "Links copied to clipboard"
+            : "Link copied to clipboard",
+          type: "success",
+        });
       })
       .catch(() => {});
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
+  }
+
+  // Apply a link access / role change to every selected item
+  function applyLinkChange(role, access) {
+    shareItems.forEach((it) => onClose(it, role, access));
   }
 
   if (!item) return null;
@@ -685,7 +733,7 @@ export default function ShareModal({
         )}
 
         <div
-          key={shareItems.map(getItemId).join(",")}
+          key={idsKey}
           className="gd-modal-overlay"
           onClick={() => {
             isChanged ? setIsConfirmation(true) : setSelectedUsers([]);
@@ -884,21 +932,19 @@ export default function ShareModal({
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: isMulti ? "flex-end" : "space-between",
+                    justifyContent: "space-between",
                     marginTop: 8,
                   }}
                 >
-                  {!isMulti && (
-                    <button
-                      type="button"
-                      style={{ width: "36px", height: "36px" }}
-                      className="gd-icon-btn"
-                      onClick={handleCopyLink}
-                      title="Copy link"
-                    >
-                      <IconLink size={20} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    style={{ width: "36px", height: "36px" }}
+                    className="gd-icon-btn"
+                    onClick={handleCopyLink}
+                    title={isMulti ? "Copy links" : "Copy link"}
+                  >
+                    <IconLink size={20} />
+                  </button>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
@@ -1136,21 +1182,19 @@ export default function ShareModal({
                       paddingTop: 12,
                     }}
                   >
-                    {!isMulti && (
-                      <button
-                        type="button"
-                        style={{
-                          width: "36px",
-                          height: "36px",
-                          marginRight: "auto",
-                        }}
-                        className="gd-icon-btn"
-                        onClick={handleCopyLink}
-                        title="Copy link"
-                      >
-                        <IconLink size={20} />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      style={{
+                        width: "36px",
+                        height: "36px",
+                        marginRight: "auto",
+                      }}
+                      className="gd-icon-btn"
+                      onClick={handleCopyLink}
+                      title={isMulti ? "Copy links" : "Copy link"}
+                    >
+                      <IconLink size={20} />
+                    </button>
                     <button
                       type="button"
                       className="gd-btn gd-btn-text"
@@ -1248,260 +1292,331 @@ export default function ShareModal({
                     </div>
                   </div>
 
-                  {/* People with access + General access: single item only */}
-                  {!isMulti && (
-                    <>
-                      <div className="gd-share-section-label">
-                        People with access
-                      </div>
+                  {/* People with access
+                      (multi: only people who have access to ALL selected items) */}
+                  <div className="gd-share-section-label">
+                    People with access
+                  </div>
 
-                      {item.permissions?.length > 0 && (
-                        <div className="gd-share-people-list">
-                          {peopleWithAccess
-                            .sort(
-                              (a, b) =>
-                                ROLE_PRIORITY[b.role] - ROLE_PRIORITY[a.role],
-                            )
-                            ?.map((person, idx) => {
-                              if (person?.type === "anyone") return null;
-                              if (!personRefs.current[idx])
-                                personRefs.current[idx] = { current: null };
-                              return (
-                                <div
-                                  key={person?.email || person?.emailAddress}
-                                  onClick={() =>
-                                    setActivePerson(
-                                      activePerson === idx ? null : idx,
-                                    )
-                                  }
-                                  className={`gd-share-person ${activePerson === idx ? "gd-active" : ""}`}
-                                >
-                                  <div className="gd-share-person-row">
-                                    <UseAvatar
-                                      name={person?.displayName || person?.name}
-                                      avatar={
-                                        person?.photoLink || person?.avatar
-                                      }
-                                    />
-                                    <div className="gd-share-person-info">
-                                      <div
-                                        className={`gd-share-person-name ${person?.role === "remove" ? "line-through" : ""}`}
-                                      >
-                                        {person?.displayName}{" "}
-                                        {person?.emailAddress === user.email
-                                          ? "(you)"
-                                          : ""}
-                                      </div>
-                                      <div className="gd-share-person-email">
-                                        {person?.emailAddress}
-                                      </div>
-                                      <div className="gd-share-person-pending-owner">
-                                        {person?.pendingOwner &&
-                                          "Pending owner"}
-                                      </div>
-                                    </div>
-                                    <div className="gd-share-role-select">
-                                      <MouseTooltip
-                                        disabled={!canChangeRole}
-                                        message="Can't reduce permission because it's set on a parent folder"
-                                      >
-                                        <button
-                                          ref={(el) =>
-                                            (personRefs.current[idx] = {
-                                              current: el,
-                                            })
-                                          }
-                                          disabled={
-                                            person.role === "owner" ||
-                                            !canChangeRole
-                                          }
-                                          className={`${person.role === "owner" ? "gd-share-owner-role-btn" : "gd-share-person-role-btn"}`}
-                                          aria-disabled={!canChangeRole}
-                                          onClick={(e) => {
-                                            if (!canChangeRole) return;
-                                            e.stopPropagation();
-                                            setOpenDropdown(
-                                              openDropdown === idx ? null : idx,
-                                            );
-                                          }}
-                                          style={{
-                                            opacity: !canChangeRole ? 0.5 : 1,
-                                            cursor:
-                                              !canChangeRole ||
-                                              person.role === "owner"
-                                                ? "default"
-                                                : "pointer",
-                                            pointerEvents: !canChangeRole
-                                              ? "none"
-                                              : "auto",
-                                          }}
-                                        >
-                                          {ROLE_LABEL[person?.role]}{" "}
-                                          {canChangeRole &&
-                                            person.role !== "owner" && (
-                                              <IconChevronDown size={12} />
-                                            )}
-                                        </button>
-                                      </MouseTooltip>
+                  {peopleWithAccess?.length > 0 && (
+                    <div className="gd-share-people-list">
+                      {[...peopleWithAccess]
+                        .sort(
+                          (a, b) =>
+                            (ROLE_PRIORITY[b.role] ?? 0) -
+                            (ROLE_PRIORITY[a.role] ?? 0),
+                        )
+                        .map((person, idx) => {
+                          if (person?.type === "anyone") return null;
+                          if (!personRefs.current[idx])
+                            personRefs.current[idx] = { current: null };
 
-                                      <RoleDropdown
-                                        open={openDropdown === idx}
-                                        isChanged={isChanged}
-                                        isOwnerPending={person?.pendingOwner}
-                                        onTransfer={() =>
-                                          sendOwnershipTransferMail(person)
-                                        }
-                                        onCancel={() =>
-                                          cancelOwnershipTransferMail(person)
-                                        }
-                                        anchorRef={personRefs.current[idx]}
-                                        current={ROLE_LABEL[person?.role]}
-                                        onChange={(r) =>
-                                          updatePersonRole(person, r)
-                                        }
-                                        onClose={() => setOpenDropdown(null)}
-                                        showRemove={true}
-                                        isOwner={isOwner}
-                                        person={person}
-                                      />
-                                    </div>
+                          const roleLocked =
+                            person.role === "owner" ||
+                            !canChangeRole ||
+                            isMulti;
+
+                          return (
+                            <div
+                              key={person?.email || person?.emailAddress}
+                              onClick={() =>
+                                setActivePerson(
+                                  activePerson === idx ? null : idx,
+                                )
+                              }
+                              className={`gd-share-person ${activePerson === idx ? "gd-active" : ""}`}
+                            >
+                              <div className="gd-share-person-row">
+                                <UseAvatar
+                                  name={person?.displayName || person?.name}
+                                  avatar={person?.photoLink || person?.avatar}
+                                />
+                                <div className="gd-share-person-info">
+                                  <div
+                                    className={`gd-share-person-name ${person?.role === "remove" ? "line-through" : ""}`}
+                                  >
+                                    {person?.displayName}{" "}
+                                    {person?.emailAddress === user.email
+                                      ? "(you)"
+                                      : ""}
+                                  </div>
+                                  <div className="gd-share-person-email">
+                                    {person?.emailAddress}
+                                  </div>
+                                  <div className="gd-share-person-pending-owner">
+                                    {person?.pendingOwner && "Pending owner"}
                                   </div>
                                 </div>
-                              );
-                            })
-                            .filter(Boolean)}
-                        </div>
-                      )}
-
-                      {/* Link sharing */}
-                      <div className="gd-share-section-label">
-                        General access
-                      </div>
-
-                      <div className="gd-share-link-section">
-                        <div className={`gd-share-link-row`}>
-                          <div
-                            className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
-                          >
-                            {linkAccess === "anyone" ? (
-                              <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
-                            ) : (
-                              <LockClosedIcon className="text-black w-5 h-5" />
-                            )}
-                          </div>
-                          <div className="gd-share-link-info">
-                            <div
-                              className="gd-share-link-title"
-                              ref={accessDropdownRef}
-                              style={{ position: "relative" }}
-                            >
-                              <button
-                                className="gd-share-access-btn"
-                                onClick={() =>
-                                  setShowAccessDropdown(!showAccessDropdown)
-                                }
-                              >
-                                <span>
-                                  {" "}
-                                  {linkAccess === "anyone"
-                                    ? "Anyone with the link"
-                                    : "Restricted"}
-                                </span>
-                                <IconChevronDown size={14} />
-                              </button>
-
-                              {showAccessDropdown && (
-                                <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
-                                  {["restricted", "anyone"].map((opt) => (
+                                <div className="gd-share-role-select">
+                                  <MouseTooltip
+                                    disabled={!canChangeRole}
+                                    message="Can't reduce permission because it's set on a parent folder"
+                                  >
                                     <button
-                                      key={opt}
-                                      className="gd-share-access-option"
-                                      onClick={() => {
-                                        setLinkAccess(opt);
-                                        onClose(item, linkRole, opt);
-                                        setShowAccessDropdown(false);
+                                      ref={(el) =>
+                                        (personRefs.current[idx] = {
+                                          current: el,
+                                        })
+                                      }
+                                      disabled={roleLocked}
+                                      className={`${person.role === "owner" ? "gd-share-owner-role-btn" : "gd-share-person-role-btn"}`}
+                                      aria-disabled={roleLocked}
+                                      onClick={(e) => {
+                                        if (roleLocked) return;
+                                        e.stopPropagation();
+                                        setOpenDropdown(
+                                          openDropdown === idx ? null : idx,
+                                        );
+                                      }}
+                                      style={{
+                                        opacity: !canChangeRole ? 0.5 : 1,
+                                        cursor: roleLocked
+                                          ? "default"
+                                          : "pointer",
+                                        pointerEvents: !canChangeRole
+                                          ? "none"
+                                          : "auto",
                                       }}
                                     >
-                                      <span className="gd-share-access-check">
-                                        {linkAccess === opt && (
-                                          <IconCheck size={16} />
-                                        )}
-                                      </span>
-                                      {opt === "anyone"
-                                        ? "Anyone with the link"
-                                        : "Restricted"}
+                                      {ROLE_LABEL[person?.role]}{" "}
+                                      {!roleLocked && (
+                                        <IconChevronDown size={12} />
+                                      )}
                                     </button>
-                                  ))}
+                                  </MouseTooltip>
+
+                                  {!isMulti && (
+                                    <RoleDropdown
+                                      open={openDropdown === idx}
+                                      isChanged={isChanged}
+                                      isOwnerPending={person?.pendingOwner}
+                                      onTransfer={() =>
+                                        sendOwnershipTransferMail(person)
+                                      }
+                                      onCancel={() =>
+                                        cancelOwnershipTransferMail(person)
+                                      }
+                                      anchorRef={personRefs.current[idx]}
+                                      current={ROLE_LABEL[person?.role]}
+                                      onChange={(r) =>
+                                        updatePersonRole(person, r)
+                                      }
+                                      onClose={() => setOpenDropdown(null)}
+                                      showRemove={true}
+                                      isOwner={isOwner}
+                                      person={person}
+                                    />
+                                  )}
                                 </div>
-                              )}
-                            </div>
-
-                            <div className="gd-share-link-sub">
-                              {linkAccess === "anyone"
-                                ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
-                                : "Only people with access can open with this link"}
-                            </div>
-                          </div>
-
-                          <div className="gd-share-link-actions">
-                            {linkAccess === "anyone" && (
-                              <div className="gd-share-link-role-wrap">
-                                <button
-                                  ref={linkRoleRef}
-                                  className="gd-share-role-btn"
-                                  onClick={() =>
-                                    setOpenDropdown(
-                                      openDropdown === "link" ? null : "link",
-                                    )
-                                  }
-                                >
-                                  {ROLE_LABEL[linkRole]}{" "}
-                                  {<IconChevronDown size={14} />}
-                                </button>
-
-                                <RoleDropdown
-                                  open={openDropdown === "link"}
-                                  anchorRef={linkRoleRef}
-                                  containerRef={shareModalOverlayRef}
-                                  current={ROLE_LABEL[linkRole]}
-                                  onChange={(r) => {
-                                    setLinkRole(r);
-                                    setOpenDropdown(null);
-                                    onClose(item, r, linkAccess);
-                                  }}
-                                  onClose={() => setOpenDropdown(null)}
-                                />
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          );
+                        })
+                        .filter(Boolean)}
+                    </div>
+                  )}
+
+                  {/* Link sharing */}
+                  <div className="gd-share-section-label">General access</div>
+
+                  <div className="gd-share-link-section">
+                    <div className={`gd-share-link-row`}>
+                      <div
+                        className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
+                      >
+                        {linkAccess === "anyone" ? (
+                          <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
+                        ) : (
+                          <LockClosedIcon className="text-black w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="gd-share-link-info">
+                        <div
+                          className="gd-share-link-title"
+                          ref={accessDropdownRef}
+                          style={{ position: "relative" }}
+                        >
+                          <button
+                            className="gd-share-access-btn"
+                            onClick={() =>
+                              setShowAccessDropdown(!showAccessDropdown)
+                            }
+                          >
+                            <span>
+                              {" "}
+                              {linkAccess === "anyone"
+                                ? "Anyone with the link"
+                                : "Restricted"}
+                            </span>
+                            <IconChevronDown size={14} />
+                          </button>
+
+                          {showAccessDropdown && (
+                            <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
+                              {["restricted", "anyone"].map((opt) => (
+                                <button
+                                  key={opt}
+                                  className="gd-share-access-option"
+                                  onClick={() => {
+                                    setLinkAccess(opt);
+                                    applyLinkChange(linkRole, opt);
+                                    setShowAccessDropdown(false);
+                                  }}
+                                >
+                                  <span className="gd-share-access-check">
+                                    {linkAccess === opt && (
+                                      <IconCheck size={16} />
+                                    )}
+                                  </span>
+                                  {opt === "anyone"
+                                    ? "Anyone with the link"
+                                    : "Restricted"}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="gd-share-link-sub">
+                          {linkAccess === "anyone"
+                            ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
+                            : "Only people with access can open with this link"}
                         </div>
                       </div>
-                    </>
+
+                      <div className="gd-share-link-actions">
+                        {linkAccess === "anyone" && (
+                          <div className="gd-share-link-role-wrap">
+                            <button
+                              ref={linkRoleRef}
+                              className="gd-share-role-btn"
+                              onClick={() =>
+                                setOpenDropdown(
+                                  openDropdown === "link" ? null : "link",
+                                )
+                              }
+                            >
+                              {ROLE_LABEL[linkRole]}{" "}
+                              {<IconChevronDown size={14} />}
+                            </button>
+
+                            <RoleDropdown
+                              open={openDropdown === "link"}
+                              anchorRef={linkRoleRef}
+                              containerRef={shareModalOverlayRef}
+                              current={ROLE_LABEL[linkRole]}
+                              onChange={(r) => {
+                                setLinkRole(r);
+                                setOpenDropdown(null);
+                                applyLinkChange(r, linkAccess);
+                              }}
+                              onClose={() => setOpenDropdown(null)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-item link status (multi only) */}
+                  {isMulti && (
+                    <div
+                      style={{
+                        margin: "12px 24px 0",
+                        maxHeight: 176,
+                        overflowY: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 16,
+                      }}
+                    >
+                      {shareItems.map((it) => {
+                        const publicPermission = getAnyonePermission(it);
+                        const pub = Boolean(publicPermission);
+
+                        return (
+                          <div key={getItemId(it)}>
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                maxWidth: "100%",
+                                alignItems: "center",
+                                border: "1px solid var(--border-color, #dadce0)",
+                                borderRadius: 8,
+                                padding: "4px 12px",
+                                fontSize: 14,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {it.name}
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                                marginTop: 8,
+                              }}
+                            >
+                              <div
+                                className={`gd-share-link-icon ${pub ? "active" : ""}`}
+                              >
+                                {pub ? (
+                                  <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
+                                ) : (
+                                  <LockClosedIcon className="text-black w-5 h-5" />
+                                )}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                                  {pub ? "Anyone with the link" : "Restricted"}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--text-tertiary)",
+                                  }}
+                                >
+                                  {pub
+                                    ? `Anyone on the internet with the link ${ROLE_DESC[publicPermission.role] ?? ""}`
+                                    : "Only people with access can open with this link"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
 
                   {/* Footer */}
                   <div
                     className={`${!showInvitePanel ? "mx-6" : ""} gd-share-footer`}
-                    style={isMulti ? { justifyContent: "flex-end" } : undefined}
                   >
-                    {!isMulti && (
-                      <button
-                        className={`gd-copy-link-btn ${copyFeedback ? "copied" : ""}`}
-                        onClick={handleCopyLink}
-                      >
-                        {copyFeedback ? (
-                          <>
-                            <IconCheck size={14} /> Copied!
-                          </>
-                        ) : (
-                          <>
-                            <IconLink size={14} /> Copy link
-                          </>
-                        )}
-                      </button>
-                    )}
+                    <button
+                      className={`gd-copy-link-btn ${copyFeedback ? "copied" : ""}`}
+                      onClick={handleCopyLink}
+                    >
+                      {copyFeedback ? (
+                        <>
+                          <IconCheck size={14} /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <IconLink size={14} />{" "}
+                          {isMulti ? "Copy links" : "Copy link"}
+                        </>
+                      )}
+                    </button>
                     <div className="gd-pending-span">
-                      {!isMulti && isChanged && <span>Pending changes</span>}
+                      {isChanged && <span>Pending changes</span>}
                     </div>
                     <button
                       className={`gd-btn  ${isShareLoading ? "btn-loading" : "gd-btn-primary"}`}

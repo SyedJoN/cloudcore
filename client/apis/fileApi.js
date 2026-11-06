@@ -104,17 +104,17 @@ export async function fetchUserFiles() {
 
   return data.users;
 }
-export async function softDeleteFile(url) {
-  const response = await axiosWithCreds.delete(url);
-  return response;
+export async function softDeleteFile(url, ids) {
+  const { data } = await axiosWithCreds.patch(url, { ids });
+  return data; 
 }
 export async function deleteFile(url) {
   const response = await axiosWithCreds.delete(url);
   return response;
 }
-export async function restoreFile(url) {
-  const response = await axiosWithCreds.patch(url);
-  return response;
+export async function restoreFile(url, ids) {
+  const { data } = await axiosWithCreds.patch(url, { ids });
+  return data; 
 }
 
 export async function updateFileViewTime(id) {

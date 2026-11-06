@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { IconDownload } from "../Icons/Icons";
 
-function OfficeViewer({ item, category }) {
+function OfficeViewer({ BASE_URL, item, category }) {
   const fileUrl = `${BASE_URL}/file/${item._id}`;
   // Try Microsoft Office Online viewer (requires publicly accessible URL — show fallback)
   const [useMicrosoft] = useState(false); // set true if your server is public

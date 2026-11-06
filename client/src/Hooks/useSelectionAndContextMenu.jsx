@@ -49,7 +49,7 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef, lastDirecto
 const itemMatch = combinedItems.find(
   (i) => (i.id ?? i._id) === id
 );
-console.log('parent', parentMatch)
+
 setContextItem(parentMatch ? lastDirectory : itemMatch ?? lastDirectory);
     },
     [combinedItems, lastDirectory],

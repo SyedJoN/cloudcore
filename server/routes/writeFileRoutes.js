@@ -26,10 +26,10 @@ router.param("id", validateIdMiddleware);
 
 // DELETE
 router.delete("/:id", checkAuth, deleteFile);
-router.delete("/soft-delete/:id", checkAuth, softDeleteFile);
+router.patch(["/soft-delete", "/soft-delete/:id"], softDeleteFile);
 
 // Update
-router.patch("/:id/restore", checkAuth, restoreFile);
+router.patch(["/restore", "/:id/restore"], checkAuth, restoreFile);
 router.patch("/:id", checkAuth, updateFile);
 router.patch("/:itemId/public/:role", checkAuth, toggleFilePublic);
 router.patch("/:id/activity/view", checkAuth, updateFileViewTime);

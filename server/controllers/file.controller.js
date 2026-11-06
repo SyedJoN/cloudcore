@@ -1005,52 +1005,71 @@ const performRename = async (file, fileName, res, userId) => {
 
 export const softDeleteFile = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user._id;
+    const user = req.user;
+    const ids = req.body?.ids ?? [req.params.id]; // single OR multiple
 
-    const file = await File.findOne({ _id: id });
-    if (!file) return res.status(404).json({ message: "File not found!" });
+    const files = await File.find({ _id: { $in: ids } });
+    if (!files.length) return res.status(404).json({ message: "File not found!" });
 
-    const isOwner = file.userId.toString() === userId.toString();
+    // permission check per file
+    const checks = await Promise.all(
+      files.map((f) =>
+        fgaClient.check({
+          user: getFgaObject("user", user._id),
+          relation: "can_trash",
+          object: getFgaObject("file", f._id),
+        }),
+      ),
+    );
+    const allowed = files.filter(
+      (_, i) => user.role === "superuser" || checks[i].allowed,
+    );
+    if (!allowed.length) return res.status(403).json({ message: "Unauthorized!" });
 
-    const canTrash = await fgaClient.check({
-      user: getFgaObject("user", userId),
-      relation: "can_trash",
-      object: getFgaObject("file", id),
+    const owned = allowed.filter((f) => f.userId.toString() === user._id.toString());
+    const shared = allowed.filter((f) => !owned.includes(f));
+
+    // owned files: one updateMany
+    if (owned.length) {
+      await File.updateMany(
+        { _id: { $in: owned.map((f) => f._id) } },
+        { isDeleted: true, trashedTime: Date.now() },
+      );
+
+      // one size update per parent folder
+      const sizeByParent = {};
+      owned.forEach((f) => {
+        const key = String(f.parentDirId);
+        sizeByParent[key] = (sizeByParent[key] ?? 0) + f.size;
+      });
+      await Promise.all(
+        Object.entries(sizeByParent).map(([dirId, size]) =>
+          updateParentDirSize(dirId, -size),
+        ),
+      );
+    }
+
+    // shared files: just remove this user's access
+    await Promise.allSettled(
+      shared.flatMap((f) =>
+        ["reader", "writer"].map((relation) =>
+          fgaClient.write({
+            deletes: [
+              {
+                user: getFgaObject("user", user._id),
+                relation,
+                object: getFgaObject("file", f._id),
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    return res.status(200).json({
+      message: "Moved to trash",
+      trashedIds: allowed.map((f) => String(f._id)),
     });
-    if (req.user.role !== "superuser" && !canTrash.allowed) {
-      return res.status(403).json({ message: "Unauthorized!" });
-    }
-
-    if (isOwner) {
-      file.isDeleted = true;
-      file.trashedTime = Date.now();
-      await file.save();
-    } else {
-      await Promise.allSettled([
-        fgaClient.write({
-          deleteFile: [
-            {
-              user: getFgaObject("user", userId),
-              role: "reader",
-              object: getFgaObject("file", id),
-            },
-          ],
-        }),
-        fgaClient.write({
-          deletes: [
-            {
-              user: getFgaObject("user", userId),
-              role: "writer",
-              object: getFgaObject("file", id),
-            },
-          ],
-        }),
-      ]);
-    }
-
-    await updateParentDirSize(file.parentDirId, -file.size);
-    return res.status(200).json({ message: "File moved to trash" });
   } catch (error) {
     next(error);
   }
@@ -1141,34 +1160,56 @@ export const deleteFile = async (req, res, next) => {
 };
 export const restoreFile = async (req, res, next) => {
   try {
-    const { id } = req.params;
     const userId = req.user?._id;
-    const totalStorage = req.user?.totalStorage;
     if (!userId) {
       return res
         .status(409)
         .json({ message: "Unauthorized. You are not logged in!" });
     }
-    const file = await File.findOne({ _id: id, isDeleted: true });
-    if (!file) {
+
+    const ids = (req.body?.ids ?? [req.params.id]).filter((id) =>
+      mongoose.isValidObjectId(id),
+    );
+    if (!ids.length) return res.status(400).json({ message: "No valid ids" });
+
+    const files = await File.find({ _id: { $in: ids }, isDeleted: true });
+    if (!files.length) {
       return res.status(404).json({ message: "File not found to restore" });
     }
-    const rootDir = await Directory.findOne({
-      userId,
-    }).lean();
 
-    const totalStorageLeft = totalStorage - rootDir.size;
-    const needed = file.size - totalStorageLeft;
-    if (file.size > totalStorageLeft) {
+    // storage check for ALL files together
+    const rootDir = await Directory.findOne({ userId }).lean();
+    const totalNeeded = files.reduce((sum, f) => sum + f.size, 0);
+    const storageLeft = req.user.totalStorage - rootDir.size;
+
+    if (totalNeeded > storageLeft) {
       return res.status(507).json({
-        message: `Storage is full. You need ${formatSize(needed)} more storage`,
+        message: `Storage is full. You need ${formatSize(totalNeeded - storageLeft)} more storage`,
       });
     }
-    file.isDeleted = false;
-    await file.save();
-    await updateParentDirSize(file.parentDirId, file.size);
 
-    return res.status(200).json({ message: "File restored successfully" });
+    // restore everything in one query
+    await File.updateMany(
+      { _id: { $in: files.map((f) => f._id) } },
+      { isDeleted: false },
+    );
+
+    // one size update per parent folder
+    const sizeByParent = {};
+    files.forEach((f) => {
+      const key = String(f.parentDirId);
+      sizeByParent[key] = (sizeByParent[key] ?? 0) + f.size;
+    });
+    await Promise.all(
+      Object.entries(sizeByParent).map(([dirId, size]) =>
+        updateParentDirSize(dirId, size),
+      ),
+    );
+
+    return res.status(200).json({
+      message: "Restored successfully",
+      restoredIds: files.map((f) => String(f._id)),
+    });
   } catch (error) {
     next(error);
   }

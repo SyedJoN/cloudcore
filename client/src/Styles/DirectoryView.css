@@ -1498,16 +1498,18 @@ body.gd-overlay-open {
 .gd-selection-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   padding-left: 8px;
 }
 
 .gd-sel-action-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  justify-content: center;
+  width: 36px;
   height: 36px;
+  gap: 8px;
+  padding: 6px 14px;
   border: none;
   border-radius: var(--radius-full);
   background: none;

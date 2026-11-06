@@ -74,8 +74,9 @@ export default function MobileContextMenu({
   const { toast } = useToast();
 
   // Normalise: always an array. `item` is the first one.
-  const raw = items ?? itemProp;
-  const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+const raw = items?.length ? items : itemProp;
+const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+  
   const isMulti = targets.length > 1;
   const item = targets[0];
 
@@ -99,7 +100,10 @@ export default function MobileContextMenu({
       view === "openWith" ? openWithPanelRef.current : mainPanelRef.current;
     if (!el) return;
 
-    const update = () => setPanelHeight(el.scrollHeight);
+   const update = () => {
+  const h = el.scrollHeight;
+  if (h > 0) setPanelHeight(h);
+};
     update();
 
     const ro = new ResizeObserver(update);
@@ -216,7 +220,7 @@ export default function MobileContextMenu({
             {/* ---------- MAIN PANEL ---------- */}
             <div
               ref={mainPanelRef}
-              className="w-full shrink-0"
+              className="mobile-context-menu w-full shrink-0"
               aria-hidden={view === "openWith"}
             >
               <SheetHeader title={headerTitle} />
