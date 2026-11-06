@@ -52,7 +52,7 @@ const itemMatch = combinedItems.find(
 console.log('parent', parentMatch)
 setContextItem(parentMatch ? lastDirectory : itemMatch ?? lastDirectory);
     },
-    [combinedItems],
+    [combinedItems, lastDirectory],
   );
 
   const handleMainMouseDown = useCallback(

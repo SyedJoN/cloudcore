@@ -34,6 +34,7 @@ export default function DriveToolbarMobile({
   setPath,
   crumbs = [],
   setCrumbs,
+  handleSelect,
   setInDirectory,
   disabled,
   restartAnimation,
@@ -162,7 +163,7 @@ export default function DriveToolbarMobile({
           className="gd-icon-btn"
           aria-label="More options"
           aria-haspopup="dialog"
-          onClick={(e) => onContextMenu?.(e, dirId)}
+          onClick={(e) => {handleSelect?.(dirId); onContextMenu?.(e, dirId)}}
         >
           <EllipsisVerticalIcon className="h-5 w-5"/>
         </button>

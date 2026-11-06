@@ -54,7 +54,7 @@ export default function GridItem({
       : "file";
 
   const iconType = item.isDirectory ? null : getFileType(item?.name || "");
-  const itemId = item.id ?? item._id;
+  const itemId = (item._id ?? item.id) || item?.map((i)=> i._id ?? i.id) 
 
   const avatarEl =
     avatar && !hasImgError ? (
@@ -98,7 +98,7 @@ export default function GridItem({
     const now = Date.now();
 
     if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.name, item.path);
+      onDoubleClick?.(type, itemId, item.name);
       lastTap.current = 0;
     } else {
       lastTap.current = now;
@@ -127,7 +127,7 @@ export default function GridItem({
       {showInputCircle && (
         <div className="gd-mobile-selected-header w-full h-16 flex items-center fixed top-0 left-0 bg-(--surface-container) z-400">
           <button
-            onClick={() => {setSelectedItems(new Set());setShowInputCircle(false)}}
+            onClick={() => {setSelectedItems(new Set()); setShowInputCircle(false)}}
             aria-label="Back"
             className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
           >

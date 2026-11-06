@@ -24,6 +24,14 @@ import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
 import { Divider } from "../Divider";
 
+// "2 files" | "3 folders" | "5 items" (mixed)
+function getCountLabel(list) {
+  const dirs = list.filter((i) => i?.isDirectory).length;
+  const noun =
+    dirs === list.length ? "folders" : dirs === 0 ? "files" : "items";
+  return `${list.length} ${noun}`;
+}
+
 /* File name at the top; becomes a back row inside the "Open with" view */
 function SheetHeader({ title, onBack }) {
   return (
@@ -46,7 +54,8 @@ function SheetHeader({ title, onBack }) {
 
 export default function MobileContextMenu({
   open,
-  item,
+  item: itemProp = null, // single item (backward compatible)
+  items = null, // NEW: array of items
   route,
   isStarred = {},
   dirId,
@@ -64,7 +73,13 @@ export default function MobileContextMenu({
 }) {
   const { toast } = useToast();
 
-  // "main" = full menu, "openWith" = Preview / Open in new tab
+  // Normalise: always an array. `item` is the first one.
+  const raw = items ?? itemProp;
+  const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+  const isMulti = targets.length > 1;
+  const item = targets[0];
+
+  // "main" = full menu, "openWith" = Preview / Open in new tab (single only)
   const [view, setView] = useState("main");
 
   // reset after the sheet has finished sliding out
@@ -90,9 +105,9 @@ export default function MobileContextMenu({
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [view, open, item]);
+  }, [view, open, item, isMulti]);
 
-  // details sheet
+  // details sheet (single item only)
   const [detailsItem, setDetailsItem] = useState(null);
 
   const detailsSheet = (
@@ -107,29 +122,48 @@ export default function MobileContextMenu({
   if (!item) return detailsSheet;
 
   /* ---------- flags ---------- */
-console.log('item', item)
-  const isGoogle = Boolean(item.webViewLink);
+  // Actions are enabled only if EVERY selected item allows them.
+  const every = (fn) => targets.every(fn);
+  const some = (fn) => targets.some(fn);
+
+  const isGoogle = every((it) => Boolean(it.webViewLink));
   const isSharedRoute = route === "shared";
   const isGoogleDriveRoute = route === "google-drive" && isGoogle;
   const isTrashRoute = route === "trash";
-  const isFile = !item.isDirectory;
+  const isFile = every((it) => !it.isDirectory);
 
-  const capabilities = item.capabilities || {};
-  console.log('capa', capabilities)
+  const cap = (name) => every((it) => it.capabilities?.[name] === true);
 
-  const canRead = isGoogle ? true : capabilities.canRead === true;
-  const canDownload = capabilities.canDownload === true;
+  const canRead = every((it) =>
+    it.webViewLink ? true : it.capabilities?.canRead === true,
+  );
+  const canDownload = cap("canDownload");
   const canCopy = true;
-  const canMove = capabilities.canMove === true;
+  const canMove = cap("canMove");
   const canShare = true;
-  const canRename = capabilities.canRename === true;
-  const canTrash = capabilities.canTrash === true;
-  const canDelete = capabilities.canDelete === true;
+  const canRename = cap("canRename");
+  const canTrash = cap("canTrash");
+  const canDelete = cap("canDelete");
 
-  const isDeleted = Boolean(item?.isDeleted);
-  const showDeleteActions = isTrashRoute && isDeleted && !dirId;
+  const isDeleted = some((it) => Boolean(it?.isDeleted));
+  const allDeleted = every((it) => Boolean(it?.isDeleted));
+  const showDeleteActions = isTrashRoute && allDeleted && !dirId;
 
-  const starred = Boolean(isStarred[item._id]);
+  // Starred: if everything is starred -> "Remove", otherwise "Add"
+  const allStarred = every((it) => Boolean(isStarred[it._id]));
+  const starred = allStarred;
+  // onStar toggles per item, so only pass the ones that need to change
+  const starTargets = allStarred
+    ? targets
+    : targets.filter((it) => !isStarred[it._id]);
+
+  // Single item -> the item itself; multiple -> the array.
+  // (Parent callbacks should accept both, e.g. [].concat(x))
+  const payload = isMulti ? targets : item;
+
+  const headerTitle = isMulti
+    ? `${getCountLabel(targets)} selected`
+    : item.name;
 
   /* ---------- helpers ---------- */
 
@@ -185,7 +219,7 @@ console.log('item', item)
               className="w-full shrink-0"
               aria-hidden={view === "openWith"}
             >
-              <SheetHeader title={item.name} />
+              <SheetHeader title={headerTitle} />
 
               <div className="max-h-[70vh] overflow-y-auto py-2">
                 {showDeleteActions ? (
@@ -195,22 +229,25 @@ console.log('item', item)
                       icon={<IconRestore size={22} />}
                       label="Restore"
                       disabled={!canDelete}
-                      onClick={run(() => onRestore(item))}
+                      onClick={run(() => onRestore(payload))}
                     />
                     <SheetItem
                       icon={<IconTrash size={22} />}
                       label="Delete forever"
                       disabled={!canDelete}
                       onClick={run(() =>
-                        onDeleteForever(isGoogle ? "google" : "local"),
+                        onDeleteForever(
+                          isGoogle ? "google" : "local",
+                          payload,
+                        ),
                       )}
                     />
                   </>
                 ) : (
                   /* ---------- NORMAL ---------- */
                   <>
-                    {/* Open with: files only */}
-                    {isFile && (
+                    {/* Open with: single file only */}
+                    {!isMulti && isFile && (
                       <>
                         <SheetItem
                           icon={<IconOpenWith size={22} />}
@@ -231,43 +268,54 @@ console.log('item', item)
                       icon={<IconShare size={22} />}
                       label="Share"
                       disabled={isDeleted || !canShare}
-                      onClick={run(() => onShare(item))}
-                    />
-                    <SheetItem
-                      icon={<IconLink size={22} />}
-                      label="Copy link"
-                      disabled={isDeleted}
-                      onClick={handleCopyLink}
+                      onClick={run(() => onShare(payload))}
                     />
 
-                    <Divider />
-                    <SheetItem
-                      icon={<InformationCircleIcon className="h-6 w-6" />}
-                      label="View Information"
-                      onClick={() => {
-                        setDetailsItem(item);
-                        onClose();
-                      }}
-                    />
+                    {/* Copy link + info: single item only */}
+                    {!isMulti && (
+                      <>
+                        <SheetItem
+                          icon={<IconLink size={22} />}
+                          label="Copy link"
+                          disabled={isDeleted}
+                          onClick={handleCopyLink}
+                        />
+
+                        <Divider />
+                        <SheetItem
+                          icon={<InformationCircleIcon className="h-6 w-6" />}
+                          label="View Information"
+                          onClick={() => {
+                            setDetailsItem(item);
+                            onClose();
+                          }}
+                        />
+                      </>
+                    )}
                     <Divider />
 
                     <SheetItem
                       icon={<IconDownload size={22} />}
                       label="Download"
                       disabled={isDeleted || !canDownload}
-                      onClick={run(() => onDownload(item))}
+                      onClick={run(() => onDownload(payload))}
                     />
-                    <SheetItem
-                      icon={<IconRename size={22} />}
-                      label="Rename"
-                      disabled={isDeleted || !canRename}
-                      onClick={run(() => onRename(item))}
-                    />
+
+                    {/* Rename: single item only */}
+                    {!isMulti && (
+                      <SheetItem
+                        icon={<IconRename size={22} />}
+                        label="Rename"
+                        disabled={isDeleted || !canRename}
+                        onClick={run(() => onRename(item))}
+                      />
+                    )}
+
                     <SheetItem
                       icon={<DocumentDuplicateIcon className="h-6 w-6" />}
                       label="Make a copy"
                       disabled={isSharedRoute || !canCopy}
-                      onClick={run(() => onCopy(item))}
+                      onClick={run(() => onCopy(payload))}
                     />
 
                     <Divider />
@@ -282,7 +330,10 @@ console.log('item', item)
                         !canMove ||
                         isGoogleDriveRoute
                       }
-                      onClick={run(() => onMove(item._id))}
+                      // single: the id, multiple: array of ids
+                      onClick={run(() =>
+                        onMove(isMulti ? targets.map((it) => it._id) : item._id),
+                      )}
                     />
                     <SheetItem
                       icon={
@@ -294,7 +345,9 @@ console.log('item', item)
                       }
                       label={starred ? "Remove from starred" : "Add to starred"}
                       disabled={isDeleted || isGoogleDriveRoute}
-                      onClick={run(() => onStar(item))}
+                      onClick={run(() =>
+                        onStar(isMulti ? starTargets : item),
+                      )}
                     />
 
                     {(!isDeleted && !isGoogleDriveRoute) ||
@@ -308,7 +361,7 @@ console.log('item', item)
                         icon={<IconTrash size={22} />}
                         label="Move to trash"
                         disabled={!canDelete || !canTrash}
-                        onClick={run(() => onTrash(item))}
+                        onClick={run(() => onTrash(payload))}
                       />
                     )}
 
@@ -319,7 +372,10 @@ console.log('item', item)
                         label="Delete forever"
                         disabled={isDeleted || !canDelete}
                         onClick={run(() =>
-                          onDeleteForever(isGoogle ? "google" : "local"),
+                          onDeleteForever(
+                            isGoogle ? "google" : "local",
+                            payload,
+                          ),
                         )}
                       />
                     )}
@@ -328,29 +384,34 @@ console.log('item', item)
               </div>
             </div>
 
-            {/* ---------- OPEN WITH PANEL ---------- */}
-            <div
-              ref={openWithPanelRef}
-              className="w-full shrink-0"
-              aria-hidden={view !== "openWith"}
-            >
-              <SheetHeader title="Open with" onBack={() => setView("main")} />
+            {/* ---------- OPEN WITH PANEL (single item only) ---------- */}
+            {!isMulti && (
+              <div
+                ref={openWithPanelRef}
+                className="w-full shrink-0"
+                aria-hidden={view !== "openWith"}
+              >
+                <SheetHeader
+                  title="Open with"
+                  onBack={() => setView("main")}
+                />
 
-              <div className="max-h-[70vh] overflow-y-auto py-2">
-                <SheetItem
-                  icon={<IconPreview size={22} />}
-                  label="Preview"
-                  disabled={isDeleted || !canRead}
-                  onClick={run(() => onPreview(item))}
-                />
-                <SheetItem
-                  icon={<IconNewTab size={22} />}
-                  label="Open in new tab"
-                  disabled={isDeleted || !canRead}
-                  onClick={handleOpenInNewTab}
-                />
+                <div className="max-h-[70vh] overflow-y-auto py-2">
+                  <SheetItem
+                    icon={<IconPreview size={22} />}
+                    label="Preview"
+                    disabled={isDeleted || !canRead}
+                    onClick={run(() => onPreview(item))}
+                  />
+                  <SheetItem
+                    icon={<IconNewTab size={22} />}
+                    label="Open in new tab"
+                    disabled={isDeleted || !canRead}
+                    onClick={handleOpenInNewTab}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </BottomSheet>

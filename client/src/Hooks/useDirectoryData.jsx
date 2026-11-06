@@ -178,6 +178,7 @@ export function useDirectoryData({
     directoryName,
     directoriesList,
     lastDirectory,
+    setLastDirectory,
     filesList,
     setFilesList,
     setDirectoriesList,
