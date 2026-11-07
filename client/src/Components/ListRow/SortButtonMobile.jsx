@@ -48,7 +48,7 @@ const SortButtonMobile = ({
   const viewBtn = (mode) =>
     `flex h-8 w-8 items-center justify-center rounded-full
      text-(--text-secondary) cursor-pointer transition-colors duration-150
-     ${viewMode === mode ? "bg-white text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark-hover)"}`;
+     ${viewMode === mode ? "bg-(--folder-color) text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark-hover)"}`;
 
   return (
 

@@ -83,3 +83,10 @@ export const ROLE_DESC = {
   editor: "can edit",
   writer: "can edit",
 };
+
+export function getCountLabel(list) {
+  const dirs = list.filter((i) => i?.isDirectory).length;
+  const noun =
+    dirs === list.length ? "folders" : dirs === 0 ? "files" : "items";
+  return `${list.length} ${noun}`;
+}

@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../Contexts/AuthContext.jsx";
 import HowItWorks from "../Components/Home/HowItWorks.jsx";
+import { useDevice } from "../Contexts/DeviceContext.jsx";
 
 const FONT_IMPORT = `
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
@@ -80,7 +81,7 @@ const FONT_IMPORT = `
 `;
 
 export default function Home() {
-
+const {device} = useDevice();
   const location = useLocation();
   useEffect(() => {
     if (location.hash) {
@@ -93,9 +94,9 @@ export default function Home() {
   return (
     <div className="cc-root min-h-screen w-full">
       <style>{FONT_IMPORT}</style>
-      <Header/>
+      <Header device={device}/>
       <Hero />
-      <Features />
+      <Features device={device} />
       <HowItWorks/>
       <Pricing />
       <SecurityBand />

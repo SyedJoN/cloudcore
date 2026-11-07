@@ -52,6 +52,7 @@ export default function ListRow({
   onStar,
   isStarred,
   setIsStarred,
+  selectedItems,
   route,
   owner,
   email,
@@ -217,10 +218,13 @@ export default function ListRow({
       onMouseEnter={() => setIsListHovered(true)}
       onMouseLeave={() => setIsListHovered(false)}
       onDoubleClick={() => onDoubleClick?.(type, itemId)}
-      onContextMenu={(e) => {
+      
+       onContextMenu={(e) => {
         e.preventDefault();
-        onSelect?.(itemId);
-        onContextMenu?.(e, itemId);
+        if (!selectedItems.has(itemId)) {
+          onSelect?.(itemId);
+        }
+        onContextMenu(e, itemId);
       }}
     >
       <div className="gd-list-row-name">

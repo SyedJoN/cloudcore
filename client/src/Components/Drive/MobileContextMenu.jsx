@@ -23,14 +23,7 @@ import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
 import { Divider } from "../Divider";
-
-// "2 files" | "3 folders" | "5 items" (mixed)
-function getCountLabel(list) {
-  const dirs = list.filter((i) => i?.isDirectory).length;
-  const noun =
-    dirs === list.length ? "folders" : dirs === 0 ? "files" : "items";
-  return `${list.length} ${noun}`;
-}
+import { getCountLabel } from "../../../Utils/displayUtils";
 
 /* File name at the top; becomes a back row inside the "Open with" view */
 function SheetHeader({ title, onBack }) {
@@ -54,8 +47,8 @@ function SheetHeader({ title, onBack }) {
 
 export default function MobileContextMenu({
   open,
-  item: itemProp = null, 
-  items = null, 
+  item: itemProp = null,
+  items = null,
   route,
   isStarred = {},
   dirId,
@@ -199,22 +192,46 @@ export default function MobileContextMenu({
       onClose();
     };
 
-  async function handleCopyLink() {
-    const url =
-      item.webViewLink ??
-      (item.isDirectory
-        ? `${window.location.origin}/directory/${item._id}?usp=drive_link`
-        : `${window.location.origin}/file/${item._id}?usp=drive_link`);
+  const handleCopyLink = async (ids) => {
+    if (isDeleted) return;
 
     try {
-      await navigator.clipboard.writeText(url);
-      toast({ message: "Link copied to clipboard", type: "success" });
+      const selectedIds = Array.isArray(ids) ? ids : [ids];
+
+      const files = selectedIds
+        .map((id) => targets.find((it) => it._id === id))
+        .filter(Boolean)
+        .filter((file) => !file.isDeleted);
+
+      if (!files.length) return;
+
+      const urls = files.map((file) => {
+        return (
+          file.webViewLink ??
+          (file.isDirectory
+            ? `${window.location.origin}/directory/${file._id}?usp=drive_link`
+            : `${window.location.origin}/file/${file._id}?usp=drive_link`)
+        );
+      });
+
+      await navigator.clipboard.writeText(urls.join(", "));
       onClose();
+      toast({
+        message:
+          files.length > 1
+            ? "Links copied to clipboard"
+            : "Link copied to clipboard",
+        type: "success",
+      });
     } catch (error) {
-      console.error("Failed to copy link:", error);
-      toast({ message: "Failed to copy link", type: "error" });
+      console.error("Failed to copy links:", error);
+
+      toast({
+        message: "Failed to copy link",
+        type: "error",
+      });
     }
-  }
+  };
 
   function handleOpenInNewTab() {
     window.open(item.webViewLink || `/file/${item._id}`, "_blank");
@@ -291,26 +308,26 @@ export default function MobileContextMenu({
                       disabled={isDeleted || !canShare}
                       onClick={run(() => onShare(payload))}
                     />
-
-                    {/* Copy link + info: single item only */}
+                    {/* Copy Links */}
+                    <SheetItem
+                      icon={<IconLink size={22} />}
+                      label="Copy link"
+                      disabled={isDeleted}
+                      onClick={() =>
+                        handleCopyLink(
+                          isMulti ? targets.map((it) => it._id) : item._id,
+                        )
+                      }
+                    />
+                    {/* info: single item only */}
                     {!isMulti && (
-                      <>
-                        <SheetItem
-                          icon={<IconLink size={22} />}
-                          label="Copy link"
-                          disabled={isDeleted}
-                          onClick={handleCopyLink}
-                        />
-
-                        <Divider />
-                        <SheetItem
-                          icon={<InformationCircleIcon className="h-6 w-6" />}
-                          label="View Information"
-                          onClick={() => {
-                            setDetailsItem(item);
-                          }}
-                        />
-                      </>
+                      <SheetItem
+                        icon={<InformationCircleIcon className="h-6 w-6" />}
+                        label="View Information"
+                        onClick={() => {
+                          setDetailsItem(item);
+                        }}
+                      />
                     )}
                     <Divider />
 

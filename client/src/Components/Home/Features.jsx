@@ -1,6 +1,6 @@
 import { Globe2, Lock, Share2 } from "lucide-react";
 
-export default function Features() {
+export default function Features({device}) {
   const items = [
     {
       icon: Lock,
@@ -22,7 +22,7 @@ export default function Features() {
   return (
     <section id="features" className="relative border-t border-white/5">
          <div>
-        <img alt="drive-view" className="max-w-1xl md:max-w-6xl pt-20 mx-auto" src="./homepage.png" />
+        <img alt="drive-view" className="max-w-1xl md:max-w-6xl pt-20 mx-auto"   src={`/${device === "mobile" ? "mb-drive-view.png" : "homepage.png"}`} />
       </div>
       <div className="max-w-6xl mx-auto px-6 py-20 grid md:grid-cols-3 gap-8">
         {items.map(({ icon: Icon, title, desc }) => (

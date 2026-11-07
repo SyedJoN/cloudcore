@@ -1,22 +1,27 @@
+import { getCountLabel } from "../../../Utils/displayUtils";
 import {
   IconClose,
   IconDownload,
-  IconRename,
   IconRestore,
   IconShare,
   IconLink,
   IconTrash,
+  IconDots,
 } from "../../Components/Icons/Icons";
+import { FolderInput } from "lucide-react";
+
 import { useToast } from "../../Contexts";
 
 export default function SelectionBar({
-  combinedItems,
   selectedItems,
   route,
+  item: itemProp = null,
+  items = null,
   onClear,
   onDownload,
-  onRename,
+  onContextMenu,
   onShare,
+  onMove,
   onRestore,
   onTrash,
   onDeleteForever,
@@ -27,21 +32,37 @@ export default function SelectionBar({
 
   const { toast } = useToast();
 
-  // SELECTED ITEM
-  const item = combinedItems.find((item) =>
-    selectedItems.has(item.id ?? item._id),
-  );
+  const raw = items?.length ? items : itemProp;
+  const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+
+  const isMulti = targets.length > 1;
+  const item = targets[0];
+
+  // Actions are enabled only if EVERY selected item allows them.
+  const every = (fn) => targets.every(fn);
+  const some = (fn) => targets.some(fn);
+
+  const payload = isMulti ? targets : item;
+
+  // run action, then close the sheet
+  const run =
+    (action) =>
+    (...args) => {
+      action?.(...args);
+      onClear();
+    };
 
   if (!item) {
     return null;
   }
 
   // ITEM TYPE / ROUTE
-  const isGoogle = Boolean(item.webViewLink);
+  const isGoogle = every((it) => Boolean(it.webViewLink));
+
   const isTrashRoute = route === "trash";
   const isSharedRoute = route === "shared";
   const isGoogleDriveRoute = route === "google-drive" && isGoogle;
-  const isDeleted = Boolean(item.isDeleted);
+  const isDeleted = some((it) => Boolean(it?.isDeleted));
 
   // CAPABILITIES
   const capabilities = item.capabilities || {};
@@ -50,32 +71,46 @@ export default function SelectionBar({
   const canRename = capabilities.canRename === true;
   const canDelete = capabilities.canDelete === true;
   const canTrash = capabilities.canTrash === true;
+  const canMove = capabilities.canMove === true;
 
   // SHARE
   const canShare = true;
 
   // COPY LINK
 
-  const handleCopyLink = async () => {
-    if (isDeleted) {
-      return;
-    }
-
-    const url =
-      item.webViewLink ??
-      (item.isDirectory
-        ? `${window.location.origin}/directory/${item._id}?usp=drive_link`
-        : `${window.location.origin}/file/${item._id}?usp=drive_link`);
+  const handleCopyLink = async (ids) => {
+    if (isDeleted) return;
 
     try {
-      await navigator.clipboard.writeText(url);
+      const selectedIds = Array.isArray(ids) ? ids : [ids];
+
+      const files = selectedIds
+        .map((id) => targets.find((it) => it._id === id))
+        .filter(Boolean)
+        .filter((file) => !file.isDeleted);
+
+      if (!files.length) return;
+
+      const urls = files.map((file) => {
+        return (
+          file.webViewLink ??
+          (file.isDirectory
+            ? `${window.location.origin}/directory/${file._id}?usp=drive_link`
+            : `${window.location.origin}/file/${file._id}?usp=drive_link`)
+        );
+      });
+
+      await navigator.clipboard.writeText(urls.join(", "));
 
       toast({
-        message: "Link copied to clipboard",
+        message:
+          files.length > 1
+            ? "Links copied to clipboard"
+            : "Link copied to clipboard",
         type: "success",
       });
     } catch (error) {
-      console.error("Failed to copy link:", error);
+      console.error("Failed to copy links:", error);
 
       toast({
         message: "Failed to copy link",
@@ -108,7 +143,7 @@ export default function SelectionBar({
             className="gd-sel-action-btn gd-sel-action-success"
             title="Restore"
             disabled={!canDelete}
-            onClick={onRestore}
+            onClick={() => onRestore(payload)}
           >
             <IconRestore size={18} />
           </button>
@@ -118,7 +153,7 @@ export default function SelectionBar({
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Delete Forever"
             disabled={!canDelete}
-            onClick={() => onDeleteForever(isGoogle ? "google" : "local")}
+            onClick={() => onDeleteForever(isGoogle ? "google" : "local", payload)}
           >
             <IconTrash size={18} />
           </button>
@@ -130,12 +165,10 @@ export default function SelectionBar({
   // NORMAL ROUTES
 
   const downloadDisabled = isDeleted || !canDownload;
-
+  const moveDisabled = isDeleted || !canMove;
   const shareDisabled = isDeleted || !canShare;
 
   const copyLinkDisabled = isDeleted;
-
-  const renameDisabled = isDeleted || !canRename;
 
   const trashDisabled = isDeleted || isGoogle || isSharedRoute || !canTrash;
 
@@ -157,44 +190,35 @@ export default function SelectionBar({
       <span className="gd-selection-count">{selectedItems.size} selected</span>
 
       <div className="gd-selection-actions">
-        {/* DOWNLOAD */}
-        <button
-          className="gd-sel-action-btn"
-          title="Download"
-          disabled={downloadDisabled}
-          onClick={onDownload}
-        >
-          <IconDownload size={18} />
-        </button>
-
         {/* SHARE */}
         <button
           className="gd-sel-action-btn"
           title="Share"
           disabled={shareDisabled}
-          onClick={onShare}
+          onClick={() => onShare(payload)}
         >
           <IconShare size={18} />
         </button>
 
-        {/* COPY LINK */}
+        {/* DOWNLOAD */}
         <button
           className="gd-sel-action-btn"
-          title="Copy link"
-          disabled={copyLinkDisabled}
-          onClick={handleCopyLink}
+          title="Download"
+          disabled={downloadDisabled}
+          onClick={() => onDownload(payload)}
         >
-          <IconLink size={18} />
+          <IconDownload size={18} />
         </button>
-
-        {/* RENAME / EDIT */}
+        {/* MOVE */}
         <button
           className="gd-sel-action-btn"
-          title="Edit"
-          disabled={renameDisabled}
-          onClick={onRename}
+          title="Move"
+          disabled={moveDisabled}
+          onClick={() => {
+            onMove(isMulti ? targets.map((it) => it._id) : item._id);
+          }}
         >
-          <IconRename size={18} />
+          <FolderInput size={18} />
         </button>
 
         {/* MOVE TO TRASH */}
@@ -203,7 +227,7 @@ export default function SelectionBar({
             className="gd-sel-action-btn gd-sel-action-danger"
             title="Move to trash"
             disabled={trashDisabled}
-            onClick={onTrash}
+            onClick={() => onTrash(payload)}
           >
             <IconTrash size={18} />
           </button>
@@ -232,6 +256,32 @@ export default function SelectionBar({
             <IconTrash size={18} />
           </button>
         )}
+        {/* COPY LINK */}
+        <button
+          className="gd-sel-action-btn"
+          title="Copy link"
+          disabled={copyLinkDisabled}
+          onClick={() =>
+            handleCopyLink(isMulti ? targets.map((it) => it._id) : item._id)
+          }
+        >
+          <IconLink size={18} />
+        </button>
+        {/* Context Menu */}
+        <button
+          className="gd-sel-action-btn"
+          title="Copy link"
+          onClick={(e) =>
+            onContextMenu?.(
+              e,
+              isMulti
+                ? targets.filter((it) => selectedItems.has(it._id ?? it.id))
+                : item._id,
+            )
+          }
+        >
+          <IconDots size={18} />
+        </button>
       </div>
     </div>
   );

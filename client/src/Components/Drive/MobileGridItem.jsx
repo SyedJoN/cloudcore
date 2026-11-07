@@ -205,7 +205,7 @@ export default function MobileGridItem({
         {/* Preview: big folder icon, or the file thumbnail */}
         <div className="mgi-preview">
           {item.isDirectory ? (
-            <IconFolder size={100} style={{ color: "#c4c7c5" }} />
+            <IconFolder size={100} />
           ) : (
             <FilePreview item={item} />
           )}

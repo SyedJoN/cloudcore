@@ -20,9 +20,9 @@ export default function GridItem({
   avatar,
   owner,
   selected,
+  selectedItems,
   setSelectedItems,
   combinedItems,
-  selectedItemsSize,
   handleSelectAll,
   onSelect,
   onRowClick,
@@ -125,7 +125,10 @@ export default function GridItem({
       }}
       onDoubleClick={() => onDoubleClick?.(type, itemId, item.name)}
       onContextMenu={(e) => {
-        onSelect?.(itemId);
+        e.preventDefault();
+        if (!selectedItems.has(itemId)) {
+          onSelect?.(itemId);
+        }
         onContextMenu(e, itemId);
       }}
     >

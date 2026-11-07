@@ -53,7 +53,7 @@ export default function DriveBottomBar({
       <button
         onClick={() => setShowNew(true)}
         aria-label="New"
-        className="fixed right-4 z-150 flex h-14 items-center gap-3 rounded-2xl bg-white px-5 text-[15px] font-medium text-[#001d35] shadow-[0_2px_6px_rgba(0,0,0,0.3)] active:scale-95 transition-transform"
+        className="fixed right-4 z-150 flex h-14 items-center gap-3 rounded-2xl bg-(--text-primary) px-5 text-[15px] font-medium text-(--text-theme) shadow-[0_2px_6px_rgba(0,0,0,0.3)] active:scale-95 transition-transform"
         style={{ bottom: "calc(80px + env(safe-area-inset-bottom) + 16px)" }}
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

@@ -14,19 +14,19 @@ const router = createBrowserRouter(allRoutes);
 function App() {
   return (
     <AuthProvider>
-      <GDriveAuthProvider>
-      <ThemeProvider>
-        <SidebarProvider>
-      <ToastProvider>
-        <BreadcrumbProvider>
-        <DeviceProvider>
-          <RouterProvider router={router} />
-          </DeviceProvider>
-        </BreadcrumbProvider>
-      </ToastProvider>
-      </SidebarProvider>
-        </ThemeProvider>
+      <DeviceProvider>
+        <GDriveAuthProvider>
+          <ThemeProvider>
+            <SidebarProvider>
+              <ToastProvider>
+                <BreadcrumbProvider>
+                  <RouterProvider router={router} />
+                </BreadcrumbProvider>
+              </ToastProvider>
+            </SidebarProvider>
+          </ThemeProvider>
         </GDriveAuthProvider>
+      </DeviceProvider>
     </AuthProvider>
   );
 }

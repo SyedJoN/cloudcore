@@ -22,52 +22,50 @@ export function useSelectionAndContextMenu({
   }, [combinedItems]);
 
   const handleContextMenu = useCallback(
-  (e, id) => {
-    e.stopPropagation();
-    e.preventDefault();
+    (e, id) => {
+      e.stopPropagation();
+      e.preventDefault();
 
-    // Toggle off if clicking the same item again
-    if (open && contextItem?.id === id) {
-      setOpen(false);
-      setContextItem(null);
-      return;
-    }
+      // Toggle off if clicking the same item again
+      if (open && contextItem?.id === id) {
+        setOpen(false);
+        setContextItem(null);
+        return;
+      }
 
-    const spaceLeft = e.clientX;
-    const spaceRight = window.innerWidth - e.clientX;
+      const spaceLeft = e.clientX;
+      const spaceRight = window.innerWidth - e.clientX;
 
-    let left = false;
-    let x = e.clientX;
+      let left = false;
+      let x = e.clientX;
 
-    if (spaceRight >= CONTEXT_MENU_WIDTH) {
-      left = false;
-      x = e.clientX;
-    } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
-      left = true;
-      x = e.clientX - CONTEXT_MENU_WIDTH;
-    } else {
-      left = spaceLeft > spaceRight;
-      x = left ? 0 : e.clientX;
-    }
+      if (spaceRight >= CONTEXT_MENU_WIDTH) {
+        left = false;
+        x = e.clientX;
+      } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
+        left = true;
+        x = e.clientX - CONTEXT_MENU_WIDTH;
+      } else {
+        left = spaceLeft > spaceRight;
+        x = left ? 0 : e.clientX;
+      }
 
-    setOpenLeft(left);
-    setOpen(true);
-    setContextPos({ x, y: e.clientY });
+      setOpenLeft(left);
+      setOpen(true);
+      setContextPos({ x, y: e.clientY });
 
-    const parentMatch = combinedItems.find(
-      (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id,
-    );
+      const parentMatch = combinedItems.find(
+        (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id,
+      );
 
-    const itemMatch = combinedItems.find(
-      (i) => (i.id ?? i._id) === id,
-    );
+      const itemMatch = combinedItems.find((i) => (i.id ?? i._id) === id);
 
-    setContextItem(
-      parentMatch ? lastDirectory : (itemMatch ?? lastDirectory),
-    );
-  },
-  [open, contextItem, combinedItems, lastDirectory],
-);
+      setContextItem(
+        parentMatch ? lastDirectory : (itemMatch ?? lastDirectory),
+      );
+    },
+    [open, contextItem, combinedItems, lastDirectory],
+  );
 
   const handleMainMouseDown = useCallback(
     (e) => {

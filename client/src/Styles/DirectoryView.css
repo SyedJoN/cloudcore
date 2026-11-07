@@ -93,6 +93,7 @@
   overflow: hidden;
   display: grid;
   place-items: center;
+  order: 1;
   background: #1a73e8;
   color: #fff;
   font-weight: 500;
@@ -1202,8 +1203,12 @@
 .gd-loading {
   display: flex;
   align-items: center;
+  flex: none;
   justify-content: center;
   padding: 80px;
+}
+.gd-loading.mobile {
+  flex: 1
 }
 .gd-spinner {
   width: 36px;

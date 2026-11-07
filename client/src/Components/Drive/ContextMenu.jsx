@@ -23,6 +23,18 @@ import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { FolderInput } from "lucide-react";
 
 /* 
+   HELPERS
+ */
+
+// Always returns an array of truthy items
+function normalizeTargets(item, items) {
+  const raw = items?.length ? items : item;
+  return Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+}
+
+const getId = (it) => String(it?._id ?? it?.id ?? "");
+
+/* 
    SUB MENU
  */
 
@@ -101,10 +113,10 @@ function ContextMenuContent({
   open,
   onExited,
   openLeft,
-  item,
+  targets,
   position,
   route,
-  isStarred,
+  isStarred = {},
   dirId,
   onClose,
   onShare,
@@ -157,39 +169,66 @@ function ContextMenuContent({
   }, [onClose]);
 
   /* 
-     ITEM
+     TARGETS
    */
+
+  const item = targets[0];
 
   if (!item) {
     return null;
   }
 
-  const isGoogle = Boolean(item.webViewLink);
+  const isMulti = targets.length > 1;
+
+  // Actions are enabled only if EVERY selected item allows them.
+  const every = (fn) => targets.every(fn);
+  const some = (fn) => targets.some(fn);
+
+  const isGoogle = every((it) => Boolean(it.webViewLink));
   const isSharedRoute = route === "shared";
   const isGoogleDriveRoute = route === "google-drive" && isGoogle;
   const isTrashRoute = route === "trash";
 
-  const isFile = !item.isDirectory;
+  const isFile = every((it) => !it.isDirectory);
 
   /* 
      CAPABILITIES
    */
 
-  const capabilities = item.capabilities || {};
+  const cap = (name) => every((it) => it.capabilities?.[name] === true);
 
-  const canRead = isGoogle ? true : capabilities.canRead === true;
+  const canRead = every((it) =>
+    it.webViewLink ? true : it.capabilities?.canRead === true,
+  );
 
-  const canDownload = capabilities.canDownload === true;
+  const canDownload = cap("canDownload");
   const canCopy = true;
-  const canMove = capabilities.canMove === true;
+  const canMove = cap("canMove");
   const canShare = true;
-  const canRename = capabilities.canRename === true;
-  const canTrash = capabilities.canTrash === true;
-  const canDelete = capabilities.canDelete === true;
+  const canRename = cap("canRename");
+  const canTrash = cap("canTrash");
+  const canDelete = cap("canDelete");
 
-  const isDeleted = Boolean(item?.isDeleted);
+  const isDeleted = some((it) => Boolean(it?.isDeleted));
+  const allDeleted = every((it) => Boolean(it?.isDeleted));
 
-  const showDeleteActions = isTrashRoute && isDeleted && !dirId;
+  const showDeleteActions = isTrashRoute && allDeleted && !dirId;
+
+  /* 
+     STARRED
+   */
+
+  // everything starred -> "Remove", otherwise "Add"
+  const starred = every((it) => Boolean(isStarred[it._id]));
+
+  // onStar toggles per item, so only pass the ones that need to change
+  const starTargets = starred
+    ? targets
+    : targets.filter((it) => !isStarred[it._id]);
+
+  // Single item -> the item itself; multiple -> the array.
+  // (Parent callbacks should accept both, e.g. [].concat(x))
+  const payload = isMulti ? targets : item;
 
   /* 
      CLOSE WRAPPER
@@ -207,23 +246,34 @@ function ContextMenuContent({
    */
 
   async function handleCopyLink() {
-    const url =
-      item.webViewLink ??
-      (item.isDirectory
-        ? `${window.location.origin}/directory/${item._id}?usp=drive_link`
-        : `${window.location.origin}/file/${item._id}?usp=drive_link`);
+    if (isDeleted) return;
 
     try {
-      await navigator.clipboard.writeText(url);
+      const files = targets.filter((file) => !file.isDeleted);
+
+      if (!files.length) return;
+
+      const urls = files.map(
+        (file) =>
+          file.webViewLink ??
+          (file.isDirectory
+            ? `${window.location.origin}/directory/${file._id}?usp=drive_link`
+            : `${window.location.origin}/file/${file._id}?usp=drive_link`),
+      );
+
+      await navigator.clipboard.writeText(urls.join(", "));
 
       toast({
-        message: "Link copied to clipboard",
+        message:
+          files.length > 1
+            ? "Links copied to clipboard"
+            : "Link copied to clipboard",
         type: "success",
       });
 
       onClose();
     } catch (error) {
-      console.error("Failed to copy link:", error);
+      console.error("Failed to copy links:", error);
 
       toast({
         message: "Failed to copy link",
@@ -233,7 +283,7 @@ function ContextMenuContent({
   }
 
   /* 
-     OPEN IN NEW TAB
+     OPEN IN NEW TAB (single only)
    */
 
   function handleOpenInNewTab() {
@@ -268,7 +318,7 @@ function ContextMenuContent({
           <button
             className="gd-context-item"
             disabled={!canDelete}
-            onClick={close(() => onRestore(item))}
+            onClick={close(() => onRestore(payload))}
           >
             <IconRestore size={18} />
             Restore
@@ -278,7 +328,7 @@ function ContextMenuContent({
             className="gd-context-item danger"
             disabled={!canDelete}
             onClick={close(() =>
-              onDeleteForever(isGoogle ? "google" : "local"),
+              onDeleteForever(isGoogle ? "google" : "local", payload),
             )}
           >
             <IconTrash size={18} />
@@ -292,10 +342,10 @@ function ContextMenuContent({
         <div>
           {/* 
               OPEN WITH
-              FILES ONLY
+              SINGLE FILE ONLY
            */}
 
-          {isFile && (
+          {!isMulti && isFile && (
             <>
               <div style={{ position: "relative" }}>
                 <button
@@ -354,24 +404,26 @@ function ContextMenuContent({
           <button
             className="gd-context-item"
             disabled={isDeleted || !canDownload}
-            onClick={close(() => onDownload(item))}
+            onClick={close(() => onDownload(payload))}
           >
             <IconDownload size={18} />
             Download
           </button>
 
           {/* 
-              RENAME
+              RENAME (single only)
            */}
 
-          <button
-            className="gd-context-item"
-            disabled={isDeleted || !canRename}
-            onClick={close(() => onRename(item))}
-          >
-            <IconRename size={18} />
-            Rename
-          </button>
+          {!isMulti && (
+            <button
+              className="gd-context-item"
+              disabled={isDeleted || !canRename}
+              onClick={close(() => onRename(item))}
+            >
+              <IconRename size={18} />
+              Rename
+            </button>
+          )}
 
           {/* 
               COPY
@@ -381,7 +433,7 @@ function ContextMenuContent({
             className="gd-context-item"
             disabled={isSharedRoute || !canCopy}
             title="Copy"
-            onClick={close(() => onCopy(item))}
+            onClick={close(() => onCopy(payload))}
           >
             <DocumentDuplicateIcon className="w-5 h-5" />
             Make a Copy
@@ -419,7 +471,7 @@ function ContextMenuContent({
             >
               <button
                 className="gd-context-item"
-                onClick={close(() => onShare(item))}
+                onClick={close(() => onShare(payload))}
               >
                 <IconShare size={18} />
                 Share
@@ -478,7 +530,10 @@ function ContextMenuContent({
               <button
                 className="gd-context-item"
                 disabled={isSharedRoute || isDeleted || !canMove}
-                onClick={close(() => onMove(item._id))}
+                // single: the id, multiple: array of ids
+                onClick={close(() =>
+                  onMove(isMulti ? targets.map((it) => it._id) : item._id),
+                )}
               >
                 <FolderInput width={18} height={18} />
                 Move
@@ -490,14 +545,14 @@ function ContextMenuContent({
                 className="gd-context-item"
                 disabled={isDeleted || isGoogleDriveRoute}
                 title="Star"
-                onClick={close(() => onStar(item))}
+                onClick={close(() => onStar(isMulti ? starTargets : item))}
               >
-                {isStarred[item._id] ? (
+                {starred ? (
                   <StarIconSolid className="w-5 h-5" />
                 ) : (
                   <StarIcon className="w-5 h-5" />
                 )}
-                Add to starred
+                {starred ? "Remove from starred" : "Add to starred"}
               </button>
             </SubMenu>
           </div>
@@ -512,7 +567,7 @@ function ContextMenuContent({
             <button
               className="gd-context-item danger"
               disabled={isDeleted || !canDelete || !canTrash}
-              onClick={close(() => onTrash(item))}
+              onClick={close(() => onTrash(payload))}
             >
               <IconTrash size={18} />
               Move to trash
@@ -528,7 +583,7 @@ function ContextMenuContent({
               className="gd-context-item danger"
               disabled={isDeleted || !canDelete}
               onClick={close(() =>
-                onDeleteForever(isGoogle ? "google" : "local"),
+                onDeleteForever(isGoogle ? "google" : "local", payload),
               )}
             >
               <IconTrash size={18} />
@@ -543,11 +598,14 @@ function ContextMenuContent({
 
 /* 
    CONTEXT MENU
+
+   Accepts either `item` (single) or `items` (array).
  */
 
 export default function ContextMenu({
   open,
-  item,
+  item = null,
+  items = null,
   position,
   setShowCreateMenu,
   ...rest
@@ -555,19 +613,23 @@ export default function ContextMenu({
   const [mounted, setMounted] = useState(false);
 
   const [render, setRender] = useState({
-    item: null,
+    targets: [],
     position: null,
     key: null,
   });
 
+  const targets = normalizeTargets(item, items);
+  const targetsKey = targets
+    .map((it) => `${getId(it)}:${it?.isDirectory ? "dir" : "file"}`)
+    .join("|");
+
   useEffect(() => {
-    if (!open || !item || !position) {
+    if (!open || !targets.length || !position) {
       return;
     }
-    setShowCreateMenu(false);
-    const instanceKey = `${position.x},${position.y},${
-      item?._id ?? ""
-    },${item?.isDirectory ? "dir" : "file"}`;
+    setShowCreateMenu?.(false);
+
+    const instanceKey = `${position.x},${position.y},${targetsKey}`;
 
     setRender((prev) => {
       if (prev.key === instanceKey) {
@@ -575,14 +637,15 @@ export default function ContextMenu({
       }
 
       return {
-        item,
+        targets,
         position,
         key: instanceKey,
       };
     });
 
     setMounted(true);
-  }, [open, item, position]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, targetsKey, position]);
 
   if (!mounted) {
     return null;
@@ -592,7 +655,7 @@ export default function ContextMenu({
     <Portal>
       <ContextMenuContent
         key={render.key}
-        item={render.item}
+        targets={render.targets}
         position={render.position}
         open={open}
         onExited={() => setMounted(false)}

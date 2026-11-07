@@ -2,11 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import { Cloud, Menu, X } from "lucide-react";
 import UserAccountBar from "../UserAccountBar";
 import { useAuth } from "../../Contexts/AuthContext";
+import UserAccountDrawerMobile from "../UserAccountDrawerBar";
+import { UseAvatar } from "../../Hooks/useAvatar";
+import { useDevice } from "../../Contexts/DeviceContext";
 
-export default function Header() {
+export default function Header({device}) {
+  const { user, loggedIn } = useAuth();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const { loggedIn } = useAuth();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -22,6 +27,19 @@ export default function Header() {
     { label: "FAQ", href: "#faq" },
   ];
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target) && !event.target.closest(".menu-links")) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
   return (
     <header
       className={`sticky top-0 z-50 transition-colors duration-300 ${
@@ -55,8 +73,25 @@ export default function Header() {
             </a>
           ))}
         </nav>
+        {device === "mobile" && loggedIn && (
+          <button
+            type="button"
+            className="gd-mavatar"
+            aria-label="Account"
+            onClick={() => setAccountOpen(true)}
+          >
+            <UseAvatar name={user.name} avatar={user.avatar} size={32} />
+          </button>
+        )}
         {loggedIn ? (
-          <UserAccountBar />
+          device === "mobile" ? (
+            <UserAccountDrawerMobile
+              open={accountOpen}
+              onClose={() => setAccountOpen(false)}
+            />
+          ) : (
+            <UserAccountBar />
+          )
         ) : (
           <div className="hidden md:flex items-center gap-3">
             <a
@@ -75,7 +110,8 @@ export default function Header() {
         )}
 
         <button
-          className="md:hidden text-white cc-focus rounded p-1"
+        ref={menuRef}
+          className={`md:hidden text-white cc-focus rounded p-1 ${loggedIn ? "-order-1" : ""}`}
           onClick={() => setOpen((o) => !o)}
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
@@ -85,7 +121,7 @@ export default function Header() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-white/10 bg-[#050b1f]/98 px-6 py-4 flex flex-col gap-4">
+        <div className="menu-links md:hidden border-t border-white/10 bg-[#050b1f]/98 px-6 py-4 flex flex-col gap-4">
           {links.map((l) => (
             <a
               key={l.label}

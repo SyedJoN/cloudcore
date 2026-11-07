@@ -258,6 +258,7 @@ export default function MobileMoveModal({
       );
       setFiles(data.files || []);
     } catch (error) {
+      
       toast({
         message: error.message || "Failed to load folders",
         type: "error",
