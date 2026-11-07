@@ -291,7 +291,7 @@ export default function UsersPage() {
                 setShowDeletedUsers(false);
                 setShowFiles(false);
               }}
-              className={`${!showDeletedUsers && !showFiles ? "active" : ""}`}
+              className={`user-heading ${!showDeletedUsers && !showFiles ? "active" : ""}`}
             >
               Users
             </li>
@@ -303,7 +303,7 @@ export default function UsersPage() {
 
                   setShowFiles(false);
                 }}
-                className={`${showDeletedUsers && !showFiles ? "active" : ""}`}
+                className={`user-heading ${showDeletedUsers && !showFiles ? "active" : ""}`}
               >
                 Deleted Users
               </li>
@@ -315,7 +315,7 @@ export default function UsersPage() {
                   setShowDeletedUsers(false);
                   setIsEditable({});
                 }}
-                className={showFiles ? "active" : ""}
+                className={`user-heading ${showFiles ? "active" : ""}`}
               >
                 User Files
               </li>

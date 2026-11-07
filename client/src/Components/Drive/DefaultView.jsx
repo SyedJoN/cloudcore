@@ -10,6 +10,8 @@ import SortButton from "../ListRow/SortButton";
 import { useAuth } from "../../Contexts";
 import { useDevice } from "../../Contexts/DeviceContext";
 import MobileListRow from "./MobileListRow";
+import MobileGridItem from "./MobileGridItem";
+import SortButtonMobile from "../ListRow/SortButtonMobile";
 
 const DefaultView = ({
   items,
@@ -27,6 +29,8 @@ const DefaultView = ({
   onToggleView,
   onRowClick,
   onDoubleClick,
+  showInputCircle,
+  setShowInputCircle,
   onDownload,
   onRename,
   onShare,
@@ -41,7 +45,6 @@ const DefaultView = ({
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
   const { device } = useDevice();
-  const [showInputCircle, setShowInputCircle] = useState(false);
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -119,16 +122,15 @@ const DefaultView = ({
         ? GridItem
         : ListRow
       : viewMode === "grid"
-        ? GridItem
+        ? MobileGridItem
         : MobileListRow;
 
-  const FoldersOnTop = viewMode === "grid" && sortConfig.folders === "top";
+  const FoldersOnTop =
+    device === "windows" && viewMode === "grid" && sortConfig.folders === "top";
 
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
   const isGoogleDriveRoute = route === "google-drive";
-
- 
 
   return (
     <div className="gd-drive">
@@ -143,13 +145,22 @@ const DefaultView = ({
       {device === "windows"
         ? viewMode === "grid"
         : true && (
-            <div className="sort-btn pb-2">
-              <SortButton
-                viewMode={viewMode}
-                onToggleView={onToggleView}
-                sortConfig={sortConfig}
-                setSortConfig={setSortConfig}
-              />
+            <div className="sort-btn pb-2 -mx-1.5 py-2">
+              {device === "mobile" ? (
+                <SortButtonMobile
+                  viewMode={viewMode}
+                  onToggleView={onToggleView}
+                  sortConfig={sortConfig}
+                  setSortConfig={setSortConfig}
+                />
+              ) : (
+                <SortButton
+                  viewMode={viewMode}
+                  onToggleView={onToggleView}
+                  sortConfig={sortConfig}
+                  setSortConfig={setSortConfig}
+                />
+              )}
             </div>
           )}
 
@@ -163,7 +174,9 @@ const DefaultView = ({
       ) : (
         <>
           {FoldersOnTop && containsDirectory && (
-            <div className="gd-grid gd-grid-on-top">
+            <div
+              className={`gd-grid ${device === "mobile" ? "" : "gd-grid-on-top"}`}
+            >
               {sortedItems
                 .filter((s) => s.isDirectory)
                 .map((item) => (
@@ -202,7 +215,17 @@ const DefaultView = ({
                 ))}
             </div>
           )}
-          <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
+          <div
+           className={
+  viewMode === "grid"
+    ? device === "mobile"
+      ? "mgi-grid"
+      : "gd-grid"
+    : device === "mobile"
+      ? "gd-list mobile"
+      : "gd-list"
+}
+          >
             {sortedItems
               .filter((s) => (FoldersOnTop ? !s.isDirectory : s))
               .map((item) => (

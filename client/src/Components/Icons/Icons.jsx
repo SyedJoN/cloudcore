@@ -27,14 +27,24 @@ export const IconDots = ({ size = 18 }) => (
   </svg>
 );
 
-export const IconGrid = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-    <path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zM13 3h8v8h-8V3zm0 10h8v8h-8v-8z"/>
+export const IconGrid = ({ size = 20, color = "currentColor" }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="1.8"
+    strokeLinejoin="round"
+  >
+    <rect x="4.5" y="4.5" width="5" height="5" rx="1" />
+    <rect x="14.5" y="4.5" width="5" height="5" rx="1" />
+    <rect x="4.5" y="14.5" width="5" height="5" rx="1" />
+    <rect x="14.5" y="14.5" width="5" height="5" rx="1" />
   </svg>
 );
-
-export const IconList = ({ size = 20 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+export const IconList = ({ size = 20, color="currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
   </svg>
 );

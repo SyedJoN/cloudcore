@@ -65,9 +65,8 @@ import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationMo
 import { useDevice } from "../Contexts/DeviceContext";
 import MobileContextMenu from "../Components/Drive/MobileContextMenu";
 import FileViewerMobile from "../Components/File/FileViewerMobile";
-import DriveToolbarMobile from "../Components/Drive/DriveToolbarMobile";
-import DriveHeaderMobile from "../Components/Drive/DriveHeaderMobile";
 import DriveTopBarMobile from "../Components/Drive/DriveTopbarMobile";
+import MobileMoveModal from "../Components/Modals/MobileMoveModal";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -132,6 +131,7 @@ export default function DirectoryView({ route }) {
   const [createMenuPos, setCreateMenuPos] = useState({ x: 0, y: 0 });
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
+  const [showInputCircle, setShowInputCircle] = useState(false);
   const [inDirectory, setInDirectory] = useState(false);
   const [mobileHeaderDirName, setMobileHeaderDirName] = useState("");
   const [animate, setAnimate] = useState(false);
@@ -148,6 +148,8 @@ export default function DirectoryView({ route }) {
     if (location.pathname.startsWith("/directory") && device === "mobile") {
       setAnimate(true);
       setInDirectory(true);
+    } else {
+      setInDirectory(false);
     }
   }, [location.pathname, device]);
 
@@ -236,22 +238,22 @@ export default function DirectoryView({ route }) {
 
         const folders = items.filter((item) => item.isDirectory);
         const files = items.filter((item) => !item.isDirectory);
-      if (!isTrashRoute) {
+        if (!isTrashRoute) {
           setDirectoriesList((prev) => [...prev, ...folders]);
 
-        setFilesList((prev) => [...prev, ...files]);
-      }
+          setFilesList((prev) => [...prev, ...files]);
+        }
       }
       if (undoAction.type === "restore") {
         await handleMoveToTrash(items);
         const folders = items.filter((item) => item.isDirectory);
         const files = items.filter((item) => !item.isDirectory);
 
-       if (isTrashRoute) {
-         setDirectoriesList((prev) => [...prev, ...folders]);
-        setFilesList((prev) => [...prev, ...files]);
+        if (isTrashRoute) {
+          setDirectoriesList((prev) => [...prev, ...folders]);
+          setFilesList((prev) => [...prev, ...files]);
+        }
       }
-       }
       if (undoAction.type === "star") {
         await handleToggleStar(items);
 
@@ -596,157 +598,194 @@ export default function DirectoryView({ route }) {
     }
   };
 
- async function handleMoveToTrash(items) {
-  try {
+  async function handleMoveToTrash(items) {
+    try {
+      showError("");
+
+      const fileIds = items.filter((i) => !i.isDirectory).map((i) => i._id);
+      const dirIds = items.filter((i) => i.isDirectory).map((i) => i._id);
+
+      const responses = await Promise.all([
+        fileIds.length ? softDeleteFile("/file/soft-delete", fileIds) : null,
+        dirIds.length ? softDeleteFile("/directory/soft-delete", dirIds) : null,
+      ]);
+
+      const trashedIds = new Set(
+        responses.filter(Boolean).flatMap((r) => r.trashedIds),
+      );
+      const trashed = items.filter((i) => trashedIds.has(String(i._id)));
+
+      if (trashed.length) {
+        await refreshUser();
+
+        const noun = trashed.every((i) => !i.isDirectory)
+          ? "file"
+          : trashed.every((i) => i.isDirectory)
+            ? "folder"
+            : "item";
+        const count = trashed.length;
+
+        toast({
+          message: `${count} ${noun}${count === 1 ? "" : "s"} moved to trash`,
+          type: "success",
+          duration: 5000,
+          undoAction: {
+            type: "trash",
+            items: trashed,
+            onUndo: () => handleUndo({ type: "trash", items: trashed }),
+          },
+        });
+
+        setDirectoriesList((prev) =>
+          prev.filter((i) => !trashedIds.has(String(i._id))),
+        );
+        setFilesList((prev) =>
+          prev.filter((i) => !trashedIds.has(String(i._id))),
+        );
+      }
+
+      if (trashed.length < items.length) {
+        showError(
+          `${items.length - trashed.length} item(s) couldn't be moved to trash`,
+        );
+      }
+
+      clearSelection();
+    } catch (err) {
+      if (err.response?.status === 429) {
+        showError("Too many requests. Please slow down.");
+        return;
+      }
+      showError(err.response?.data?.message ?? err.message);
+    }
+  }
+
+  async function handleRestoreItem(items) {
     showError("");
 
     const fileIds = items.filter((i) => !i.isDirectory).map((i) => i._id);
     const dirIds = items.filter((i) => i.isDirectory).map((i) => i._id);
 
-    const responses = await Promise.all([
-      fileIds.length ? softDeleteFile("/file/soft-delete", fileIds) : null,
-      dirIds.length ? softDeleteFile("/directory/soft-delete", dirIds) : null,
+    // allSettled: if files fail (e.g. storage full) folders can still succeed
+    const results = await Promise.allSettled([
+      fileIds.length ? restoreFile("/file/restore", fileIds) : null,
+      dirIds.length ? restoreFile("/directory/restore", dirIds) : null,
     ]);
 
-    const trashedIds = new Set(
-      responses.filter(Boolean).flatMap((r) => r.trashedIds),
+    const restoredIds = new Set(
+      results
+        .filter((r) => r.status === "fulfilled" && r.value)
+        .flatMap((r) => r.value.restoredIds.map(String)),
     );
-    const trashed = items.filter((i) => trashedIds.has(String(i._id)));
+    const restored = items.filter((i) =>
+      restoredIds.has(String(i._id ?? i.id)),
+    );
 
-    if (trashed.length) {
+    if (restored.length) {
       await refreshUser();
 
-      const noun = trashed.every((i) => !i.isDirectory)
-        ? "file"
-        : trashed.every((i) => i.isDirectory)
-          ? "folder"
-          : "item";
-      const count = trashed.length;
-
       toast({
-        message: `${count} ${noun}${count === 1 ? "" : "s"} moved to trash`,
+        message: `${restored.length} item${restored.length === 1 ? "" : "s"} restored`,
         type: "success",
-        duration: 5000,
         undoAction: {
-          type: "trash",
-          items: trashed,
-          onUndo: () => handleUndo({ type: "trash", items: trashed }),
+          type: "restore",
+          items: restored,
+          onUndo: () => handleUndo({ type: "restore", items: restored }),
         },
       });
 
-      setDirectoriesList((prev) => prev.filter((i) => !trashedIds.has(String(i._id))));
-      setFilesList((prev) => prev.filter((i) => !trashedIds.has(String(i._id))));
+      setDirectoriesList((prev) =>
+        prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
+      );
+      setFilesList((prev) =>
+        prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
+      );
     }
 
-    if (trashed.length < items.length) {
-      showError(`${items.length - trashed.length} item(s) couldn't be moved to trash`);
+    // report the first failure, if any
+    const failure = results.find((r) => r.status === "rejected");
+    if (failure) {
+      const status = failure.reason?.response?.status;
+      if (status === 401) {
+        navigate("/login");
+        return;
+      }
+      showError(
+        status === 507
+          ? (failure.reason.response.data?.message ??
+              "Free up space to restore these items.")
+          : (failure.reason?.response?.data?.message ??
+              failure.reason?.message),
+      );
     }
 
     clearSelection();
-  } catch (err) {
-    if (err.response?.status === 429) {
-      showError("Too many requests. Please slow down.");
-      return;
-    }
-    showError(err.response?.data?.message ?? err.message);
   }
-}
-
- async function handleRestoreItem(items) {
-  showError("");
-
-  const fileIds = items.filter((i) => !i.isDirectory).map((i) => i._id);
-  const dirIds = items.filter((i) => i.isDirectory).map((i) => i._id);
-
-  // allSettled: if files fail (e.g. storage full) folders can still succeed
-  const results = await Promise.allSettled([
-    fileIds.length ? restoreFile("/file/restore", fileIds) : null,
-    dirIds.length ? restoreFile("/directory/restore", dirIds) : null,
-  ]);
-
-  const restoredIds = new Set(
-    results
-      .filter((r) => r.status === "fulfilled" && r.value)
-      .flatMap((r) => r.value.restoredIds.map(String)),
-  );
-  const restored = items.filter((i) => restoredIds.has(String(i._id ?? i.id)));
-
-  if (restored.length) {
-    await refreshUser();
-
-    toast({
-      message: `${restored.length} item${restored.length === 1 ? "" : "s"} restored`,
-      type: "success",
-      undoAction: {
-        type: "restore",
-        items: restored,
-        onUndo: () => handleUndo({ type: "restore", items: restored }),
-      },
-    });
-
-    setDirectoriesList((prev) =>
-      prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
-    );
-    setFilesList((prev) =>
-      prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
-    );
-  }
-
-  // report the first failure, if any
-  const failure = results.find((r) => r.status === "rejected");
-  if (failure) {
-    const status = failure.reason?.response?.status;
-    if (status === 401) {
-      navigate("/login");
-      return;
-    }
-    showError(
-      status === 507
-        ? (failure.reason.response.data?.message ??
-            "Free up space to restore these items.")
-        : (failure.reason?.response?.data?.message ?? failure.reason?.message),
-    );
-  }
-
-  clearSelection();
-}
-
   async function handleDelete(items, type) {
     try {
-      await Promise.all(
-        items.map((item) => {
-          const url =
-            item?.isDirectory && type === "local"
-              ? `/directory/${item._id ?? item.id}`
-              : `/file/${item._id ?? item.id}?type=${type}`;
-          return deleteFile(url);
-        }),
+      showError("");
+
+      const fileIds = items
+        .filter((i) => !i.isDirectory)
+        .map((i) => i._id ?? i.id);
+
+      const dirIds = items
+        .filter((i) => i.isDirectory)
+        .map((i) => i._id ?? i.id);
+
+      const responses = await Promise.all([
+        fileIds.length ? deleteFile(`/file?type=${type}`, fileIds, type) : null,
+
+        dirIds.length ? deleteFile("/directory", dirIds) : null,
+      ]);
+
+      const deletedIds = new Set(
+        responses.filter(Boolean).flatMap((r) => r.deletedIds ?? []),
       );
+
+      const deleted = items.filter((i) =>
+        deletedIds.has(String(i._id ?? i.id)),
+      );
+
+      if (deleted.length) {
+        await refreshUser();
+
+        const areAllFiles = deleted.every((i) => !i.isDirectory);
+        const areAllFolders = deleted.every((i) => i.isDirectory);
+        const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
+
+        toast({
+          message: `${deleted.length} ${noun}${deleted.length === 1 ? "" : "s"} deleted permanently`,
+          type: "success",
+        });
+
+        setViewItem(null);
+
+        setDirectoriesList((prev) =>
+          prev.filter((i) => !deletedIds.has(String(i._id ?? i.id))),
+        );
+
+        setFilesList((prev) =>
+          prev.filter((i) => !deletedIds.has(String(i._id ?? i.id))),
+        );
+      }
+
+      if (deleted.length < items.length) {
+        showError(
+          `${items.length - deleted.length} item(s) couldn't be deleted`,
+        );
+      }
 
       clearSelection();
-      const areAllFiles = items.every((item) => !item.isDirectory);
-      const areAllFolders = items.every((item) => item.isDirectory);
-      const count = items.length;
-      const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
-
-      toast({
-        message: `${count} ${noun}${count === 1 ? "" : "s"} deleted permanently`,
-        type: "success",
-      });
-
-      setViewItem(null);
-      const deletedIds = new Set(items.map((item) => item.id ?? item._id));
-      setDirectoriesList((prev) =>
-        prev.filter((item) => !deletedIds.has(item.id ?? item._id)),
-      );
-      setFilesList((prev) =>
-        prev.filter((item) => !deletedIds.has(item.id ?? item._id)),
-      );
     } catch (err) {
-      showError(err.message);
+      if (err.response?.status === 429) {
+        showError("Too many requests. Please slow down.");
+        return;
+      }
+
+      showError(err.response?.data?.message ?? err.message);
     }
   }
-
   async function handleCreateDirectory(e) {
     e.preventDefault();
     showError("");
@@ -1017,37 +1056,38 @@ export default function DirectoryView({ route }) {
       controller.abort();
     }
   }
-function handleDownload(item) {
-  try {
-    let url;
+  function handleDownload(item) {
+    try {
+      let url;
 
-    if (isGoogleDriveRoute) {
-      url = `${BASE_URL}/auth/google-drive/download?fileId=${item.id}`;
-    } else {
-      url = `${BASE_URL}/file/${item._id}?action=download`;
+      if (isGoogleDriveRoute) {
+        url = `${BASE_URL}/auth/google-drive/download?fileId=${item.id}`;
+      } else {
+        url = `${BASE_URL}/file/${item._id}?action=download`;
+      }
+
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.style.display = "none";
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("Download error:", err);
+      showError(err.message);
     }
-
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.style.display = "none";
-
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-  } catch (err) {
-    console.error("Download error:", err);
-    showError(err.message);
   }
-}
 
   const handleToggleResourcePublic = async (item, role, access) => {
-    setIsShareLoading(true);
+
+      setIsShareLoading(true);
+  const isMultiShare = selectedItems.size > 1;
     try {
-      const publicPermission = peopleWithAccess.find(
-        (p) => p.type === "anyone",
-      );
+    const publicPermission = isMultiShare
+      ? (item.permissions ?? []).find((p) => p.type === "anyone")
+      : peopleWithAccess.find((p) => p.type === "anyone");
       const currentAccess = publicPermission ? "anyone" : "restricted";
       if (currentAccess === access) {
         if (access === "restricted") return;
@@ -1370,11 +1410,11 @@ function handleDownload(item) {
         });
       }
 
-      setPeopleWithAccess(updatedPeopleWithAccess);
-
-      setLinkAccess(restricted ? "restricted" : "anyone");
-      setLinkRole(restricted ? "reader" : userRole);
-
+    if (!isMultiShare) {
+  setPeopleWithAccess(updatedPeopleWithAccess);
+  setLinkAccess(restricted ? "restricted" : "anyone");
+  setLinkRole(restricted ? "reader" : userRole);
+}
       if (myRole === "remove") {
         const personsToRemove = peopleWithAccess.filter(
           (person) => person?.role === "remove",
@@ -1724,17 +1764,19 @@ function handleDownload(item) {
 
     return [...items.slice(0, index), newItem, ...items.slice(index)];
   };
-  async function handleCopyItem(item) {
-    const type = item?.isDirectory ? "folder" : "file";
-    const providerType = item?.webViewLink ? "google" : "local";
-
+  async function handleCopyItems(items) {
     try {
+      showError("");
+
+      const providerType = items.some((item) => item?.webViewLink)
+        ? "google"
+        : "local";
+
       const {
         message,
-        data: { copiedItem, owners, capabilities, permissions },
+        data: { copiedItems },
       } = await copyItem({
-        item,
-        type,
+        items,
         providerType,
       });
 
@@ -1743,29 +1785,48 @@ function handleDownload(item) {
         type: "success",
       });
 
-      const newItem = {
-        ...copiedItem,
-        owners,
-        capabilities,
-        permissions,
-        sortName: item?.name,
-        sortModifiedTime: item?.modifiedTime || item?.updatedAt,
-        isDirectory: type === "folder",
-      };
       const isInsideItem =
-        device === "mobile" && item._id === lastDirectory._id;
+        device === "mobile" &&
+        items.some((item) => String(item._id) === String(lastDirectory?._id));
+
       if (isInsideItem) return;
 
-      if (type === "folder") {
-        setDirectoriesList((prev) => insertBefore(prev, item, newItem));
-      } else {
-        setFilesList((prev) => insertBefore(prev, item, newItem));
+      const newFolders = [];
+      const newFiles = [];
+
+      copiedItems.forEach((result, index) => {
+        const item = items[index];
+        const type = item.isDirectory ? "folder" : "file";
+
+        const newItem = {
+          ...result.copiedItem,
+          owners: result.owners || [],
+          capabilities: result.capabilities || {},
+          permissions: result.permissions || [],
+          sortName: item.name,
+          sortModifiedTime: item.modifiedTime || item.updatedAt,
+          isDirectory: type === "folder",
+        };
+
+        if (type === "folder") {
+          newFolders.push(newItem);
+        } else {
+          newFiles.push(newItem);
+        }
+      });
+
+      if (newFolders.length) {
+        setDirectoriesList((prev) => [...newFolders, ...prev]);
+      }
+
+      if (newFiles.length) {
+        setFilesList((prev) => [...newFiles, ...prev]);
       }
     } catch (error) {
       showError(
         error?.response?.data?.message ||
           error?.message ||
-          "Failed to copy item",
+          "Failed to copy items",
       );
     }
   }
@@ -1849,9 +1910,14 @@ function handleDownload(item) {
     return item && !item?.isDirectory;
   });
 
+  const selectedId = [...selectedItems][0];
+
   const selectedItem =
     selectedItems.size === 1
-      ? combinedItems.find((i) => (i.id ?? i._id) === [...selectedItems][0])
+      ? combinedItems.find((i) => (i.id ?? i._id) === selectedId) ||
+        combinedItems.find(
+          (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === selectedId,
+        )?.parentDirId
       : null;
 
   let CREATE_MENU_WIDTH = 180;
@@ -1956,7 +2022,6 @@ function handleDownload(item) {
           setInDirectory={setInDirectory}
           restartAnimation={restartAnimation}
           disabled={isUploading}
-          currentDir={dirId} // the full folder object, with _id, name, capabilitis
           onShare={(itemId) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
             if (item) setShareItem(item);
@@ -2078,17 +2143,44 @@ function handleDownload(item) {
                 {error?.message || String(error)}
               </div>
             )}
-            {moveItem && (
-              <MoveModal
-                currentDirId={dirId}
-                item={moveItem}
-                route={route}
-                setDirectoriesList={setDirectoriesList}
-                setFilesList={setFilesList}
-                onClose={() => setMoveItem(null)}
-                open={Boolean(moveItem)}
-              />
-            )}
+            {moveItem &&
+              (device === "mobile" ? (
+                <MobileMoveModal
+                  currentDirId={dirId}
+                  item={selectedItem}
+                  items={combinedItems.filter((i) =>
+                    selectedItems.has(i.id ?? i._id),
+                  )}
+                  route={route}
+                  viewMode={viewMode}
+                  onToggleView={() =>
+                    setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                  }
+                  sortConfig={sortConfig}
+                  setSortConfig={setSortConfig}
+                  setDirectoriesList={setDirectoriesList}
+                  setFilesList={setFilesList}
+                  onClose={() => setMoveItem(null)}
+                />
+              ) : (
+                <MoveModal
+                  currentDirId={dirId}
+                  item={selectedItem}
+                  items={combinedItems.filter((i) =>
+                    selectedItems.has(i.id ?? i._id),
+                  )}
+                  route={route}
+                  viewMode={viewMode}
+                  onToggleView={() =>
+                    setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                  }
+                  sortConfig={sortConfig}
+                  setSortConfig={setSortConfig}
+                  setDirectoriesList={setDirectoriesList}
+                  setFilesList={setFilesList}
+                  onClose={() => setMoveItem(null)}
+                />
+              ))}
 
             {isLoading ? (
               <div className="gd-loading">
@@ -2156,6 +2248,8 @@ function handleDownload(item) {
                     isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
                     items={combinedItems}
+                    showInputCircle={showInputCircle}
+                    setShowInputCircle={setShowInputCircle}
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
                     viewMode={viewMode}
@@ -2274,29 +2368,29 @@ function handleDownload(item) {
             clearSelection();
             setContextItem(null);
           }}
-        onDownload={async () => {
-  const items = combinedItems.filter((item) =>
-    selectedItems.has(item.id ?? item._id)
-  );
+          onDownload={async () => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
 
-  if (!items.length && selectedItems.has(lastDirectory._id)) {
-    items.push(lastDirectory);
-  }
+            if (!items.length && selectedItems.has(lastDirectory._id)) {
+              items.push(lastDirectory);
+            }
 
-  if (!items.length) return;
+            if (!items.length) return;
 
-  for (const item of items) {
-    if (item.isDirectory) {
-      await handleDownloadFolder(item);
-    } else {
-      handleDownload(item);
-    }
+            for (const item of items) {
+              if (item.isDirectory) {
+                await handleDownloadFolder(item);
+              } else {
+                handleDownload(item);
+              }
 
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
 
-  clearSelection();
-}}
+            clearSelection();
+          }}
           onCopy={() => {
             setContextItem(null);
 
@@ -2354,60 +2448,294 @@ function handleDownload(item) {
         />
       )}
 
-      {device === "mobile" ? (
-        <MobileContextMenu
-          open={open}
-          openLeft={openLeft}
-          setShowCreateMenu={setShowCreateMenu}
-          item={selectedItem}
-          items={combinedItems.filter((i) => selectedItems.has(i.id ?? i._id))}
-          position={contextPos}
-          route={route}
+      {contextItem &&
+        (device === "mobile" ? (
+          <MobileContextMenu
+            open={open}
+            openLeft={openLeft}
+            setShowCreateMenu={setShowCreateMenu}
+            item={contextItem}
+            items={combinedItems.filter((i) =>
+              selectedItems.has(i.id ?? i._id),
+            )}
+            position={contextPos}
+            route={route}
+            isStarred={isStarred}
+            handleSelect={handleSelect}
+            dirId={dirId}
+            viewMode={viewMode}
+            setContextItem={setContextItem}
+            onClose={() => {
+              setOpen(false);
+              setContextItem(null);
+            }}
+            onDownload={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              for (const item of items) {
+                if (item.isDirectory) {
+                  await handleDownloadFolder(item);
+                } else {
+                  handleDownload(item);
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onCopy={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              await handleCopyItems(items);
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onMove={() => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              setMoveItem(items);
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onStar={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (items.length) await handleToggleStar(items);
+            }}
+            onRename={(item) => {
+              if (item) openRename(item);
+            }}
+            onShare={() => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (items.length) setShareItem(items);
+            }}
+            onTrash={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              await handleMoveToTrash(items);
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onRestore={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              await handleRestoreItem(items);
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onDeleteForever={async (type) => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (!items.length) return;
+
+              await handleDelete(items, type);
+              if (showInputCircle) setShowInputCircle(false);
+            }}
+            onPreview={(item) => setViewItem(item)}
+          />
+        ) : (
+          <ContextMenu
+            open={open}
+            openLeft={openLeft}
+            setShowCreateMenu={setShowCreateMenu}
+            item={selectedItem}
+            items={combinedItems.filter((i) =>
+              selectedItems.has(i.id ?? i._id),
+            )}
+            position={contextPos}
+            route={route}
+            isStarred={isStarred}
+            dirId={dirId}
+            viewMode={viewMode}
+            setContextItem={setContextItem}
+            onClose={() => {
+              setOpen(false);
+              setContextItem(null);
+            }}
+            onDownload={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length) return;
+
+              for (const item of items) {
+                if (item.isDirectory) {
+                  await handleDownloadFolder(item);
+                } else {
+                  handleDownload(item);
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+
+              clearSelection();
+            }}
+            onCopy={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length) return;
+
+              await handleCopyItems(items);
+              clearSelection();
+            }}
+            onMove={() => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length) return;
+
+              setMoveItem(items);
+            }}
+            onStar={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (items.length) await handleToggleStar(items);
+            }}
+            onRename={() => {
+              selectedItems.forEach((id) => {
+                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+
+                if (item) openRename(item);
+              });
+            }}
+            onShare={() => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (!items.length && selectedItems.has(lastDirectory._id)) {
+                items.push(lastDirectory);
+              }
+
+              if (items.length) setShareItem(items);
+            }}
+            onTrash={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (items.length) await handleMoveToTrash(items);
+            }}
+            onRestore={async () => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (items.length) await handleRestoreItem(items);
+            }}
+            onDeleteForever={async (type) => {
+              const items = combinedItems.filter((item) =>
+                selectedItems.has(item.id ?? item._id),
+              );
+
+              if (items.length) await handleDelete(items, type);
+            }}
+            onPreview={(item) => setViewItem(item)}
+          />
+        ))}
+
+      {viewItem && device === "mobile" ? (
+        <FileViewerMobile
+          key={viewItem?._id}
+          item={viewItem}
           isStarred={isStarred}
-          handleSelect={handleSelect}
-          dirId={dirId}
-          viewMode={viewMode}
-          setContextItem={setContextItem}
-          onClose={() => {
-            setOpen(false);
-            setContextItem(null);
-          }}
-onDownload={async () => {
-  const items = combinedItems.filter((item) =>
-    selectedItems.has(item.id ?? item._id)
-  );
-
-  if (!items.length && selectedItems.has(lastDirectory._id)) {
-    items.push(lastDirectory);
-  }
-
-  if (!items.length) return;
-
-  for (const item of items) {
-    if (item.isDirectory) {
-      await handleDownloadFolder(item);
-    } else {
-      handleDownload(item);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  clearSelection();
-}}
-          onCopy={(item) => {
-            if (item) {
-              handleCopyItem(item);
-            }
-
-            clearSelection();
-          }}
+          onClose={() => setViewItem(null)}
+          isSharedRoute={isSharedRoute}
+          files={filteredFiles}
+          onNavigate={(item) => setViewItem(item)}
           onMove={(item) => {
             if (item) setMoveItem(item);
           }}
+          onDownload={async () => {
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
+
+            if (!items.length) return;
+
+            for (const item of items) {
+              if (item.isDirectory) {
+                await handleDownloadFolder(item);
+              } else {
+                handleDownload(item);
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+          }}
           onStar={async (item) => {
-            if (!item.length) return;
-            await handleToggleStar(item);
+            const items = combinedItems.filter((item) =>
+              selectedItems.has(item.id ?? item._id),
+            );
+
+            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
+              items.push(lastDirectory);
+            }
+
+            if (!items.length) return;
+            await handleToggleStar(items);
           }}
           onRename={(item) => {
             if (item) openRename(item);
@@ -2457,163 +2785,6 @@ onDownload={async () => {
             await handleDelete(items, type);
           }}
           onPreview={(item) => setViewItem(item)}
-        />
-      ) : (
-        contextItem && (
-          <ContextMenu
-            open={open}
-            openLeft={openLeft}
-            setShowCreateMenu={setShowCreateMenu}
-            item={selectedItem}
-            items={combinedItems.filter((i) =>
-              selectedItems.has(i.id ?? i._id),
-            )}
-            position={contextPos}
-            route={route}
-            isStarred={isStarred}
-            dirId={dirId}
-            viewMode={viewMode}
-            setContextItem={setContextItem}
-            onClose={() => {
-              setOpen(false);
-              setContextItem(null);
-         
-            }}
-           onDownload={async () => {
-  const items = combinedItems.filter((item) =>
-    selectedItems.has(item.id ?? item._id)
-  );
-
-  if (!items.length) return;
-
-  for (const item of items) {
-    if (item.isDirectory) {
-      await handleDownloadFolder(item);
-    } else {
-      handleDownload(item);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-
-  clearSelection();
-}}
-            onCopy={() => {
-              selectedItems.forEach((id) => {
-                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-                if (item) {
-                  handleCopyItem(item);
-                }
-              });
-              clearSelection();
-            }}
-            onMove={(itemId) => {
-              const item = combinedItems.find(
-                (i) => (i.id ?? i._id) === itemId,
-              );
-              if (item) setMoveItem(item);
-            }}
-            onStar={async () => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-              if (!items.length) return;
-              await handleToggleStar(items);
-            }}
-            onRename={() => {
-              selectedItems.forEach((id) => {
-                const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-                if (item) openRename(item);
-              });
-            }}
-            onShare={() => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-
-              if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
-                items.push(lastDirectory);
-              }
-
-              if (!items.length) return;
-              setShareItem(items);
-            }}
-            onTrash={async () => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-
-              if (!items.length) return;
-              await handleMoveToTrash(items);
-            }}
-            onRestore={async () => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-              if (!items.length) return;
-              await handleRestoreItem(items);
-            }}
-            onDeleteForever={async (type) => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-              if (!items.length) return;
-              await handleDelete(items, type);
-            }}
-            onPreview={(item) => setViewItem(item)}
-          />
-        )
-      )}
-
-      {viewItem && device === "mobile" ? (
-        <FileViewerMobile
-          key={viewItem?._id}
-          item={viewItem}
-          isStarred={isStarred}
-          onClose={() => setViewItem(null)}
-          isSharedRoute={isSharedRoute}
-          files={filteredFiles}
-          onNavigate={(item) => setViewItem(item)}
-          onStar={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleToggleStar(items);
-          }}
-          onShare={() => {
-            const id = [...selectedItems][0];
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) setShareItem(item);
-          }}
-          onRename={() => {
-            selectedItems.forEach((id) => {
-              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-              if (item) openRename(item);
-            });
-          }}
-          onTrash={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleMoveToTrash(items);
-          }}
-          onDeleteForever={async (type) => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleDelete(items, type);
-          }}
-          onRestore={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
-            await handleRestoreItem(items);
-          }}
-          onDownload={handleDownload}
         />
       ) : (
         <FileViewer

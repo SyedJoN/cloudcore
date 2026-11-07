@@ -132,7 +132,7 @@ export default function MobileListRow({
       lastTap.current = now;
     }
   };
-   useEffect(() => {
+  useEffect(() => {
     if (selectedItemsSize === 0) {
       setShowInputCircle(false);
     }
@@ -142,7 +142,10 @@ export default function MobileListRow({
       {showInputCircle && (
         <div className="gd-mobile-selected-header w-full h-16 flex items-center fixed top-0 left-0 bg-(--surface-container) z-400">
           <button
-           onClick={() => {setSelectedItems(new Set());setShowInputCircle(false)}}
+            onClick={() => {
+              setSelectedItems(new Set());
+              setShowInputCircle(false);
+            }}
             aria-label="Back"
             className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
           >
@@ -175,8 +178,8 @@ export default function MobileListRow({
       )}
 
       <div
-        className={`gd-mobile-list-row flex items-center gap-3 pr-1.5 active:bg-black/5 ${
-          selected ? "selected bg-black/5" : ""
+        className={`gd-mobile-list-row flex items-center gap-2 pr-1.5 active:bg-black/5 border-b border-(--divider) py-1.5 px-1 rounded-2xl ${
+          selected ? "selected bg-(--surface-container-dark-hover)" : ""
         }`}
         data-id={itemId}
         onClick={() => {
@@ -202,15 +205,15 @@ export default function MobileListRow({
         {/* icon */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center">
           {item.isDirectory ? (
-            <IconFolder size={28} />
+            <IconFolder size={36} />
           ) : (
-            <FileBadge size={28} type={iconType} />
+            <FileBadge size={36} type={iconType} />
           )}
         </div>
 
         {/* name + subtitle */}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium text-(--text-primary)">
+          <div className="truncate text-[14px] font-medium text-(--text-primary)">
             {item.name}
           </div>
           <div className="flex items-center gap-1 text-[12px] text-(--text-secondary)">
@@ -238,14 +241,10 @@ export default function MobileListRow({
           {showInputCircle ? (
             <div
               className={`h-5 w-5 rounded-full border-2 flex items-center justify-center
-    ${
-      selected
-        ? "border-blue-600 bg-blue-600"
-        : "border-gray-400 bg-transparent"
-    }`}
+    ${selected ? "bg-white" : "bg-transparent border-white"}`}
             >
               {selected && (
-                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-white">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black">
                   <path
                     d="m5 12 4 4L19 6"
                     fill="none"
@@ -262,8 +261,6 @@ export default function MobileListRow({
           )}
         </button>
       </div>
-
-      <Divider fullWidth={true} />
     </>
   );
 }

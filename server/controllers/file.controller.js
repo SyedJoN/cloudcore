@@ -1075,71 +1075,127 @@ export const softDeleteFile = async (req, res, next) => {
   }
 };
 export const deleteFile = async (req, res, next) => {
-  const userId = req.user._id;
-  const { id } = req.params;
-  const { type } = req.query;
+  try {
+    const user = req.user;
+    const userId = user._id;
+    const ids = req.body?.ids ?? [req.params.id];
+    const { type } = req.query;
 
-  if (!id) {
-    return res.status(400).json({
-      message: "fileId is required",
-    });
-  }
-  if (type === "google") {
-    try {
+    if (!ids.length) {
+      return res.status(400).json({
+        message: "fileIds are required",
+      });
+    }
+
+    // Google Drive deletion
+    if (type === "google") {
       const { drive_access_token } = req.signedCookies;
+
       if (!drive_access_token) {
         return res.status(401).json({
           message: "Unauthorized",
         });
       }
+
       const drive = getDriveClient(drive_access_token);
 
-      await drive.files.delete({
-        fileId: id,
-      });
+      await Promise.all(
+        ids.map((id) =>
+          drive.files.delete({
+            fileId: id,
+          }),
+        ),
+      );
 
       return res.status(200).json({
-        message: "File deleted successfully",
+        message: "Files deleted successfully",
+        deletedIds: ids.map(String),
       });
-    } catch (error) {
-      console.error("File delete error:", error);
-      next(error);
     }
-  } else {
-    try {
-      const fileToDelete = await File.findOne({
-        _id: id,
-      }).select("name extension size");
-      if (!fileToDelete) {
-        return res.status(404).json({ message: "File not found!" });
-      }
-      const object = getFgaObject("file", id);
-      const user = getFgaObject("user", userId);
 
-      const canDelete = await fgaClient.check({
-        user,
-        relation: "can_delete",
-        object,
+    // Fetch files
+    const files = await File.find({
+      _id: { $in: ids },
+    })
+      .select("_id parentDirId name extension size")
+      .lean();
+
+    if (!files.length) {
+      return res.status(404).json({
+        message: "File not found!",
       });
-      if (req.user.role !== "superuser" && !canDelete.allowed) {
-        return res.status(403).json({ message: "Unauthorized!" });
-      }
+    }
 
+    // Check permissions
+    const checks = await Promise.all(
+      files.map((file) =>
+        fgaClient.check({
+          user: getFgaObject("user", userId),
+          relation: "can_delete",
+          object: getFgaObject("file", file._id),
+        }),
+      ),
+    );
+
+    const allowed = files.filter(
+      (_, i) => user.role === "superuser" || checks[i].allowed,
+    );
+
+    if (!allowed.length) {
+      return res.status(403).json({
+        message: "Unauthorized!",
+      });
+    }
+
+    const fileIds = allowed.map((file) => file._id);
+
+    // Delete files from S3
+    const s3Keys = allowed.map(
+      (file) => `${file._id}${file.extension}`,
+    );
+
+    await Promise.all(s3Keys.map((key) => deleteFileFromS3(key)));
+
+    // Delete MongoDB metadata
+    await File.deleteMany({
+      _id: { $in: fileIds },
+    });
+
+    // Prepare OpenFGA relationship deletions
+    const deletes = allowed.flatMap((file) => {
+      const object = getFgaObject("file", file._id);
+
+      return [
+        {
+          user: getFgaObject("user", userId),
+          relation: "owner",
+          object,
+        },
+        {
+          user: getFgaObject("user", userId),
+          relation: "writer",
+          object,
+        },
+        {
+          user: getFgaObject("user", userId),
+          relation: "reader",
+          object,
+        },
+        {
+          user: getFgaObject("folder", file.parentDirId),
+          relation: "parent",
+          object,
+        },
+      ];
+    });
+
+    // OpenFGA maximum batch size: 100
+    const batchSize = 100;
+
+    for (let i = 0; i < deletes.length; i += batchSize) {
       await fgaClient.write(
         {
-          deletes: [
-            { user, role: "owner", object },
-            {
-              user,
-              relation: "writer",
-              object,
-            },
-            {
-              user,
-              relation: "reader",
-              object,
-            },
-          ],
+          deletes: deletes.slice(i, i + batchSize),
         },
         {
           conflict: {
@@ -1147,15 +1203,33 @@ export const deleteFile = async (req, res, next) => {
           },
         },
       );
-      const s3Key = `${fileToDelete._id}${fileToDelete.extension}`;
-      await deleteFileFromS3(s3Key);
-      await fileToDelete.deleteOne();
-      await updateParentDirSize(fileToDelete.parentDirId, fileToDelete.size);
-      return res.status(200).json({ message: "File Deleted Successfully" });
-    } catch (error) {
-      console.log(error);
-      next(error);
     }
+
+    // Update parent directory sizes
+    const sizeByParent = {};
+
+    allowed.forEach((file) => {
+      const key = String(file.parentDirId);
+
+      sizeByParent[key] = (sizeByParent[key] ?? 0) + file.size;
+    });
+
+    await Promise.all(
+      Object.entries(sizeByParent).map(([dirId, size]) =>
+        updateParentDirSize(dirId, -size),
+      ),
+    );
+
+    return res.status(200).json({
+      message: "Files deleted successfully",
+      deletedIds: allowed.map((file) => String(file._id)),
+      deleted: {
+        files: allowed.length,
+      },
+    });
+  } catch (error) {
+    console.error("File delete error:", error);
+    next(error);
   }
 };
 export const restoreFile = async (req, res, next) => {

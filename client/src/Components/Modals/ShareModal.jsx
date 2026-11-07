@@ -137,6 +137,8 @@ export default function ShareModal({
   const [inviteInput, setInviteInput] = useState("");
   const [activePerson, setActivePerson] = useState(null);
   const [showAccessDropdown, setShowAccessDropdown] = useState(false);
+  // multi mode: which per-item dropdown is open -> `${itemId}:access` | `${itemId}:role`
+  const [itemAccessDropdown, setItemAccessDropdown] = useState(null);
 
   const [isConfirmation, setIsConfirmation] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
@@ -147,6 +149,7 @@ export default function ShareModal({
   const suggestionsRef = useRef(null);
   const inviteSuggestionsRef = useRef(null);
   const accessDropdownRef = useRef(null);
+  const multiAccessRef = useRef(null);
   const prevRoleRef = useRef(null);
   const shareModalOverlayRef = useRef(null);
   const [notifyPeople, setNotifyPeople] = useState(true);
@@ -239,6 +242,7 @@ export default function ShareModal({
   useClickOutside(suggestionsRef, () => setShowSuggestions(false));
   useClickOutside(inviteSuggestionsRef, () => setShowInviteSuggestions(false));
   useClickOutside(accessDropdownRef, () => setShowAccessDropdown(false));
+  useClickOutside(multiAccessRef, () => setItemAccessDropdown(null));
 
   const suggestions = emailInput.trim()
     ? allUsers.filter(
@@ -712,9 +716,14 @@ export default function ShareModal({
     setTimeout(() => setCopyFeedback(false), 2000);
   }
 
-  // Apply a link access / role change to every selected item
+  // Single-item mode: apply a link access / role change
   function applyLinkChange(role, access) {
     shareItems.forEach((it) => onClose(it, role, access));
+  }
+
+  // Multi mode: apply a link access / role change to ONE item only
+  function applyLinkChangeToItem(it, role, access) {
+    onClose(it, role, access);
   }
 
   if (!item) return null;
@@ -1416,184 +1425,300 @@ export default function ShareModal({
                     </div>
                   )}
 
-                  {/* Link sharing */}
-                  <div className="gd-share-section-label">General access</div>
-
-                  <div className="gd-share-link-section">
-                    <div className={`gd-share-link-row`}>
-                      <div
-                        className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
-                      >
-                        {linkAccess === "anyone" ? (
-                          <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
-                        ) : (
-                          <LockClosedIcon className="text-black w-5 h-5" />
-                        )}
+                  {/* Link sharing (single item: one shared control) */}
+                  {!isMulti && (
+                    <>
+                      <div className="gd-share-section-label">
+                        General access
                       </div>
-                      <div className="gd-share-link-info">
-                        <div
-                          className="gd-share-link-title"
-                          ref={accessDropdownRef}
-                          style={{ position: "relative" }}
-                        >
-                          <button
-                            className="gd-share-access-btn"
-                            onClick={() =>
-                              setShowAccessDropdown(!showAccessDropdown)
-                            }
-                          >
-                            <span>
-                              {" "}
-                              {linkAccess === "anyone"
-                                ? "Anyone with the link"
-                                : "Restricted"}
-                            </span>
-                            <IconChevronDown size={14} />
-                          </button>
 
-                          {showAccessDropdown && (
-                            <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
-                              {["restricted", "anyone"].map((opt) => (
-                                <button
-                                  key={opt}
-                                  className="gd-share-access-option"
-                                  onClick={() => {
-                                    setLinkAccess(opt);
-                                    applyLinkChange(linkRole, opt);
-                                    setShowAccessDropdown(false);
-                                  }}
-                                >
-                                  <span className="gd-share-access-check">
-                                    {linkAccess === opt && (
-                                      <IconCheck size={16} />
-                                    )}
-                                  </span>
-                                  {opt === "anyone"
+                      <div className="gd-share-link-section">
+                        <div className={`gd-share-link-row`}>
+                          <div
+                            className={`gd-share-link-icon ${linkAccess === "anyone" ? "active" : ""}`}
+                          >
+                            {linkAccess === "anyone" ? (
+                              <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
+                            ) : (
+                              <LockClosedIcon className="text-black w-5 h-5" />
+                            )}
+                          </div>
+                          <div className="gd-share-link-info">
+                            <div
+                              className="gd-share-link-title"
+                              ref={accessDropdownRef}
+                              style={{ position: "relative" }}
+                            >
+                              <button
+                                className="gd-share-access-btn"
+                                onClick={() =>
+                                  setShowAccessDropdown(!showAccessDropdown)
+                                }
+                              >
+                                <span>
+                                  {" "}
+                                  {linkAccess === "anyone"
                                     ? "Anyone with the link"
                                     : "Restricted"}
-                                </button>
-                              ))}
+                                </span>
+                                <IconChevronDown size={14} />
+                              </button>
+
+                              {showAccessDropdown && (
+                                <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
+                                  {["restricted", "anyone"].map((opt) => (
+                                    <button
+                                      key={opt}
+                                      className="gd-share-access-option"
+                                      onClick={() => {
+                                        setLinkAccess(opt);
+                                        applyLinkChange(linkRole, opt);
+                                        setShowAccessDropdown(false);
+                                      }}
+                                    >
+                                      <span className="gd-share-access-check">
+                                        {linkAccess === opt && (
+                                          <IconCheck size={16} />
+                                        )}
+                                      </span>
+                                      {opt === "anyone"
+                                        ? "Anyone with the link"
+                                        : "Restricted"}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
 
-                        <div className="gd-share-link-sub">
-                          {linkAccess === "anyone"
-                            ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
-                            : "Only people with access can open with this link"}
-                        </div>
-                      </div>
-
-                      <div className="gd-share-link-actions">
-                        {linkAccess === "anyone" && (
-                          <div className="gd-share-link-role-wrap">
-                            <button
-                              ref={linkRoleRef}
-                              className="gd-share-role-btn"
-                              onClick={() =>
-                                setOpenDropdown(
-                                  openDropdown === "link" ? null : "link",
-                                )
-                              }
-                            >
-                              {ROLE_LABEL[linkRole]}{" "}
-                              {<IconChevronDown size={14} />}
-                            </button>
-
-                            <RoleDropdown
-                              open={openDropdown === "link"}
-                              anchorRef={linkRoleRef}
-                              containerRef={shareModalOverlayRef}
-                              current={ROLE_LABEL[linkRole]}
-                              onChange={(r) => {
-                                setLinkRole(r);
-                                setOpenDropdown(null);
-                                applyLinkChange(r, linkAccess);
-                              }}
-                              onClose={() => setOpenDropdown(null)}
-                            />
+                            <div className="gd-share-link-sub">
+                              {linkAccess === "anyone"
+                                ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
+                                : "Only people with access can open with this link"}
+                            </div>
                           </div>
-                        )}
+
+                          <div className="gd-share-link-actions">
+                            {linkAccess === "anyone" && (
+                              <div className="gd-share-link-role-wrap">
+                                <button
+                                  ref={linkRoleRef}
+                                  className="gd-share-role-btn"
+                                  onClick={() =>
+                                    setOpenDropdown(
+                                      openDropdown === "link" ? null : "link",
+                                    )
+                                  }
+                                >
+                                  {ROLE_LABEL[linkRole]}{" "}
+                                  {<IconChevronDown size={14} />}
+                                </button>
+
+                                <RoleDropdown
+                                  open={openDropdown === "link"}
+                                  anchorRef={linkRoleRef}
+                                  containerRef={shareModalOverlayRef}
+                                  current={ROLE_LABEL[linkRole]}
+                                  onChange={(r) => {
+                                    setLinkRole(r);
+                                    setOpenDropdown(null);
+                                    applyLinkChange(r, linkAccess);
+                                  }}
+                                  onClose={() => setOpenDropdown(null)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
 
-                  {/* Per-item link status (multi only) */}
+                  {/* Per-item General access (multi only) — each item is independent */}
                   {isMulti && (
-                    <div
-                      style={{
-                        margin: "12px 24px 0",
-                        maxHeight: 176,
-                        overflowY: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 16,
-                      }}
-                    >
-                      {shareItems.map((it) => {
-                        const publicPermission = getAnyonePermission(it);
-                        const pub = Boolean(publicPermission);
+                    <>
+                      <div className="gd-share-section-label">
+                        General access
+                      </div>
+                      <div
+                        ref={multiAccessRef}
+                        style={{
+                          margin: "0 24px",
+                          maxHeight: 260,
+                          overflowY: "auto",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 16,
+                          paddingBottom: 56,
+                        }}
+                      >
+                        {shareItems.map((it) => {
+                          const id = getItemId(it);
+                          const publicPermission = getAnyonePermission(it);
+                          const pub = Boolean(publicPermission);
+                          const role = publicPermission?.role || "reader";
+                          const canShareThis =
+                            it?.capabilities?.canShare === true;
+                          const accessKey = `${id}:access`;
+                          const roleKey = `${id}:role`;
 
-                        return (
-                          <div key={getItemId(it)}>
-                            <div
-                              style={{
-                                display: "inline-flex",
-                                maxWidth: "100%",
-                                alignItems: "center",
-                                border: "1px solid var(--border-color, #dadce0)",
-                                borderRadius: 8,
-                                padding: "4px 12px",
-                                fontSize: 14,
-                              }}
-                            >
-                              <span
+                          return (
+                            <div key={id}>
+                              <div
                                 style={{
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
+                                  display: "inline-flex",
+                                  maxWidth: "100%",
+                                  alignItems: "center",
+                                  border:
+                                    "1px solid var(--border-color, #dadce0)",
+                                  borderRadius: 8,
+                                  padding: "4px 12px",
+                                  fontSize: 14,
                                 }}
                               >
-                                {it.name}
-                              </span>
-                            </div>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 12,
-                                marginTop: 8,
-                              }}
-                            >
-                              <div
-                                className={`gd-share-link-icon ${pub ? "active" : ""}`}
-                              >
-                                {pub ? (
-                                  <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
-                                ) : (
-                                  <LockClosedIcon className="text-black w-5 h-5" />
-                                )}
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 14, fontWeight: 500 }}>
-                                  {pub ? "Anyone with the link" : "Restricted"}
-                                </div>
-                                <div
+                                <span
                                   style={{
-                                    fontSize: 12,
-                                    color: "var(--text-tertiary)",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
                                   }}
                                 >
-                                  {pub
-                                    ? `Anyone on the internet with the link ${ROLE_DESC[publicPermission.role] ?? ""}`
-                                    : "Only people with access can open with this link"}
+                                  {it.name}
+                                </span>
+                              </div>
+
+                              <div
+                                className="gd-share-link-row"
+                                style={{ marginTop: 8, position: "relative" }}
+                              >
+                                <div
+                                  className={`gd-share-link-icon ${pub ? "active" : ""}`}
+                                >
+                                  {pub ? (
+                                    <GlobeAmericasIcon className="text-green-900 w-5 h-5" />
+                                  ) : (
+                                    <LockClosedIcon className="text-black w-5 h-5" />
+                                  )}
                                 </div>
+
+                                <div className="gd-share-link-info">
+                                  <div style={{ position: "relative" }}>
+                                    <button
+                                      type="button"
+                                      className="gd-share-access-btn"
+                                      disabled={!canShareThis}
+                                      onClick={() =>
+                                        setItemAccessDropdown(
+                                          itemAccessDropdown === accessKey
+                                            ? null
+                                            : accessKey,
+                                        )
+                                      }
+                                    >
+                                      <span>
+                                        {pub
+                                          ? "Anyone with the link"
+                                          : "Restricted"}
+                                      </span>
+                                      <IconChevronDown size={14} />
+                                    </button>
+
+                                    {itemAccessDropdown === accessKey && (
+                                      <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
+                                        {["restricted", "anyone"].map((opt) => (
+                                          <button
+                                            key={opt}
+                                            type="button"
+                                            className="gd-share-access-option"
+                                            onClick={() => {
+                                              setItemAccessDropdown(null);
+                                              if ((opt === "anyone") === pub)
+                                                return;
+                                              applyLinkChangeToItem(
+                                                it,
+                                                role,
+                                                opt,
+                                              );
+                                            }}
+                                          >
+                                            <span className="gd-share-access-check">
+                                              {(opt === "anyone") === pub && (
+                                                <IconCheck size={16} />
+                                              )}
+                                            </span>
+                                            {opt === "anyone"
+                                              ? "Anyone with the link"
+                                              : "Restricted"}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="gd-share-link-sub">
+                                    {pub
+                                      ? `Anyone on the internet with the link ${ROLE_DESC[role] ?? ""}`
+                                      : "Only people with access can open with this link"}
+                                  </div>
+                                </div>
+
+                                {pub && (
+                                  <div className="gd-share-link-actions">
+                                    <div
+                                      className="gd-share-link-role-wrap"
+                                      style={{ position: "relative" }}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="gd-share-role-btn"
+                                        disabled={!canShareThis}
+                                        onClick={() =>
+                                          setItemAccessDropdown(
+                                            itemAccessDropdown === roleKey
+                                              ? null
+                                              : roleKey,
+                                          )
+                                        }
+                                      >
+                                        {ROLE_LABEL[role]}{" "}
+                                        <IconChevronDown size={14} />
+                                      </button>
+
+                                      {itemAccessDropdown === roleKey && (
+                                        <div className="gd-share-access-dropdown origin-top-right animate-[sortDropdown_80ms_ease-out]">
+                                          {["reader", "writer"].map((r) => (
+                                            <button
+                                              key={r}
+                                              type="button"
+                                              className="gd-share-access-option"
+                                              onClick={() => {
+                                                setItemAccessDropdown(null);
+                                                if (r === role) return;
+                                                applyLinkChangeToItem(
+                                                  it,
+                                                  r,
+                                                  "anyone",
+                                                );
+                                              }}
+                                            >
+                                              <span className="gd-share-access-check">
+                                                {r === role && (
+                                                  <IconCheck size={16} />
+                                                )}
+                                              </span>
+                                              {ROLE_LABEL[r]}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
 
                   {/* Footer */}

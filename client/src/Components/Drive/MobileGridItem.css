@@ -1,0 +1,207 @@
+/* ---------- Grid wrapper: exactly 2 columns, edge to edge ---------- */
+.mgi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  row-gap: 24px;
+  column-gap: 16px;
+  padding: 4px 0 16px !important;
+  margin: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-items: start;
+}
+.mgi-grid > * {
+  min-width: 0;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.mgi-section-label {
+  padding: 12px 4px 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #9aa0a6);
+}
+
+/* ---------- Card (folders AND files, same size) ---------- */
+.mgi-card {
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 1 / 1.1;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  color: var(--text-primary, #e3e3e3);
+  background: var(--surface-container);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 150ms, transform 120ms;
+}
+.mgi-card {
+  aspect-ratio: 1 / 1
+}
+.mgi-card:active {
+  background: var(--surface-container-dark-hover, #2a2b2d);
+  transform: scale(0.98);
+}
+.mgi-card.selected {
+    background: var(--surface-container-dark-hover, #2a2b2d);
+
+}
+
+/* Header */
+.mgi-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 2px 0 10px;
+  flex-shrink: 0;
+}
+.mgi-head-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.mgi-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Menu / checkbox button (smaller so names get more room) */
+.mgi-trailing {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary, #e3e3e3);
+  cursor: pointer;
+}
+.mgi-trailing:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+.mgi-check {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #000000;
+  border-radius: 50%;
+  color: none;
+  transition: background 150ms, border-color 150ms;
+}
+.mgi-check.on {
+  color: black;
+  background: transparent;
+}
+
+/* Preview area fills all remaining space */
+.mgi-preview {
+  flex: 1;
+  min-height: 0;
+  margin: 0 8px 8px;
+  border-radius: 10px;
+  background: transparent;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.mgi-preview > img,
+.mgi-preview > div,
+.mgi-preview > video {
+  width: 100%;
+  height: 100%;
+}
+.mgi-preview img,
+.mgi-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Activity row */
+.mgi-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.mgi-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.mgi-avatar-letter {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+}
+.mgi-activity-text {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9aa0a6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Selection top bar */
+.mgi-selection-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  background: var(--surface-container, #1e1f20);
+  animation: mgi-fade 150ms ease both;
+}
+.mgi-bar-count {
+  flex: 1;
+  margin: 0 0 0 4px;
+  font-size: 18px;
+  color: var(--text-primary, #e3e3e3);
+}
+.mgi-bar-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary, #e3e3e3);
+}
+.mgi-bar-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+@keyframes mgi-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

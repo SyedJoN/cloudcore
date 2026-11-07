@@ -1174,119 +1174,167 @@ export const softDeleteDirectory = async (req, res, next) => {
 };
 export const deleteDirectory = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const userId = req.user._id;
+    const user = req.user;
+    const userId = user._id;
 
-    const currentDirectory = await Directory.findOne({ _id: id, userId })
-      .select("parentDirId")
+    // Support both single and bulk deletion
+    const ids = req.body?.ids ?? (req.params.id ? [req.params.id] : []);
+
+    if (!ids.length) {
+      return res.status(400).json({
+        message: "Directory IDs are required",
+      });
+    }
+
+    // Find all requested root directories
+    const dirs = await Directory.find({
+      _id: { $in: ids },
+      userId,
+    })
+      .select("_id parentDirId")
       .lean();
 
-    if (!currentDirectory) {
-      return res.status(404).json({ message: "Directory not found" });
+    if (!dirs.length) {
+      return res.status(404).json({
+        message: "Directory not found",
+      });
     }
-    const canDelete = await fgaClient.check({
-      user: getFgaObject("user", userId),
-      relation: "can_delete",
-      object: getFgaObject("folder", id),
-    });
 
-    if (req.user.role !== "superuser" && !canDelete.allowed) {
-      return res.status(403).json({ message: "Unauthorized!" });
+    // Check permissions for all requested directories
+    const checks = await Promise.all(
+      dirs.map((dir) =>
+        fgaClient.check({
+          user: getFgaObject("user", userId),
+          relation: "can_delete",
+          object: getFgaObject("folder", dir._id),
+        }),
+      ),
+    );
+
+    const allowed = dirs.filter(
+      (_, i) => user.role === "superuser" || checks[i].allowed,
+    );
+
+    if (!allowed.length) {
+      return res.status(403).json({
+        message: "Unauthorized!",
+      });
     }
-    const queue = [currentDirectory._id];
-    const directories = [];
-    const files = [];
 
-    // BFS traversal
-    while (queue.length) {
-      const currentId = queue.shift();
+    // Collect all nested directories and files
+    let frontier = allowed.map((dir) => dir._id);
 
+    const allDirIds = [...frontier];
+
+    const allDirDetails = [...allowed];
+
+    const allFiles = [];
+
+    while (frontier.length) {
       const [childDirs, childFiles] = await Promise.all([
-        Directory.find({ parentDirId: currentId, userId })
+        Directory.find({
+          parentDirId: { $in: frontier },
+          userId,
+        })
           .select("_id parentDirId")
           .lean(),
-        File.find({ parentDirId: currentId, userId })
-          .select("_id extension parentDirId")
+
+        File.find({
+          parentDirId: { $in: frontier },
+          userId,
+        })
+          .select("_id parentDirId extension")
           .lean(),
       ]);
 
-      directories.push(...childDirs);
-      files.push(...childFiles);
+      frontier = childDirs.map((dir) => dir._id);
 
-      queue.push(...childDirs.map((d) => d._id));
+      allDirIds.push(...frontier);
+      allDirDetails.push(...childDirs);
+      allFiles.push(...childFiles);
     }
 
-    // Delete files from S3 Bucket
-    await deleteFileArray(files);
+    // Delete files from S3
+    if (allFiles.length) {
+      await deleteFileArray(allFiles);
+    }
 
-    const allDirIds = [
-      { _id: currentDirectory._id, parentDirId: currentDirectory.parentDirId },
-      ...directories,
-    ];
-    const dirIds = allDirIds.map((d) => d._id);
-    const fileIds = files.map((f) => f._id);
+    const fileIds = allFiles.map((file) => file._id);
 
-    // Delete file metadata
+    // Delete MongoDB metadata
     await Promise.all([
       fileIds.length
         ? File.deleteMany({ _id: { $in: fileIds } })
         : Promise.resolve(),
-      Directory.deleteMany({ _id: { $in: dirIds } }),
+
+      Directory.deleteMany({ _id: { $in: allDirIds } }),
     ]);
 
+    // Prepare OpenFGA relationship deletions
     const deletes = [
-      ...files.flatMap((f) => [
-        {
-          user: getFgaObject("user", userId),
-          relation: "owner",
-          object: getFgaObject("file", f._id),
-        },
-        {
-          user: getFgaObject("user", userId),
-          relation: "writer",
-          object: getFgaObject("file", f._id),
-        },
-        {
-          user: getFgaObject("user", userId),
-          relation: "reader",
-          object: getFgaObject("file", f._id),
-        },
-        {
-          user: getFgaObject("folder", f.parentDirId),
-          relation: "parent",
-          object: getFgaObject("file", f._id),
-        },
-      ]),
+      ...allFiles.flatMap((file) => {
+        const object = getFgaObject("file", file._id);
 
-      ...allDirIds.flatMap((dir) => [
-        {
-          user: getFgaObject("user", userId),
-          relation: "owner",
-          object: getFgaObject("folder", dir._id),
-        },
-        {
-          user: getFgaObject("user", userId),
-          relation: "writer",
-          object: getFgaObject("folder", dir._id),
-        },
-        {
-          user: getFgaObject("user", userId),
-          relation: "reader",
-          object: getFgaObject("folder", dir._id),
-        },
-        {
-          user: getFgaObject("folder", dir.parentDirId),
-          relation: "parent",
-          object: getFgaObject("folder", dir._id),
-        },
-      ]),
+        return [
+          {
+            user: getFgaObject("user", userId),
+            relation: "owner",
+            object,
+          },
+          {
+            user: getFgaObject("user", userId),
+            relation: "writer",
+            object,
+          },
+          {
+            user: getFgaObject("user", userId),
+            relation: "reader",
+            object,
+          },
+          {
+            user: getFgaObject("folder", file.parentDirId),
+            relation: "parent",
+            object,
+          },
+        ];
+      }),
+
+      ...allDirDetails.flatMap((dir) => {
+        const object = getFgaObject("folder", dir._id);
+
+        return [
+          {
+            user: getFgaObject("user", userId),
+            relation: "owner",
+            object,
+          },
+          {
+            user: getFgaObject("user", userId),
+            relation: "writer",
+            object,
+          },
+          {
+            user: getFgaObject("user", userId),
+            relation: "reader",
+            object,
+          },
+          {
+            user: getFgaObject("folder", dir.parentDirId),
+            relation: "parent",
+            object,
+          },
+        ];
+      }),
     ];
 
-    // FGA recommends max 100 per write
+    // Delete OpenFGA relationships in batches of 100
     const batchSize = 100;
+
     for (let i = 0; i < deletes.length; i += batchSize) {
       await fgaClient.write(
-        { deletes: deletes.slice(i, i + batchSize) },
+        {
+          deletes: deletes.slice(i, i + batchSize),
+        },
         {
           conflict: {
             onMissingDeletes: ClientWriteRequestOnMissingDeletes.Ignore,
@@ -1297,12 +1345,14 @@ export const deleteDirectory = async (req, res, next) => {
 
     return res.status(200).json({
       message: "Directory deleted successfully",
+      deletedIds: allowed.map((dir) => String(dir._id)),
       deleted: {
         directories: allDirIds.length,
         files: fileIds.length,
       },
     });
   } catch (error) {
+    console.error("Directory delete error:", error);
     next(error);
   }
 };
@@ -2671,18 +2721,20 @@ export const completeFolderUpload = async (req, res, next) => {
   }
 };
 
-export const copyItem = async (req, res, next) => {
+
+export const copyItems = async (req, res, next) => {
   try {
-    const { item, type, providerType } = req.body;
     const userId = req.user?._id;
-    const itemId = item.id || item._id;
+    const providerType = req.body?.providerType;
+
+    // Support both single and multiple items
+    const items = req.body?.items ?? (req.body?.item ? [req.body.item] : []);
 
     const allowedProviderTypes = ["local", "google"];
-    const allowedTypes = ["file", "folder"];
 
-    if (!itemId || !type) {
+    if (!items.length) {
       return res.status(400).json({
-        message: "Item id and type are required",
+        message: "At least one item is required",
       });
     }
 
@@ -2692,13 +2744,34 @@ export const copyItem = async (req, res, next) => {
       });
     }
 
-    if (!allowedTypes.includes(type)) {
-      return res.status(400).json({
-        message: "Invalid item type",
-      });
+    // Resolve item types
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      itemId: item?._id || item?.id,
+      type: item?.isDirectory
+        ? "folder"
+        : item?.type || req.body?.type || "file",
+    }));
+
+    for (const item of normalizedItems) {
+      if (!item.itemId) {
+        return res.status(400).json({
+          message: "Item id is required",
+        });
+      }
+
+      if (!["file", "folder"].includes(item.type)) {
+        return res.status(400).json({
+          message: "Invalid item type",
+        });
+      }
     }
 
-    // GOOGLE
+    const copiedItems = [];
+
+    // =========================================
+    // GOOGLE DRIVE
+    // =========================================
     if (providerType === "google") {
       const { drive_access_token } = req.signedCookies;
 
@@ -2710,253 +2783,310 @@ export const copyItem = async (req, res, next) => {
 
       const drive = getDriveClient(drive_access_token);
 
-      if (type === "file") {
-        const copiedFile = await drive.files.copy({
-          fileId: itemId,
+      async function copyGoogleFolder(
+        sourceFolderId,
+        destinationParentId,
+        newName,
+      ) {
+        const folder = await drive.files.create({
           requestBody: {
-            name: `Copy of ${item.name}`,
+            name: newName,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [destinationParentId],
           },
           fields:
-            "id,name,mimeType,webViewLink,owners,createdTime, modifiedTime,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+            "id,name,mimeType,parents,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
         });
 
+        const newFolderId = folder.data.id;
+
+        const response = await drive.files.list({
+          q: `'${sourceFolderId}' in parents and trashed = false`,
+          fields: "files(id,name,mimeType)",
+        });
+
+        for (const file of response.data.files || []) {
+          if (file.mimeType === "application/vnd.google-apps.folder") {
+            await copyGoogleFolder(
+              drive,
+              file.id,
+              newFolderId,
+              file.name,
+            );
+          } else {
+            await drive.files.copy({
+              fileId: file.id,
+              requestBody: {
+                name: file.name,
+                parents: [newFolderId],
+              },
+            });
+          }
+        }
+
         const permissions = await drive.permissions.list({
-          fileId: copiedFile.data.id,
+          fileId: newFolderId,
           fields:
             "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
         });
 
-        const copiedItem = {
-          ...copiedFile.data,
-          owners: copiedFile.data.owners || [],
-          capabilities: copiedFile.data.capabilities || {},
+        return {
+          ...folder.data,
+          owners: folder.data.owners || [],
+          capabilities: folder.data.capabilities || {},
           permissions: permissions.data.permissions || [],
         };
+      }
 
-        return res.status(200).json({
-          message: "File copied successfully",
-          data: {
-            copiedItem,
-            owners: copiedItem.owners,
-            capabilities: copiedItem.capabilities,
-            permissions: copiedItem.permissions,
-          },
-        });
-      } else {
-        const newName = "Copy of " + item.name;
-
-        async function copyFolder(
-          drive,
-          sourceFolderId,
-          destinationParentId,
-          newName,
-        ) {
-          const folder = await drive.files.create({
+      for (const item of normalizedItems) {
+        if (item.type === "file") {
+          const copiedFile = await drive.files.copy({
+            fileId: item.itemId,
             requestBody: {
-              name: newName,
-              mimeType: "application/vnd.google-apps.folder",
-              parents: [destinationParentId],
+              name: `Copy of ${item.name}`,
             },
             fields:
-              "id,name,mimeType,parents,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+              "id,name,mimeType,webViewLink,owners,createdTime,modifiedTime,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
           });
-
-          const newFolderId = folder.data.id;
-
-          const response = await drive.files.list({
-            q: `'${sourceFolderId}' in parents and trashed = false`,
-            fields: "files(id,name,mimeType)",
-          });
-
-          for (const file of response.data.files || []) {
-            if (file.mimeType === "application/vnd.google-apps.folder") {
-              await copyFolder(drive, file.id, newFolderId, file.name);
-            } else {
-              await drive.files.copy({
-                fileId: file.id,
-                requestBody: {
-                  name: file.name,
-                  parents: [newFolderId],
-                },
-              });
-            }
-          }
 
           const permissions = await drive.permissions.list({
-            fileId: newFolderId,
+            fileId: copiedFile.data.id,
             fields:
               "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
           });
 
-          return {
-            ...folder.data,
-            owners: folder.data.owners || [],
-            capabilities: folder.data.capabilities || {},
-            permissions: permissions.data.permissions || [],
-          };
-        }
+          copiedItems.push({
+            copiedItem: {
+              ...copiedFile.data,
+              owners: copiedFile.data.owners || [],
+              capabilities: copiedFile.data.capabilities || {},
+              permissions: permissions.data.permissions || [],
+            },
+          });
 
-        const sourceFolder = await drive.files.get({
-          fileId: itemId,
-          fields: "id,name,mimeType,parents",
-        });
+        } else {
+          const sourceFolder = await drive.files.get({
+            fileId: item.itemId,
+            fields: "id,name,mimeType,parents",
+          });
 
-        const destinationParentId = sourceFolder.data.parents?.[0];
+          const destinationParentId = sourceFolder.data.parents?.[0];
 
-        if (!destinationParentId) {
-          return res.status(400).json({
-            message: "Could not determine destination parent folder",
+          if (!destinationParentId) {
+            return res.status(400).json({
+              message: `Could not determine destination parent for ${item.name}`,
+            });
+          }
+
+          const copiedFolder = await copyGoogleFolder(
+            item.itemId,
+            destinationParentId,
+            `Copy of ${item.name}`,
+          );
+
+          copiedItems.push({
+            copiedItem: copiedFolder,
           });
         }
-
-        const copiedFolderResult = await copyFolder(
-          drive,
-          itemId,
-          destinationParentId,
-          newName,
-        );
-
-        return res.status(200).json({
-          message: "Folder copied successfully",
-          data: {
-            copiedItem: copiedFolderResult,
-            owners: copiedFolderResult.owners,
-            capabilities: copiedFolderResult.capabilities,
-            permissions: copiedFolderResult.permissions,
-          },
-        });
       }
-    }
 
-    // LOCAL
-    const canCopy = await fgaClient.check({
-      user: getFgaObject("user", userId),
-      relation: "can_copy",
-      object: getFgaObject(type, item._id),
-    });
-
-    if (!canCopy.allowed) {
-      return res.status(403).json({ message: "Unauthorized!" });
-    }
-    const Model = type === "folder" ? Directory : File;
-
-    const dbItem = await Model.findById(itemId).lean();
-
-    if (!dbItem) {
-      return res.status(404).json({
-        message: "Item not found",
+      return res.status(200).json({
+        message: `${copiedItems.length} item(s) copied successfully`,
+        data: {
+          copiedItems,
+        },
       });
     }
 
-    const copiedItem = new Model({
-      name: "Copy of " + dbItem.name,
-      size: dbItem.size,
-      parentDirId: dbItem.parentDirId,
-      path: dbItem.path,
-      userId: dbItem.userId,
-      isPublic: dbItem.isPublic,
-      publicRole: dbItem.publicRole,
-    });
+    // =========================================
+    // LOCAL STORAGE
+    // =========================================
 
-    if (type === "file") {
-      copiedItem.extension = dbItem.extension;
-      copiedItem.isUploading = true;
+    // Check permissions for all selected items
+    const checks = await Promise.all(
+      normalizedItems.map((item) =>
+        fgaClient.check({
+          user: getFgaObject("user", userId),
+          relation: "can_copy",
+          object: getFgaObject(item.type, item.itemId),
+        }),
+      ),
+    );
 
-      const newS3Key = `${copiedItem._id.toString()}${copiedItem.extension}`;
-
-      const oldS3Key = `${dbItem._id.toString()}${dbItem.extension}`;
-
-      await copyS3File(oldS3Key, newS3Key);
-
-      copiedItem.isUploading = false;
+    if (checks.some((check) => !check.allowed)) {
+      return res.status(403).json({
+        message: "Unauthorized!",
+      });
     }
 
-    await copiedItem.save();
+    const relationships = [];
 
-    await fgaClient.write({
-      writes: [
+    // Recursively copy local files and folders
+    async function copyLocalItem(
+      source,
+      type,
+      parentDirId,
+      path,
+      name,
+    ) {
+      const Model = type === "folder" ? Directory : File;
+
+      const copiedItem = new Model({
+        name,
+        size: source.size,
+        parentDirId,
+        path,
+        userId: source.userId,
+        isPublic: source.isPublic,
+        publicRole: source.publicRole,
+      });
+
+      if (type === "file") {
+        copiedItem.extension = source.extension;
+        copiedItem.isUploading = true;
+
+        const newS3Key = `${copiedItem._id}${copiedItem.extension}`;
+        const oldS3Key = `${source._id}${source.extension}`;
+
+        await copyS3File(oldS3Key, newS3Key);
+
+        copiedItem.isUploading = false;
+      }
+
+      await copiedItem.save();
+
+      relationships.push(
         {
           user: getFgaObject("user", userId),
           relation: "owner",
           object: getFgaObject(type, copiedItem._id),
         },
         {
-          user: getFgaObject("folder", copiedItem.parentDirId),
+          user: getFgaObject("folder", parentDirId),
           relation: "parent",
           object: getFgaObject(type, copiedItem._id),
         },
-      ],
-    });
+      );
 
-    const { owners, capabilities, permissions } = await resolveRole(
-      copiedItem,
-      type,
-      userId,
-      copiedItem.parentDirId,
-    );
+      // Recursively copy folder contents
+      if (type === "folder") {
+        const [childFolders, childFiles] = await Promise.all([
+          Directory.find({
+            parentDirId: source._id,
+          }).lean(),
 
-    return res.status(201).json({
-      message: `${type} copied successfully!`,
-      data: {
+          File.find({
+            parentDirId: source._id,
+          }).lean(),
+        ]);
+
+        const childPath = [...path, copiedItem._id];
+
+        for (const folder of childFolders) {
+          await copyLocalItem(
+            folder,
+            "folder",
+            copiedItem._id,
+            childPath,
+            folder.name,
+          );
+        }
+
+        for (const file of childFiles) {
+          await copyLocalItem(
+            file,
+            "file",
+            copiedItem._id,
+            childPath,
+            file.name,
+          );
+        }
+      }
+
+      return copiedItem;
+    }
+
+    for (const item of normalizedItems) {
+      const Model = item.type === "folder" ? Directory : File;
+
+      const dbItem = await Model.findById(item.itemId).lean();
+
+      if (!dbItem) {
+        return res.status(404).json({
+          message: `${item.type === "folder" ? "Folder" : "File"} not found: ${item.itemId}`,
+        });
+      }
+
+      const copiedItem = await copyLocalItem(
+        dbItem,
+        item.type,
+        dbItem.parentDirId,
+        dbItem.path || [],
+        `Copy of ${dbItem.name}`,
+      );
+
+      const { owners, capabilities, permissions } = await resolveRole(
+        copiedItem,
+        item.type,
+        userId,
+        copiedItem.parentDirId,
+      );
+
+      copiedItems.push({
         copiedItem,
         owners,
         capabilities,
         permissions,
+      });
+    }
+
+    // Write OpenFGA relationships in batches
+    const batchSize = 100;
+
+    for (let i = 0; i < relationships.length; i += batchSize) {
+      await fgaClient.write({
+        writes: relationships.slice(i, i + batchSize),
+      });
+    }
+
+    return res.status(201).json({
+      message: `${copiedItems.length} item(s) copied successfully`,
+      data: {
+        copiedItems,
       },
     });
   } catch (error) {
+    console.error("COPY ITEM ERROR:", error);
+
     if (error?.code === 403) {
       return res.status(403).json({
-        message: error?.cause?.message || "You can't copy this file",
+        message: error?.cause?.message || "You can't copy this item",
       });
     }
-    next(error);
+
+    return res.status(500).json({
+      message: error.message || "Something went wrong while copying items",
+    });
   }
 };
 
-export const moveItem = async (req, res, next) => {
+
+export const moveItems = async (req, res, next) => {
   try {
-    const { item, destinationId, destinationName } = req.body;
     const userId = req.user?._id;
 
-    if (!item?._id || !destinationId || !destinationName) {
+    // Support single and multiple items
+    const items = req.body?.items ?? (req.body?.item ? [req.body.item] : []);
+    const { destinationId, destinationName } = req.body;
+
+    if (!items.length || !destinationId || !destinationName) {
       return res.status(400).json({
         message: "Invalid or missing move details",
       });
     }
 
-    let itemToBeMoved = await File.findById(item._id);
-    let type = "file";
-
-    if (!itemToBeMoved) {
-      itemToBeMoved = await Directory.findById(item._id);
-      type = "folder";
-    }
-
-    if (!itemToBeMoved) {
-      return res.status(404).json({
-        message: `Invalid ${item?.isDirectory ? "Folder" : "File"} ID`,
-      });
-    }
-
-    if (itemToBeMoved.parentDirId == null) {
-      return res.status(400).json({
-        message: "Root items cannot be moved",
-      });
-    }
-    const canMove = await fgaClient.check({
-      user: getFgaObject("user", userId),
-      relation: "can_move",
-      object: getFgaObject(type, item._id),
-    });
-
-    if (!canMove.allowed) {
-      return res.status(403).json({ message: "Unauthorized!" });
-    }
-    const itemId = itemToBeMoved._id.toString();
-    const oldParentId = itemToBeMoved.parentDirId.toString();
-
-    const destinationFolder = await Directory.findById(destinationId);
+    // Find destination folder
+    const destinationFolder = await Directory.findById(destinationId).lean();
 
     if (!destinationFolder) {
       return res.status(404).json({
@@ -2964,131 +3094,290 @@ export const moveItem = async (req, res, next) => {
       });
     }
 
-    const destinationFolderId = destinationFolder._id.toString();
+    const destinationFolderId = String(destinationFolder._id);
+    const destinationPath = destinationFolder.path || [];
 
-    if (oldParentId === destinationFolderId) {
-      return res.status(400).json({
-        message: `Item is already in ${destinationName}`,
+    // Resolve all files and folders
+    const resolvedItems = [];
+
+    for (const item of items) {
+      if (!item?._id) {
+        return res.status(400).json({
+          message: "Invalid item ID",
+        });
+      }
+
+      let document;
+      let type;
+
+      if (item.isDirectory) {
+        document = await Directory.findById(item._id);
+        type = "folder";
+      } else {
+        document = await File.findById(item._id);
+        type = "file";
+      }
+
+      if (!document) {
+        return res.status(404).json({
+          message: `Invalid ${type === "folder" ? "Folder" : "File"} ID: ${item._id}`,
+        });
+      }
+
+      resolvedItems.push({ document, type });
+    }
+
+    // Validate all items before moving
+    for (const { document, type } of resolvedItems) {
+      if (document.parentDirId == null) {
+        return res.status(400).json({
+          message: `${document.name}: Root items cannot be moved`,
+        });
+      }
+
+  const alreadyInDestination = resolvedItems.filter(
+  ({ document }) =>
+    String(document.parentDirId) === destinationFolderId,
+);
+
+if (alreadyInDestination.length) {
+  const message =
+    alreadyInDestination.length === 1
+      ? `${alreadyInDestination[0].document.name} is already in ${destinationName}`
+      : `Selected items are already in ${destinationName}`;
+
+  return res.status(400).json({ message });
+}
+
+      if (type === "folder") {
+        const folderId = String(document._id);
+
+        if (folderId === destinationFolderId) {
+          return res.status(400).json({
+            message: "A folder cannot be moved into itself",
+          });
+        }
+
+        const isDescendant = destinationPath.some(
+          (id) => String(id) === folderId,
+        );
+
+        if (isDescendant) {
+          return res.status(400).json({
+            message: "A folder cannot be moved into one of its own subfolders",
+          });
+        }
+      }
+    }
+
+    // Prevent moving a selected parent folder and its children together
+    const selectedFolderIds = new Set(
+      resolvedItems
+        .filter(({ type }) => type === "folder")
+        .map(({ document }) => String(document._id)),
+    );
+
+    for (const { document } of resolvedItems) {
+      const path = (document.path || []).map(String);
+
+      if (path.some((id) => selectedFolderIds.has(id))) {
+        return res.status(400).json({
+          message:
+            "Cannot move a folder and its nested items together. Select only the parent folder.",
+        });
+      }
+    }
+
+    // Check permissions for all items
+    const checks = await Promise.all(
+      resolvedItems.map(({ document, type }) =>
+        fgaClient.check({
+          user: getFgaObject("user", userId),
+          relation: "can_move",
+          object: getFgaObject(type, document._id),
+        }),
+      ),
+    );
+
+    if (checks.some((check) => !check.allowed)) {
+      return res.status(403).json({
+        message: "Unauthorized!",
       });
     }
 
-    if (type === "folder") {
-      if (itemId === destinationFolderId) {
-        return res.status(400).json({
-          message: "A folder cannot be moved into itself",
-        });
-      }
+    // Prepare updates and OpenFGA relationships
+    const writes = [];
+    const deletes = [];
 
-      const destinationPath = destinationFolder.path || [];
+    const fileOperations = [];
+    const folderOperations = [];
+    const activityOperations = [];
 
-      const isDescendant = destinationPath.some(
-        (id) => id.toString() === itemId,
-      );
+    for (const { document, type } of resolvedItems) {
+      const itemId = String(document._id);
+      const oldParentId = String(document.parentDirId);
 
-      if (isDescendant) {
-        return res.status(400).json({
-          message: "A folder cannot be moved into one of its own subfolders",
-        });
-      }
-    }
+      const oldPath = (document.path || []).map(String);
 
-    const getParentTuple = (parentId) => ({
-      user: getFgaObject("folder", parentId),
-      relation: "parent",
-      object: getFgaObject(type, itemId),
-    });
+      const newPath = [
+        ...destinationPath.map(String),
+        destinationFolderId,
+      ];
 
-    const oldParentTuple = getParentTuple(oldParentId);
-    const newParentTuple = getParentTuple(destinationFolderId);
+      const object = getFgaObject(type, document._id);
 
-    const oldPath = [...(itemToBeMoved.path || [])];
+      writes.push({
+        user: getFgaObject("folder", destinationFolderId),
+        relation: "parent",
+        object,
+      });
 
-    const newPath = [...(destinationFolder.path || []), destinationFolder._id];
+      deletes.push({
+        user: getFgaObject("folder", oldParentId),
+        relation: "parent",
+        object,
+      });
 
-    if (newPath.length > 0) {
-      newPath[newPath.length - 1] = destinationFolderId;
-    } else {
-      newPath.push(destinationFolderId);
-    }
-
-    await fgaClient.write({
-      writes: [newParentTuple],
-      deletes: [oldParentTuple],
-    });
-
-    if (type === "file") {
-      itemToBeMoved.parentDirId = destinationFolderId;
-      itemToBeMoved.path = newPath;
-
-      await itemToBeMoved.save();
-
-      if (userId) {
-        await FileActivity.findOneAndUpdate(
-          {
-            file: itemToBeMoved._id,
-            user: userId,
-            type: "move",
-          },
-          {
-            $set: {
-              occuredAt: new Date(),
+      if (type === "file") {
+        fileOperations.push({
+          updateOne: {
+            filter: { _id: document._id },
+            update: {
+              $set: {
+                parentDirId: destinationFolderId,
+                path: newPath,
+              },
             },
           },
-          {
-            upsert: true,
-          },
+        });
+
+        activityOperations.push(
+          FileActivity.findOneAndUpdate(
+            {
+              file: document._id,
+              user: userId,
+              type: "move",
+            },
+            {
+              $set: {
+                occuredAt: new Date(),
+              },
+            },
+            {
+              upsert: true,
+            },
+          ),
         );
+
+        continue;
       }
-    } else {
-      const [childFolders, childFiles] = await Promise.all([
-        Directory.find({
-          parentDirId: itemToBeMoved._id,
-        }),
 
-        File.find({
-          parentDirId: itemToBeMoved._id,
-        }),
-      ]);
-
-      itemToBeMoved.parentDirId = destinationFolderId;
-      itemToBeMoved.path = newPath;
-
-      await itemToBeMoved.save();
-
-      const descendantFolderOperations = childFolders.map((childFolder) => {
-        const childPath = childFolder.path || [];
-
-        const relativePath = childPath.slice(oldPath.length + 1);
-
-        childFolder.path = [...newPath, itemToBeMoved._id, ...relativePath];
-
-        return childFolder.save();
+      // Update moved folder
+      folderOperations.push({
+        updateOne: {
+          filter: { _id: document._id },
+          update: {
+            $set: {
+              parentDirId: destinationFolderId,
+              path: newPath,
+            },
+          },
+        },
       });
 
-      const descendantFileOperations = childFiles.map((childFile) => {
-        const childPath = childFile.path || [];
+      // Find all descendants
+      const [descendantFolders, descendantFiles] = await Promise.all([
+        Directory.find({ path: document._id })
+          .select("_id path")
+          .lean(),
 
+        File.find({ path: document._id })
+          .select("_id path")
+          .lean(),
+      ]);
+
+      // Update descendant folder paths
+      for (const folder of descendantFolders) {
+        const childPath = (folder.path || []).map(String);
         const relativePath = childPath.slice(oldPath.length + 1);
 
-        childFile.path = [...newPath, itemToBeMoved._id, ...relativePath];
+        folderOperations.push({
+          updateOne: {
+            filter: { _id: folder._id },
+            update: {
+              $set: {
+                path: [...newPath, itemId, ...relativePath],
+              },
+            },
+          },
+        });
+      }
 
-        return childFile.save();
-      });
+      // Update descendant file paths
+      for (const file of descendantFiles) {
+        const childPath = (file.path || []).map(String);
+        const relativePath = childPath.slice(oldPath.length + 1);
 
-      await Promise.all([
-        ...descendantFolderOperations,
-        ...descendantFileOperations,
-      ]);
+        fileOperations.push({
+          updateOne: {
+            filter: { _id: file._id },
+            update: {
+              $set: {
+                path: [...newPath, itemId, ...relativePath],
+              },
+            },
+          },
+        });
+      }
     }
 
+    // OpenFGA relationship updates in batches of 100
+    const batchSize = 100;
+
+    for (let i = 0; i < writes.length; i += batchSize) {
+      await fgaClient.write({
+        writes: writes.slice(i, i + batchSize),
+        deletes: deletes.slice(i, i + batchSize),
+      });
+    }
+
+    // Bulk update MongoDB documents
+    await Promise.all([
+      fileOperations.length
+        ? File.bulkWrite(fileOperations)
+        : Promise.resolve(),
+
+      folderOperations.length
+        ? Directory.bulkWrite(folderOperations)
+        : Promise.resolve(),
+
+      ...activityOperations,
+    ]);
+
+    const fileCount = resolvedItems.filter(
+      ({ type }) => type === "file",
+    ).length;
+
+    const folderCount = resolvedItems.filter(
+      ({ type }) => type === "folder",
+    ).length;
+
     return res.status(200).json({
-      message: `${
-        type === "folder" ? "Folder" : "File"
-      } moved to ${destinationName} successfully`,
+      message: `${resolvedItems.length} item(s) moved to ${destinationName} successfully`,
+      movedIds: resolvedItems.map(({ document }) =>
+        String(document._id),
+      ),
+      moved: {
+        files: fileCount,
+        folders: folderCount,
+      },
     });
   } catch (error) {
     console.error("MOVE ITEM ERROR:", error);
 
-    return next(error);
+    return res.status(500).json({
+      message: error.message || "Something went wrong while moving items",
+    });
   }
 };
+

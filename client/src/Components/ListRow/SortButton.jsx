@@ -39,7 +39,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
   };
 
   return (
-    <div ref={menuRef} className="relative ml-auto flex justify-between items-center py-2 ">
+    <div ref={menuRef} className="relative ml-auto flex justify-between items-center py-2">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -110,7 +110,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
       {device === "mobile" && 
          <div className="gd-toolbar-actions">
               <button
-                className="gd-icon-btn"
+                className="gd-icon-btn justify-end!"
                 title={viewMode === "grid" ? "List view" : "Grid view"}
                 onClick={onToggleView}
               >

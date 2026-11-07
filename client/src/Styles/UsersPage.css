@@ -181,7 +181,7 @@ font-weight: 500;
 .status.offline {
   color: red;
 }
-.active {
+.user-heading.active {
   text-decoration: underline;
 }
 .dashboardooter-actions {

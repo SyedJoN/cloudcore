@@ -27,7 +27,9 @@ router.post("/uploads/initiate", initiateFolderUpload);
 
 router.post("/uploads/complete", completeFolderUpload);
 
-router.route("/{:id}").patch(editDirectory).delete(deleteDirectory);
+router.route("/{:id}").patch(editDirectory);
+router.delete(["/", "/:id"], deleteDirectory);
+
 router.post("/{:parentDirId}", addDirectory);
 
 export default router;

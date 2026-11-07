@@ -39,7 +39,7 @@ export function useDirectoryData({
         const { fetch } = ROUTE_CONFIG[dirType];
 
         const { data } = await fetch(dirId || "");
-        setLastDirectory({...data, isDirectory: true});
+        setLastDirectory({ ...data, isDirectory: true });
         const name =
           isSharedRoute && !dirId
             ? ROUTE_CONFIG["shared"].label

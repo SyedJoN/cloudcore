@@ -56,18 +56,18 @@ export async function toggleItemStar(id, type) {
   return response;
 }
 
-export async function copyItem({ item, type, providerType }) {
-  const { data } = await axiosWithCreds.post(`/item/copy`, {
-    item,
+export async function copyItem({ items, type, providerType }) {
+  const { data } = await axiosWithCreds.post(`/items/copy`, {
+    items,
     type,
     providerType
   });
 
   return data;
 }
-export async function moveItem({ item, destinationId, destinationName }) {
-  const { data } = await axiosWithCreds.post(`/item/move`, {
-    item,
+export async function moveItem({ items, destinationId, destinationName }) {
+  const { data } = await axiosWithCreds.post(`/items/move`, {
+    items,
     destinationId,
     destinationName
   });

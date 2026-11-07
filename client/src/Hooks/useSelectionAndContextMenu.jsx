@@ -2,7 +2,11 @@ import { useState, useCallback } from "react";
 
 const CONTEXT_MENU_WIDTH = 300;
 
-export function useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory }) {
+export function useSelectionAndContextMenu({
+  combinedItems,
+  mainRef,
+  lastDirectory,
+}) {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [contextItem, setContextItem] = useState(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
@@ -42,15 +46,15 @@ export function useSelectionAndContextMenu({ combinedItems, mainRef, lastDirecto
       setOpen(true);
       setContextPos({ x, y: e.clientY });
 
- const parentMatch = combinedItems.find(
-  (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id
-);
+      const parentMatch = combinedItems.find(
+        (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id,
+      );
 
-const itemMatch = combinedItems.find(
-  (i) => (i.id ?? i._id) === id
-);
+      const itemMatch = combinedItems.find((i) => (i.id ?? i._id) === id);
 
-setContextItem(parentMatch ? lastDirectory : itemMatch ?? lastDirectory);
+      setContextItem(
+        parentMatch ? lastDirectory : (itemMatch ?? lastDirectory),
+      );
     },
     [combinedItems, lastDirectory],
   );
@@ -59,7 +63,7 @@ setContextItem(parentMatch ? lastDirectory : itemMatch ?? lastDirectory);
     (e) => {
       if (
         e.target.closest(
-          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay, .gd-icon-btn, .sort-btn",
+          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay, .gd-icon-btn, .sort-btn, .mv-screen, .mgi-card, .mgi-selection-bar",
         )
       ) {
         return;

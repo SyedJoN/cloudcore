@@ -108,9 +108,12 @@ export async function softDeleteFile(url, ids) {
   const { data } = await axiosWithCreds.patch(url, { ids });
   return data; 
 }
-export async function deleteFile(url) {
-  const response = await axiosWithCreds.delete(url);
-  return response;
+export async function deleteFile(url, ids, type) {
+  const { data } = await axiosWithCreds.delete(url, {
+    data: { ids, type },
+  });
+
+  return data;
 }
 export async function restoreFile(url, ids) {
   const { data } = await axiosWithCreds.patch(url, { ids });

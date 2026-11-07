@@ -27,8 +27,8 @@ import {
   sendOwnershipMail,
   cancelOwnershipMail,
   ownershipAction,
-  copyItem,
-  moveItem,
+  copyItems,
+  moveItems,
 } from "./controllers/directory.controller.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
 import { rateLimitMiddleware } from "./middlewares/rateLimitMiddleware.js";
@@ -130,8 +130,8 @@ app.get(
   itemLimiter,
   ownershipAction,
 );
-app.post("/item/copy", checkAuth, itemLimiter, copyItem);
-app.post("/item/move", checkAuth, itemLimiter, moveItem);
+app.post("/items/copy", checkAuth, itemLimiter, copyItems);
+app.post("/items/move", checkAuth, itemLimiter, moveItems);
 
 app.use((err, req, res, next) => {
   console.log(err);

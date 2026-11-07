@@ -27,6 +27,7 @@ router.param("id", validateIdMiddleware);
 // DELETE
 router.delete("/:id", checkAuth, deleteFile);
 router.patch(["/soft-delete", "/soft-delete/:id"], softDeleteFile);
+router.delete(["/", "/:id"], deleteFile);
 
 // Update
 router.patch(["/restore", "/:id/restore"], checkAuth, restoreFile);
