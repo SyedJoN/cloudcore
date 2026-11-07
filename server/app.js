@@ -84,11 +84,7 @@ app.use((req, res, next) =>
 
 
 app.use((req, res, next) => {
-  if (
-    req.method === "POST" &&
-    (/^\/file\/[^/]+$/.test(req.path) ||
-      req.originalUrl === "/subscription/stripe/events")
-  ) {
+  if (req.originalUrl === "/subscription/stripe/events") {
     return next();
   }
 

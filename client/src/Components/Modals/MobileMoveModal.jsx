@@ -596,7 +596,6 @@ function renderEntry(entry) {
               <>
                 {containsDirectory && (
                   <>
-                    <div className="mv-section-label">Folders</div>
                     <div className="mv-grid">
                       {sortedItems.filter((i) => i.isDirectory).map(renderEntry)}
                     </div>

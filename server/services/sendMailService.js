@@ -494,146 +494,139 @@ export const sendOwnershipTransferResultEmail = async ({
     throw error;
   }
 };
+
 export const sendAccessEmail = async function ({
   toEmail,
   toName,
   fromName,
   fromEmail,
-  itemName,
-  itemType,
-  itemUrl,
-  role,
+  role, // "reader" | "writer"
   message,
+  items, // [{ name, type, url }]
 }) {
-  try {
-    const roleLabel = role === "editor" ? "Editor" : "Viewer";
-    const roleColor = role === "editor" ? "#1a73e8" : "#5f6368";
-    const itemIcon =
-      itemType === "folder"
-        ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
-        : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
+  if (!toEmail) throw new Error("toEmail is required but missing");
 
-    if (!toEmail) throw new Error("toEmail is required but missing");
-    const info = await transporter.sendMail({
-      from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
-      to: toEmail,
-      subject: `${fromName} shared "${itemName}" with you`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        </head>
-        <body style="margin:0;padding:0;background:#f8f9fa;font-family:'Google Sans',Roboto,Arial,sans-serif;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;padding:32px 0;">
-            <tr>
-              <td align="center">
-                <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.1);overflow:hidden;">
-                  
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding:24px 32px;border-bottom:1px solid #e8eaed;">
-                      <table width="100%" cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td>
-                            <span style="font-size:20px;font-weight:600;color:#202124;">StorageApp</span>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
+  const multi = items.length > 1;
+  const roleLabel = role === "writer" ? "Editor" : "Viewer";
+  const roleColor = role === "writer" ? "#1a73e8" : "#5f6368";
 
-                  <!-- Body -->
-                  <tr>
-                    <td style="padding:32px;">
-                      
-                      <!-- Sender info -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-                        <tr>
-                          <td style="width:44px;vertical-align:top;">
-                            <div style="width:40px;height:40px;border-radius:50%;background:#1a73e8;display:block;font-size:18px;font-weight:600;color:#fff;text-align:center;line-height:40px;">
-                              ${fromName?.charAt(0)?.toUpperCase()}
-                            </div>
-                          </td>
-                          <td style="padding-left:12px;vertical-align:top;">
-                            <div style="font-size:15px;font-weight:500;color:#202124;">${fromName}</div>
-                            <div style="font-size:13px;color:#5f6368;">${fromEmail}</div>
-                          </td>
-                        </tr>
-                      </table>
+  const info = await transporter.sendMail({
+    from: `"${fromName}" <${process.env.MAIL_FROM_ADDRESS ?? "muhammadjoncs16@gmail.com"}>`,
+    replyTo: fromEmail,
+    to: toEmail,
+    subject: multi
+      ? `${fromName} shared ${items.length} items with you`
+      : `${fromName} shared "${items[0].name}" with you`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
+      <body style="margin:0;padding:0;background:#f8f9fa;font-family:'Google Sans',Roboto,Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;padding:32px 0;">
+          <tr>
+            <td align="center">
+              <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.1);overflow:hidden;">
 
-                      <!-- Title -->
-                      <h1 style="font-size:22px;font-weight:400;color:#202124;margin:0 0 8px;">
-                        Hi ${toName}, ${fromName} shared an item with you
-                      </h1>
-                      <p style="font-size:14px;color:#5f6368;margin:0 0 24px;">
-                        You've been added as <strong style="color:${roleColor};">${roleLabel}</strong>
-                      </p>
+                <!-- Header -->
+                <tr>
+                  <td style="padding:24px 32px;border-bottom:1px solid #e8eaed;">
+                    <span style="font-size:20px;font-weight:600;color:#202124;">StorageApp</span>
+                  </td>
+                </tr>
 
-                      ${
-                        message
-                          ? `
-                      <!-- Message -->
-                      <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">
-                        "${message}"
-                      </div>
-                      `
-                          : ""
-                      }
+                <!-- Body -->
+                <tr>
+                  <td style="padding:32px;">
 
-                      <!-- Item card -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:28px;">
-                        <tr>
-                          <td style="padding:16px;vertical-align:middle;width:48px;">
-                            ${itemIcon}
-                          </td>
-                          <td style="padding:16px 16px 16px 0;vertical-align:middle;">
-                            <div style="font-size:15px;font-weight:500;color:#202124;">${itemName}</div>
-                            <div style="font-size:12px;color:#5f6368;margin-top:2px;">${itemType === "folder" ? "Folder" : "File"} · ${roleLabel} access</div>
-                          </td>
-                        </tr>
-                      </table>
+                    <!-- Sender info -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="width:44px;vertical-align:top;">
+                          <div style="width:40px;height:40px;border-radius:50%;background:#1a73e8;display:block;font-size:18px;font-weight:600;color:#fff;text-align:center;line-height:40px;">
+                            ${fromName?.charAt(0)?.toUpperCase()}
+                          </div>
+                        </td>
+                        <td style="padding-left:12px;vertical-align:top;">
+                          <div style="font-size:15px;font-weight:500;color:#202124;">${fromName}</div>
+                          <div style="font-size:13px;color:#5f6368;">${fromEmail}</div>
+                        </td>
+                      </tr>
+                    </table>
 
-                      <!-- CTA button -->
-                      <table cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td>
-                            <a href="${itemUrl}"
-                              style="display:inline-block;background:#1a73e8;color:#ffffff;font-size:14px;font-weight:500;padding:12px 28px;border-radius:6px;text-decoration:none;">
-                              Open ${itemType === "folder" ? "folder" : "file"}
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
+                    <!-- Title -->
+                    <h1 style="font-size:22px;font-weight:400;color:#202124;margin:0 0 8px;">
+                      Hi ${toName}, ${fromName} shared ${multi ? `${items.length} items` : "an item"} with you
+                    </h1>
+                    <p style="font-size:14px;color:#5f6368;margin:0 0 24px;">
+                      You've been added as <strong style="color:${roleColor};">${roleLabel}</strong>
+                    </p>
 
-                    </td>
-                  </tr>
+                    ${
+                      message
+                        ? `<div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">"${message}"</div>`
+                        : ""
+                    }
 
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding:20px 32px;border-top:1px solid #e8eaed;background:#f8f9fa;">
-                      <p style="font-size:12px;color:#80868b;margin:0;">
-                        This email was sent because ${fromName} shared a ${itemType} with you on StorageApp.
-                        If you think this was a mistake, you can ignore this email.
-                      </p>
-                    </td>
-                  </tr>
+                    <!-- One card per item -->
+                    ${items
+                      .map(
+                        (it) => `
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:12px;">
+                      <tr>
+                        <td style="padding:16px;vertical-align:middle;width:48px;">
+                          <div style="width:40px;height:40px;background:${it.type === "folder" ? "#fef9e7" : "#e8f0fe"};border-radius:8px;text-align:center;line-height:40px;font-size:22px;">${it.type === "folder" ? "📁" : "📄"}</div>
+                        </td>
+                        <td style="padding:16px 16px 16px 0;vertical-align:middle;">
+                          <a href="${encodeURI(it.url)}" style="font-size:15px;font-weight:500;color:#202124;text-decoration:none;">${it.name}</a>
+                          <div style="font-size:12px;color:#5f6368;margin-top:2px;">${it.type === "folder" ? "Folder" : "File"} · ${roleLabel} access</div>
+                        </td>
+                      </tr>
+                    </table>`,
+                      )
+                      .join("")}
 
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `,
-    });
+                    <!-- CTA button (single item only) -->
+                    ${
+                      multi
+                        ? ""
+                        : `<table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                             <tr>
+                               <td>
+                                 <a href="${encodeURI(items[0].url)}" style="display:inline-block;background:#1a73e8;color:#ffffff;font-size:14px;font-weight:500;padding:12px 28px;border-radius:6px;text-decoration:none;">
+                                   Open ${items[0].type === "folder" ? "folder" : "file"}
+                                 </a>
+                               </td>
+                             </tr>
+                           </table>`
+                    }
 
-    console.log("Access email sent: %s", info.messageId);
-    return info;
-  } catch (error) {
-    throw error;
-  }
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:20px 32px;border-top:1px solid #e8eaed;background:#f8f9fa;">
+                    <p style="font-size:12px;color:#80868b;margin:0;">
+                      This email was sent because ${fromName} shared ${multi ? "items" : `a ${items[0].type}`} with you on StorageApp.
+                      If you think this was a mistake, you can ignore this email.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+  });
+
+  console.log("Access email sent: %s", info.messageId);
+  return info;
 };
 
 export const sendRequestAccessEmail = async function ({
@@ -779,166 +772,133 @@ export const sendRequestAccessEmail = async function ({
   }
 };
 
+// keep your existing `transporter` import
+
 export const sendLinkEmail = async function ({
   toEmail,
   fromName,
   fromEmail,
-  itemName,
-  itemType,
-  itemUrl,
-  isPublic,
-  publicRole,
   message,
+  items, // [{ name, type, url, isPublic, publicRole }]
 }) {
-  try {
-    const accessLabel = isPublic ? "Anyone with the link" : "Restricted";
-    const roleLabel = isPublic
-      ? publicRole.charAt(0).toUpperCase() + publicRole.slice(1)
-      : null;
-    const itemIcon =
-      itemType === "folder"
-        ? `<div style="width:40px;height:40px;background:#fef9e7;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📁</div>`
-        : `<div style="width:40px;height:40px;background:#e8f0fe;border-radius:8px;text-align:center;line-height:40px;font-size:22px;">📄</div>`;
-    if (!toEmail) throw new Error("toEmail is required but missing");
+  if (!toEmail) throw new Error("toEmail is required but missing");
 
-    const info = await transporter.sendMail({
-      from: `"${fromName}" <muhammadjoncs16@gmail.com>`,
-      to: toEmail,
-      subject: `${fromName} sent you a link to "${itemName}"`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        </head>
-        <body style="margin:0;padding:0;background:#f8f9fa;font-family:'Google Sans',Roboto,Arial,sans-serif;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;padding:32px 0;">
-            <tr>
-              <td align="center">
-                <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.1);overflow:hidden;">
+  const multi = items.length > 1;
 
-                  <!-- Header -->
-                  <tr>
-                    <td style="padding:24px 32px;border-bottom:1px solid #e8eaed;">
-                      <span style="font-size:20px;font-weight:600;color:#202124;">StorageApp</span>
-                    </td>
-                  </tr>
+  const info = await transporter.sendMail({
+    from: `"${fromName}" <${process.env.MAIL_FROM_ADDRESS ?? "muhammadjoncs16@gmail.com"}>`,
+    replyTo: fromEmail,
+    to: toEmail,
+    subject: multi
+      ? `${fromName} sent you ${items.length} links`
+      : `${fromName} sent you a link to "${items[0].name}"`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
+      <body style="margin:0;padding:0;background:#f8f9fa;font-family:'Google Sans',Roboto,Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;padding:32px 0;">
+          <tr>
+            <td align="center">
+              <table width="520" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.1);overflow:hidden;">
 
-                  <!-- Body -->
-                  <tr>
-                    <td style="padding:32px;">
+                <!-- Header -->
+                <tr>
+                  <td style="padding:24px 32px;border-bottom:1px solid #e8eaed;">
+                    <span style="font-size:20px;font-weight:600;color:#202124;">StorageApp</span>
+                  </td>
+                </tr>
 
-                      <!-- Sender info -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-                        <tr>
-                          <td style="width:44px;vertical-align:top;">
-                            <div style="width:40px;height:40px;border-radius:50%;background:#1a73e8;font-size:18px;font-weight:600;color:#fff;text-align:center;line-height:40px;">
-                              ${fromName?.charAt(0)?.toUpperCase()}
-                            </div>
-                          </td>
-                          <td style="padding-left:12px;vertical-align:top;">
-                            <div style="font-size:15px;font-weight:500;color:#202124;">${fromName}</div>
-                            <div style="font-size:13px;color:#5f6368;">${fromEmail}</div>
-                          </td>
-                        </tr>
-                      </table>
+                <!-- Body -->
+                <tr>
+                  <td style="padding:32px;">
 
-                      <!-- Title -->
-                      <h1 style="font-size:22px;font-weight:400;color:#202124;margin:0 0 8px;">
-                        ${fromName} sent you a link
-                      </h1>
-                      <p style="font-size:14px;color:#5f6368;margin:0 0 24px;">
-                        You've received a link to a ${itemType} on StorageApp.
-                      </p>
+                    <!-- Sender info -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="width:44px;vertical-align:top;">
+                          <div style="width:40px;height:40px;border-radius:50%;background:#1a73e8;font-size:18px;font-weight:600;color:#fff;text-align:center;line-height:40px;">
+                            ${fromName?.charAt(0)?.toUpperCase()}
+                          </div>
+                        </td>
+                        <td style="padding-left:12px;vertical-align:top;">
+                          <div style="font-size:15px;font-weight:500;color:#202124;">${fromName}</div>
+                          <div style="font-size:13px;color:#5f6368;">${fromEmail}</div>
+                        </td>
+                      </tr>
+                    </table>
 
-                      ${
-                        message
-                          ? `
-                      <div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">
-                        "${message}"
-                      </div>
-                      `
-                          : ""
-                      }
+                    <!-- Title -->
+                    <h1 style="font-size:22px;font-weight:400;color:#202124;margin:0 0 8px;">
+                      ${fromName} sent you ${multi ? `${items.length} links` : "a link"}
+                    </h1>
+                    <p style="font-size:14px;color:#5f6368;margin:0 0 24px;">
+                      You've received ${multi ? `${items.length} links` : "a link"} on StorageApp.
+                    </p>
 
-                      <!-- Item card -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:20px;">
-                        <tr>
-                          <td style="padding:16px;vertical-align:middle;width:56px;">
-                            ${itemIcon}
-                          </td>
-                          <td style="padding:16px 16px 16px 0;vertical-align:middle;">
-                            <div style="font-size:15px;font-weight:500;color:#202124;">${itemName}</div>
-                            <div style="font-size:12px;color:#5f6368;margin-top:2px;">${itemType === "folder" ? "Folder" : "File"}</div>
-                          </td>
-                        </tr>
-                      </table>
+                    ${
+                      message
+                        ? `<div style="background:#f8f9fa;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px;color:#3c4043;font-style:italic;">"${message}"</div>`
+                        : ""
+                    }
 
-                      <!-- General access info -->
-                      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;border-radius:8px;padding:14px;margin-bottom:24px;">
-                        <tr>
-                          <td style="vertical-align:middle;width:32px;">
-                            <span style="font-size:18px;">${isPublic ? "🌐" : "🔒"}</span>
-                          </td>
-                          <td style="padding-left:10px;vertical-align:middle;">
-                            <div style="font-size:13px;font-weight:500;color:#202124;">${accessLabel}</div>
-                            <div style="font-size:12px;color:#5f6368;margin-top:2px;">
-                              ${
-                                isPublic
-                                  ? `Anyone on the internet with the link can ${roleLabel?.toLowerCase() || "view"}`
-                                  : "Only people with access can open this link"
-                              }
-                            </div>
-                          </td>
-                          ${
-                            roleLabel
-                              ? `
-                          <td style="text-align:right;vertical-align:middle;">
-                            <span style="font-size:12px;color:#5f6368;background:#e8eaed;padding:4px 10px;border-radius:12px;">${roleLabel}</span>
-                          </td>`
-                              : ""
-                          }
-                        </tr>
-                      </table>
+                    <!-- One card per item -->
+                    ${items
+                      .map(
+                        (it) => `
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e8eaed;border-radius:8px;margin-bottom:12px;">
+                      <tr>
+                        <td style="padding:16px;width:56px;vertical-align:middle;">
+                          <div style="width:40px;height:40px;background:${it.type === "folder" ? "#fef9e7" : "#e8f0fe"};border-radius:8px;text-align:center;line-height:40px;font-size:22px;">${it.type === "folder" ? "📁" : "📄"}</div>
+                        </td>
+                        <td style="padding:16px 16px 16px 0;vertical-align:middle;">
+                          <a href="${encodeURI(it.url)}" style="font-size:15px;font-weight:500;color:#1a73e8;text-decoration:none;">${it.name}</a>
+                          <div style="font-size:12px;color:#5f6368;margin-top:2px;">${it.type === "folder" ? "Folder" : "File"}</div>
+                          <div style="font-size:12px;color:#5f6368;margin-top:2px;">
+                            ${
+                              it.isPublic
+                                ? `🌐 Anyone with the link can ${it.publicRole === "writer" ? "edit" : "view"}`
+                                : "🔒 Restricted · only people with access can open"
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    </table>`,
+                      )
+                      .join("")}
 
-                      <!-- CTA button -->
-                      <table cellpadding="0" cellspacing="0">
-                        <tr>
-                          <td>
-                            <a href="${itemUrl}"
-                              style="display:inline-block;background:#1a73e8;color:#ffffff;font-size:14px;font-weight:500;padding:12px 28px;border-radius:6px;text-decoration:none;">
-                              Open ${itemType === "folder" ? "folder" : "file"}
-                            </a>
-                          </td>
-                        </tr>
-                      </table>
+                    <!-- Open button (single item only) -->
+                    ${
+                      multi
+                        ? ""
+                        : `<a href="${encodeURI(items[0].url)}" style="display:inline-block;background:#1a73e8;color:#ffffff;font-size:14px;font-weight:500;padding:12px 28px;border-radius:6px;text-decoration:none;margin-top:12px;">Open ${items[0].type === "folder" ? "folder" : "file"}</a>`
+                    }
 
-                    </td>
-                  </tr>
+                  </td>
+                </tr>
 
-                  <!-- Footer -->
-                  <tr>
-                    <td style="padding:20px 32px;border-top:1px solid #e8eaed;background:#f8f9fa;">
-                      <p style="font-size:12px;color:#80868b;margin:0;">
-                        ${fromName} (${fromEmail}) shared a link with you on StorageApp.
-                        If you don't know this person, you can ignore this email.
-                      </p>
-                    </td>
-                  </tr>
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:20px 32px;border-top:1px solid #e8eaed;background:#f8f9fa;">
+                    <p style="font-size:12px;color:#80868b;margin:0;">
+                      ${fromName} (${fromEmail}) shared ${multi ? "links" : "a link"} with you on StorageApp.
+                      If you don't know this person, you can ignore this email.
+                    </p>
+                  </td>
+                </tr>
 
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `,
-    });
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `,
+  });
 
-    console.log("Link email sent: %s", info.messageId);
-    return info;
-  } catch (error) {
-    throw error;
-  }
+  console.log("Link email sent: %s", info.messageId);
+  return info;
 };

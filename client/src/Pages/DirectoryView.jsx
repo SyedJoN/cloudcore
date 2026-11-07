@@ -1080,426 +1080,353 @@ export default function DirectoryView({ route }) {
     }
   }
 
-  const handleToggleResourcePublic = async (item, role, access) => {
+  // ─────────────────────────────────────────────────────────────
+// Put this OUTSIDE the component (module level)
+// Accepts UI keys ("viewer"/"editor") AND Drive keys ("reader"/"writer")
+// and always returns a Drive role: "reader" | "writer".
+// ─────────────────────────────────────────────────────────────
+const toDriveRole = (r) => {
+  const mapped = DRIVE_ROLES[r] ?? r; // viewer->reader, editor->writer, writer->writer
+  return mapped === "writer" ? "writer" : "reader";
+};
 
-      setIsShareLoading(true);
+const isAnyone = (p) => p?.type === "anyone";
+
+// ─────────────────────────────────────────────────────────────
+// Inside DirectoryView, replace the existing handler with this
+// ─────────────────────────────────────────────────────────────
+const handleToggleResourcePublic = async (item, role, access) => {
+  setIsShareLoading(true);
+
   const isMultiShare = selectedItems.size > 1;
-    try {
-    const publicPermission = isMultiShare
-      ? (item.permissions ?? []).find((p) => p.type === "anyone")
-      : peopleWithAccess.find((p) => p.type === "anyone");
-      const currentAccess = publicPermission ? "anyone" : "restricted";
-      if (currentAccess === access) {
-        if (access === "restricted") return;
 
-        if (
-          (DRIVE_ROLES[publicPermission?.role] || publicPermission?.role) ===
-          (DRIVE_ROLES[role] || role)
-        )
-          return;
-      }
+  try {
+    const restricted = access === "restricted";
+    const userRole = toDriveRole(role);
 
-      const itemId = item._id ?? item.id;
-      const type = getResourceType(item);
+    // In multi mode `peopleWithAccess` is the COMMON permission set, so the
+    // per-item permissions are the only correct source of truth there.
+    const currentPermissions = isMultiShare
+      ? (item.permissions ?? [])
+      : peopleWithAccess;
 
-      const restricted = access === "restricted";
-      const userRole = DRIVE_ROLES[role] ?? "reader";
+    const publicPermission = currentPermissions.find(isAnyone);
+    const currentAccess = publicPermission ? "anyone" : "restricted";
+    const currentRole = publicPermission ? toDriveRole(publicPermission.role) : null;
 
-      const iconType =
-        (item.isDirectory ??
-        item.mimeType === "application/vnd.google-apps.folder")
-          ? null
-          : getFileType(item?.name || "");
+    // Nothing to do
+    if (currentAccess === access) {
+      if (restricted) return;
+      if (currentRole === userRole) return;
+    }
 
-      let permission = null;
-      let isMe;
-      let myRole;
-      let incomingPublicRole;
-      let updatedParentId;
+    const itemId = item._id ?? item.id;
+    const type = getResourceType(item);
+    const isFolder =
+      Boolean(item.isDirectory) ||
+      item.mimeType === "application/vnd.google-apps.folder";
+    const iconType = isFolder ? null : getFileType(item?.name || "");
 
-      if (isGoogleDriveRoute) {
-        if (restricted) {
-          const dryRun = await revokeFileAccess(
-            "google",
-            itemId,
-            "anyoneWithLink",
+    // Revert the modal UI when the user cancels a confirmation.
+    // (Multi mode has no shared link state, so nothing to revert.)
+    const revertLinkState = () => {
+      if (isMultiShare) return;
+      setLinkAccess(publicPermission ? "anyone" : "restricted");
+      setLinkRole(currentRole || "reader");
+      setPeopleWithAccess(prevPermissions);
+    };
+
+    const buildChain = ({ ancestorId, ancestorName, ancestorRole, toLabel }) => [
+      {
+        id: ancestorId,
+        name: ancestorName,
+        fromLabel: `Anyone with the link → ${ancestorRole}`,
+        toLabel,
+        isDirectory: true,
+        iconType: null,
+      },
+      {
+        id: itemId,
+        name: item.name,
+        fromLabel: `Anyone with the link → ${currentRole ?? "restricted"}`,
+        toLabel,
+        isDirectory: isFolder,
+        iconType,
+      },
+    ];
+
+    let permission = null;
+    let isMe;
+    let myRole;
+    let updatedParentId;
+
+    /* ───────────── Google Drive route ───────────── */
+    if (isGoogleDriveRoute) {
+      if (restricted) {
+        const dryRun = await revokeFileAccess("google", itemId, "anyoneWithLink");
+
+        if (dryRun?.needsConfirmation) {
+          const { ancestorId, ancestorName, previousRole } = dryRun.conflict;
+          updatedParentId = ancestorId;
+
+          const confirmed = await showCascadeConfirm(
+            buildChain({
+              ancestorId,
+              ancestorName,
+              ancestorRole: previousRole,
+              toLabel: "restricted",
+            }),
           );
-          if (dryRun?.needsConfirmation) {
-            const { ancestorId, ancestorName, previousRole } = dryRun.conflict;
-            updatedParentId = ancestorId;
-            const chain = [
-              {
-                id: ancestorId,
-                name: ancestorName,
-                fromLabel: `Anyone with the link → ${previousRole}`,
-                toLabel: "restricted",
-                isDirectory: true,
-                iconType: null,
-              },
-              {
-                id: itemId,
-                name: item.name,
-                fromLabel: `Anyone with the link → ${userRole}`,
-                toLabel: "restricted",
-                isDirectory:
-                  item.isDirectory ||
-                  item.mimeType === "application/vnd.google-apps.folder",
-                iconType,
-              },
-            ];
 
-            const confirmed = await showCascadeConfirm(chain);
-
-            if (!confirmed) {
-              const currentPublicRole = publicPermission?.role;
-              setLinkAccess(currentPublicRole ? "anyone" : "restricted");
-              setLinkRole(currentPublicRole || "reader");
-              setPeopleWithAccess(prevPermissions);
-              return;
-            }
-
-            await revokeFileAccess(
-              "google",
-              itemId,
-              "anyoneWithLink",
-              null,
-              true,
-            );
+          if (!confirmed) {
+            revertLinkState();
+            return;
           }
-        } else {
-          const dryRun = await toggleDriveFilePermission(itemId, userRole);
 
-          if (dryRun?.needsConfirmation) {
-            const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
-            updatedParentId = ancestorId;
-
-            const chain = [
-              {
-                id: ancestorId,
-                name: ancestorName,
-                fromLabel: `Anyone with the link → ${ancestorRole}`,
-                toLabel: userRole,
-              },
-              {
-                id: itemId,
-                name: item.name,
-                fromLabel: `Anyone with the link → ${userRole}`,
-                toLabel: userRole,
-              },
-            ];
-
-            const confirmed = await showCascadeConfirm(chain);
-
-            if (!confirmed) {
-              const currentPublicRole = publicPermission?.role;
-              setLinkAccess(currentPublicRole ? "anyone" : "restricted");
-              setLinkRole(currentPublicRole || "reader");
-              setPeopleWithAccess(prevPermissions);
-              return;
-            }
-
-            const data = await toggleDriveFilePermission(
-              itemId,
-              userRole,
-              true,
-            );
-            permission = data.permission;
-          } else {
-            permission = dryRun.permission;
-          }
+          await revokeFileAccess("google", itemId, "anyoneWithLink", null, true);
         }
       } else {
-        const incomingRole = peopleWithAccess.find(
-          (p) => p.emailAddress === user.email,
-        );
-
-        const isOwnerViewing = item.owners?.some(
-          (o) => o.emailAddress === user.email,
-        );
-
-        isMe = incomingRole
-          ? (incomingRole?.email ?? incomingRole.emailAddress) === user.email
-          : !isOwnerViewing;
-        myRole = incomingRole?.role;
-        incomingPublicRole = DRIVE_ROLES[role] || role;
-
-        if (
-          ((incomingPublicRole === "reader" || access === "restricted") &&
-            myRole === "reader" &&
-            isMe) ||
-          ((incomingPublicRole === "reader" ||
-            incomingPublicRole === "writer") &&
-            myRole === "remove" &&
-            isMe)
-        ) {
-          const confirmed = await showConfirmModal(
-            "You will not be able to share. Are you sure?",
-          );
-          if (!confirmed) {
-            const currentPublicRole = publicPermission?.role;
-            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
-            setLinkRole(currentPublicRole || "reader");
-            setPeopleWithAccess(prevPermissions);
-            return;
-          }
-        }
-        if (
-          access === "restricted" &&
-          (myRole === undefined || myRole === "remove") &&
-          isMe
-        ) {
-          const confirmed = await showConfirmModal(
-            "You will no longer have access. Are you sure?",
-          );
-          if (!confirmed) {
-            const currentPublicRole = prevPermissions.find(
-              (p) => p.type === "anyone",
-            )?.role;
-
-            setLinkAccess("anyone");
-            setLinkRole(currentPublicRole);
-            setPeopleWithAccess(prevPermissions);
-
-            return;
-          }
-        }
-
-        let confirmCascade = false;
-
-        const dryRun = await toggleFilePublic(itemId, userRole, access, type);
+        const dryRun = await toggleDriveFilePermission(itemId, userRole);
 
         if (dryRun?.needsConfirmation) {
           const { ancestorId, ancestorName, ancestorRole } = dryRun.conflict;
           updatedParentId = ancestorId;
 
-          const isRestricting = access === "restricted";
-          const chainIconType = item.isDirectory
-            ? null
-            : getFileType(item?.name || "");
+          const confirmed = await showCascadeConfirm(
+            buildChain({
+              ancestorId,
+              ancestorName,
+              ancestorRole,
+              toLabel: userRole,
+            }),
+          );
 
-          const chain = [
-            {
-              id: ancestorId,
-              name: ancestorName,
-              fromLabel: `Anyone with the link → ${ancestorRole}`,
-              toLabel: isRestricting ? "Restricted" : DRIVE_ROLES[role] || role,
-              isDirectory: true,
-              iconType: null,
-            },
-            {
-              id: itemId,
-              name: item.name,
-              fromLabel: `Anyone with the link → ${DRIVE_ROLES[publicPermission?.role] || publicPermission?.role}`,
-              toLabel: isRestricting ? "Restricted" : DRIVE_ROLES[role] || role,
-              isDirectory: item.isDirectory,
-              iconType: chainIconType,
-            },
-          ];
-
-          const confirmed = await showCascadeConfirm(chain);
           if (!confirmed) {
-            const currentPublicRole = publicPermission?.role;
-            setLinkAccess(currentPublicRole ? "anyone" : "restricted");
-            setLinkRole(currentPublicRole || "reader");
-            setPeopleWithAccess(prevPermissions);
+            revertLinkState();
             return;
           }
 
-          confirmCascade = true;
-        }
-
-        if (confirmCascade) {
-          await toggleFilePublic(itemId, userRole, access, type, true);
+          const data = await toggleDriveFilePermission(itemId, userRole, true);
+          permission = data.permission;
+        } else {
+          permission = dryRun.permission;
         }
       }
+    } else {
+      /* ───────────── Local route ───────────── */
+      const incomingRole = currentPermissions.find(
+        (p) => p.emailAddress === user.email,
+      );
+      const isOwnerViewing = item.owners?.some(
+        (o) => o.emailAddress === user.email,
+      );
 
-      const allIdsToBeMatched = [
-        updatedParentId,
-        itemId,
-        ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
-      ].filter(Boolean);
+      isMe = incomingRole ? true : !isOwnerViewing;
+      myRole = incomingRole?.role;
 
-      const update = (list) =>
-        restricted && (myRole === "remove" || myRole === undefined) && isMe
-          ? list.filter((resource) => {
-              const resourceId = String(resource?.id ?? resource?._id);
-              const parentDirId = String(
-                resource?.parentDirId ?? resource?.parents?.[0],
-              );
-
-              return (
-                !allIdsToBeMatched.includes(resourceId) &&
-                !allIdsToBeMatched.includes(parentDirId)
-              );
-            })
-          : list.map((resource) => {
-              const resourceId = String(resource?._id ?? resource?.id);
-              const parentDirId = String(
-                resource?.parentDirId ?? resource?.parents?.[0],
-              );
-
-              if (
-                !allIdsToBeMatched.includes(resourceId) &&
-                !allIdsToBeMatched.includes(parentDirId)
-              ) {
-                return resource;
-              }
-
-              const permissions = resource.permissions ?? [];
-
-              const updatedPermissions = restricted
-                ? permissions.filter((p) => p?.type !== "anyone")
-                : [
-                    ...permissions.filter((p) => p?.type !== "anyone"),
-                    {
-                      ...(permission ?? {}),
-                      type: "anyone",
-                      role: userRole,
-                    },
-                  ];
-
-              return {
-                ...resource,
-                capabilities: {
-                  ...resource.capabilities,
-                  canShare: isMe
-                    ? incomingPublicRole !== "reader" || myRole !== "reader"
-                    : true,
-                },
-                isPublic: restricted ? false : true,
-                publicRole: restricted ? null : userRole,
-                permissions: updatedPermissions,
-              };
-            });
-
-      setFilesList((prev) => update(prev));
-      setDirectoriesList((prev) => update(prev));
-
-      const updatedPeopleWithAccess = peopleWithAccess
-        .map((p) => {
-          if (p?.role === "remove" && incomingPublicRole === "writer") {
-            return null;
-          }
-
-          if (access === "restricted" && p?.type === "anyone") {
-            return null;
-          }
-
-          if (access === "anyone" && p?.type === "anyone") {
-            return {
-              ...p,
-              id: "anyoneWithLink",
-              type: "anyone",
-              role: DRIVE_ROLES[role] ?? role,
-            };
-          }
-
-          return p;
-        })
-        .filter(Boolean);
-
+      // Will lose ability to share
       if (
-        access === "anyone" &&
-        !updatedPeopleWithAccess.some((p) => p?.type === "anyone")
+        isMe &&
+        (((userRole === "reader" || restricted) && myRole === "reader") ||
+          myRole === "remove")
       ) {
-        updatedPeopleWithAccess.push({
-          id: "anyoneWithLink",
-          type: "anyone",
-          role: DRIVE_ROLES[role] ?? role,
-          allowFileDiscovery: false,
-        });
+        const confirmed = await showConfirmModal(
+          "You will not be able to share. Are you sure?",
+        );
+        if (!confirmed) {
+          revertLinkState();
+          return;
+        }
       }
+
+      // Will lose all access
+      if (
+        restricted &&
+        isMe &&
+        (myRole === undefined || myRole === "remove")
+      ) {
+        const confirmed = await showConfirmModal(
+          "You will no longer have access. Are you sure?",
+        );
+        if (!confirmed) {
+          revertLinkState();
+          return;
+        }
+      }
+
+      let result = await toggleFilePublic(itemId, userRole, access, type);
+
+      if (result?.needsConfirmation) {
+        const { ancestorId, ancestorName, ancestorRole } = result.conflict;
+        updatedParentId = ancestorId;
+
+        const confirmed = await showCascadeConfirm(
+          buildChain({
+            ancestorId,
+            ancestorName,
+            ancestorRole,
+            toLabel: restricted ? "Restricted" : userRole,
+          }),
+        );
+
+        if (!confirmed) {
+          revertLinkState();
+          return;
+        }
+
+        result = await toggleFilePublic(itemId, userRole, access, type, true);
+      }
+
+      // Use the server permission (with its id) if the API returns one
+      permission = result?.permission ?? null;
+    }
+
+    /* ───────────── Update lists ───────────── */
+    const allIdsToBeMatched = [
+      updatedParentId,
+      itemId,
+      ...(isGoogleDriveRoute ? (item.childrenIds ?? []) : []),
+    ]
+      .filter(Boolean)
+      .map(String);
+
+    const matches = (resource) => {
+      const resourceId = String(resource?._id ?? resource?.id);
+      const parentDirId = String(resource?.parentDirId ?? resource?.parents?.[0]);
+      return (
+        allIdsToBeMatched.includes(resourceId) ||
+        allIdsToBeMatched.includes(parentDirId)
+      );
+    };
+
+    const lostAccess =
+      restricted && isMe && (myRole === "remove" || myRole === undefined);
+
+    const applyLinkUpdate = (list) =>
+      lostAccess
+        ? list.filter((resource) => !matches(resource))
+        : list.map((resource) => {
+            if (!matches(resource)) return resource;
+
+            const others = (resource.permissions ?? []).filter(
+              (p) => !isAnyone(p),
+            );
+
+            return {
+              ...resource,
+              capabilities: {
+                ...resource.capabilities,
+                canShare: isMe ? userRole !== "reader" || myRole !== "reader" : true,
+              },
+              isPublic: !restricted,
+              publicRole: restricted ? null : userRole,
+              permissions: restricted
+                ? others
+                : [
+                    ...others,
+                    { ...(permission ?? {}), type: "anyone", role: userRole },
+                  ],
+            };
+          });
+
+    setFilesList(applyLinkUpdate);
+    setDirectoriesList(applyLinkUpdate);
+
+    /* ───────────── Update modal state (single mode only) ───────────── */
+    const updatedPeopleWithAccess = peopleWithAccess
+      .map((p) => {
+        if (p?.role === "remove" && userRole === "writer") return null;
+        if (restricted && isAnyone(p)) return null;
+        if (!restricted && isAnyone(p)) {
+          return { ...p, id: "anyoneWithLink", type: "anyone", role: userRole };
+        }
+        return p;
+      })
+      .filter(Boolean);
+
+    if (!restricted && !updatedPeopleWithAccess.some(isAnyone)) {
+      updatedPeopleWithAccess.push({
+        id: "anyoneWithLink",
+        type: "anyone",
+        role: userRole,
+        allowFileDiscovery: false,
+      });
+    }
 
     if (!isMultiShare) {
-  setPeopleWithAccess(updatedPeopleWithAccess);
-  setLinkAccess(restricted ? "restricted" : "anyone");
-  setLinkRole(restricted ? "reader" : userRole);
-}
-      if (myRole === "remove") {
-        const personsToRemove = peopleWithAccess.filter(
-          (person) => person?.role === "remove",
+      setPeopleWithAccess(updatedPeopleWithAccess);
+      setPrevPermissions(updatedPeopleWithAccess); // keeps "Pending changes" from showing
+      setLinkAccess(restricted ? "restricted" : "anyone");
+      setLinkRole(restricted ? "reader" : userRole);
+    }
+
+    /* ───────────── User chose to drop their own "remove" pending change ───────────── */
+    if (!isMultiShare && myRole === "remove") {
+      const personsToRemove = peopleWithAccess.filter((p) => p?.role === "remove");
+      const removeType = item.isDirectory ? "folder" : "file";
+
+      const messages = await Promise.all(
+        personsToRemove.map((person) =>
+          revokeFileAccess(removeType, itemId, person.id, person.role),
+        ),
+      );
+
+      const setList = removeType === "folder" ? setDirectoriesList : setFilesList;
+      const sameItem = (resource) =>
+        String(resource?._id ?? resource?.id) === String(itemId);
+
+      if (userRole === "reader") {
+        setList((prev) =>
+          restricted
+            ? prev.filter((r) => !sameItem(r))
+            : prev.map((r) =>
+                sameItem(r)
+                  ? {
+                      ...r,
+                      capabilities: {
+                        ...r.capabilities,
+                        canShare: false,
+                        canRename: false,
+                      },
+                      permissions: updatedPeopleWithAccess,
+                    }
+                  : r,
+              ),
         );
-        const removeType = item.isDirectory ? "folder" : "file";
-        const message = await Promise.all(
-          personsToRemove.map((person) =>
-            revokeFileAccess(removeType, itemId, person.id, person.role),
+        setPeopleWithAccess(updatedPeopleWithAccess);
+        setPrevPermissions(updatedPeopleWithAccess);
+        setShareItem(null);
+      } else {
+        setList((prev) =>
+          prev.map((r) =>
+            sameItem(r) ? { ...r, permissions: updatedPeopleWithAccess } : r,
           ),
         );
-        if (incomingPublicRole === "reader") {
-          const update = (list) =>
-            access === "restricted"
-              ? list.filter(
-                  (resource) =>
-                    (resource.id ?? resource._id) !== (item._id ?? item.id),
-                )
-              : list.map((resource) => {
-                  const resourceId = String(resource?._id ?? resource?.id);
-                  if (resourceId !== String(item._id ?? item.id)) {
-                    return resource;
-                  }
-                  return {
-                    ...resource,
-                    capabilities: {
-                      ...resource.capabilities,
-                      canShare: false,
-                      canRename: false,
-                    },
-                    permissions: updatedPeopleWithAccess,
-                  };
-                });
-          if (removeType === "folder") {
-            setDirectoriesList((prev) => update(prev));
-          } else {
-            setFilesList((prev) => update(prev));
-          }
-          setPeopleWithAccess(updatedPeopleWithAccess);
-          setPrevPermissions(updatedPeopleWithAccess);
-          setShareItem(null);
-        }
-        if (incomingPublicRole === "writer") {
-          const update = (list) =>
-            list.map((resource) => {
-              const resourceId = String(resource?._id ?? resource?.id);
-              if (resourceId !== String(item._id ?? item.id)) {
-                return resource;
-              }
-              return {
-                ...resource,
-                permissions: updatedPeopleWithAccess,
-              };
-            });
-          if (removeType === "folder") {
-            setDirectoriesList((prev) => update(prev));
-          } else {
-            setFilesList((prev) => update(prev));
-          }
-          setPeopleWithAccess(updatedPeopleWithAccess);
-          setPrevPermissions(updatedPeopleWithAccess);
-          setShareItem((prev) => ({
-            ...prev,
-            permissions: updatedPeopleWithAccess,
-          }));
-        }
-        toast({
-          message,
-          type: "success",
-        });
-        return;
+        setPeopleWithAccess(updatedPeopleWithAccess);
+        setPrevPermissions(updatedPeopleWithAccess);
+        setShareItem((prev) =>
+          Array.isArray(prev)
+            ? prev
+            : prev
+              ? { ...prev, permissions: updatedPeopleWithAccess }
+              : prev,
+        );
       }
 
-      toast({
-        message: "Public Access updated",
-        type: "success",
-      });
-    } catch (error) {
-      toast({
-        message: error?.message || "Something went wrong!",
-        type: "error",
-      });
-    } finally {
-      setIsShareLoading(false);
+      toast({ message: messages, type: "success" }); // unchanged from original
+      return;
     }
-  };
+
+    toast({ message: "Public Access updated", type: "success" });
+  } catch (error) {
+    toast({
+      message: error?.message || "Something went wrong!",
+      type: "error",
+    });
+  } finally {
+    setIsShareLoading(false);
+  }
+};
 
   const handleSharedRoleUpdate = async (item, type, message) => {
     setIsShareLoading(true);

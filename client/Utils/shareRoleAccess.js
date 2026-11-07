@@ -1,3 +1,4 @@
+
 export const updateSharedAccess = async ({
   item,
   type,
@@ -7,20 +8,21 @@ export const updateSharedAccess = async ({
   grantAccessById,
   revokeFileAccess,
   confirmCascade,
-  notifyPeople
+  notifyPeople,
 }) => {
+
   const previousPermissions = prevPermissions ?? [];
   const currentPermissions = peopleWithAccess ?? [];
 
   const personsToGrant = currentPermissions.filter(
-    (person) => person?.role !== "remove" && person.role !== "owner",
+    (person) =>
+      person?.role !== "remove" &&
+      person?.role !== "owner"
   );
 
   const personsToRemove = currentPermissions.filter(
-    (person) => person?.role === "remove",
+    (person) => person?.role === "remove"
   );
-
-
 
   const equal =
     previousPermissions.length === currentPermissions.length &&
@@ -28,8 +30,8 @@ export const updateSharedAccess = async ({
       currentPermissions.some(
         (person) =>
           String(person?.id) === String(prev?.id) &&
-          person?.role === prev?.role,
-      ),
+          person?.role === prev?.role
+      )
     );
 
   if (equal) {
@@ -41,12 +43,12 @@ export const updateSharedAccess = async ({
 
   const itemId = String(item?._id ?? item?.id);
 
+  let grantResponse = null;
+  let revokeResponses = [];
 
-  let response;
-  let access;
+  // STEP 1: Grant / update permissions
   if (personsToGrant.length) {
-    
-   response = await grantAccessById(
+    grantResponse = await grantAccessById(
       type,
       itemId,
       personsToGrant,
@@ -56,10 +58,9 @@ export const updateSharedAccess = async ({
     );
   }
 
-
+  // STEP 2: Revoke permissions
   if (personsToRemove.length) {
-    access = "remove"
-   response = await Promise.all(
+    revokeResponses = await Promise.all(
       personsToRemove.map((person) =>
         revokeFileAccess(
           type,
@@ -67,16 +68,33 @@ export const updateSharedAccess = async ({
           person.id,
           person.role,
           confirmCascade
-        ),
-      ),
+        )
+      )
     );
   }
 
+ const allResponses = [
+  ...(grantResponse ? [grantResponse] : []),
+  ...revokeResponses,
+];
 
-  return {
-    changed: true,
-    itemId,
-    access,
-    response: response.length ? response[0] : response
-  };
+const confirmationResponse = allResponses.find(
+  (r) => r?.needsConfirmation
+);
+  console.log("STEP 1: updateSharedAccess called");
+
+console.log("Previous:", previousPermissions);
+console.log("Current:", currentPermissions);
+
+console.log("To Grant:", personsToGrant);
+console.log("To Remove:", personsToRemove);
+
+return {
+  changed: true,
+  itemId,
+  grantResponse,
+  revokeResponses,
+  responses: allResponses,
+  response: confirmationResponse || grantResponse || revokeResponses[0] || null,
+};
 };

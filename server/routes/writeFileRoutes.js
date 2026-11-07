@@ -23,7 +23,6 @@ const router = express.Router();
 router.param("parentDir", validateIdMiddleware);
 router.param("id", validateIdMiddleware);
 
-
 // DELETE
 router.delete("/:id", checkAuth, deleteFile);
 router.patch(["/soft-delete", "/soft-delete/:id"], softDeleteFile);
@@ -36,15 +35,20 @@ router.patch("/:itemId/public/:role", checkAuth, toggleFilePublic);
 router.patch("/:id/activity/view", checkAuth, updateFileViewTime);
 
 // Shareble file
-router.post("/grant-access/:id", checkAuth, giveAccessById);
+router.post("/grant-access/batch", checkAuth, giveAccessById);
+
+// Legacy single-item sharing
+router.post(
+  ["/grant-access", "/grant-access/:id"],
+  checkAuth,
+  giveAccessById
+);
 router.post("/revoke-access/:id", checkAuth, revokeAccessById);
 router.patch("/google-drive/permissions/update", updateGoogleDrivePermission);
-
 
 // Upload
 router.post("/uploads/initiate", checkAuth, generateSignedUploadUrl);
 router.post("/uploads/google/complete", checkAuth, uploadDriveFileToS3);
 router.post("/uploads/complete", checkAuth, completeUpload);
-
 
 export default router;

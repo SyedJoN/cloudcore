@@ -291,7 +291,6 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
                           label="View Information"
                           onClick={() => {
                             setDetailsItem(item);
-                            onClose();
                           }}
                         />
                       </>

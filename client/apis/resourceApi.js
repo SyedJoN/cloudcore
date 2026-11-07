@@ -23,31 +23,10 @@ export async function cancelPendingOwnership({ newOwner, itemId, type }) {
   return data;
 }
 
-export async function sendLink({
-  toEmail,
-  message,
-  type,
-  id,
-  name,
-  url,
-  isPublic,
-  publicRole,
-  notifyPeople
-}) {
-  const { data } = await axiosWithCreds.post("/item/send-link", {
-    toEmail,
-    message,
-    type,
-    id,
-    name,
-    url,
-    isPublic,
-    publicRole,
-    notifyPeople
-  });
-
-  return data.message;
-}
+export async function sendLink(payload) {
+  const { data } = await axiosWithCreds.post("/item/send-link", payload);
+  return data; 
+} 
 
 export async function toggleItemStar(id, type) {
   const response = await axiosWithCreds.patch(

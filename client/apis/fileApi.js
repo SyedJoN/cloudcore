@@ -60,24 +60,34 @@ export async function toggleDriveFilePermission(
 
   return data;
 }
+
+
 export async function grantAccessById(
   type,
   fileId,
   usersArray,
   message,
   confirmCascade = false,
-  notifyPeople
+  notifyPeople = false,
+  items = []
 ) {
-  const { data } = await axiosWithCreds.post(`/file/grant-access/${fileId}`, {
+  const isBatch = items.length > 0;
+
+  const url = isBatch
+    ? "/file/grant-access"
+    : `/file/grant-access/${fileId}`;
+
+  const { data } = await axiosWithCreds.post(url, {
     usersArray,
     message,
     type,
     confirmCascade,
-    notifyPeople
+    notifyPeople,
+    ...(isBatch && { items }),
   });
+
   return data;
 }
-
 export async function revokeFileAccess(
   type,
   fileId,

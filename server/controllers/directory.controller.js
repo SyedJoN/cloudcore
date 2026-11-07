@@ -1461,65 +1461,162 @@ export const requestAccess = async (req, res, next) => {
   }
 };
 
+
 export const sendLink = async (req, res, next) => {
   try {
-    const {
-      id,
-      toEmail,
-      message,
-      name,
-      type,
-      url,
-      isPublic,
-      publicRole,
-      notifyPeople,
-    } = req.body;
-    const userId = req.user._id;
-    const isGoogleDriveLink = type.startsWith("google-drive");
-    const sender = await User.findById(userId).select("name email").lean();
+    const { items, toEmails, message, notifyPeople } = req.body;
+
+    if (
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      items.length > 50
+    ) {
+      return res.status(400).json({
+        message: "Send between 1 and 50 items",
+      });
+    }
+
+    if (
+      !Array.isArray(toEmails) ||
+      toEmails.length === 0
+    ) {
+      return res.status(400).json({
+        message: "At least one recipient is required",
+      });
+    }
+
+    if (!notifyPeople) {
+      return res.status(200).json({
+        message: "Item Shared",
+      });
+    }
+
+    const sender = await User.findById(req.user._id)
+      .select("name email")
+      .lean();
+
     const cleanMessage = sanitizeText(message || "");
 
-    if (isGoogleDriveLink && notifyPeople) {
-      await sendLinkEmail({
-        toEmail,
-        fromName: sender.name,
-        fromEmail: sender.email,
-        itemName: name,
-        itemType: type,
-        itemUrl: url,
-        isPublic: isPublic,
-        publicRole: publicRole,
-        message: cleanMessage,
-      });
-      return res
-        .status(200)
-        .json({ message: `${notifyPeople ? "Link sent" : "Item Shared"}` });
-    }
-    const item =
-      type === "folder"
-        ? await Directory.findById(id).lean()
-        : await File.findById(id).lean();
+    const recipients = [
+      ...new Set(
+        toEmails
+          .filter((email) => typeof email === "string")
+          .map((email) => email.trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    ];
 
-    if (notifyPeople) {
-      await sendLinkEmail({
-        toEmail,
-        fromName: sender.name,
-        fromEmail: sender.email,
-        itemName: item.name,
-        itemType: type,
-        itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "currentDirectory" : "file"}/${id}`,
-        isPublic: item.isPublic,
-        publicRole: item.publicRole,
-        message: cleanMessage,
+    const validItems = [];
+    const failed = [];
+
+    // Build and validate all items once
+    for (const it of items) {
+      if (!it.id || !it.type) {
+        failed.push({
+          id: it.id,
+          reason: "Missing item ID or type",
+        });
+        continue;
+      }
+
+      try {
+        let emailItem;
+
+        if (it.type.startsWith("google-drive")) {
+          if (!it.url) {
+            throw new Error("Missing Google Drive URL");
+          }
+
+          emailItem = {
+            name: sanitizeText(it.name || ""),
+            type: it.type,
+            url: it.url,
+            isPublic: Boolean(it.isPublic),
+            publicRole: it.publicRole || "reader",
+          };
+        } else {
+          if (!["file", "folder"].includes(it.type)) {
+            throw new Error("Invalid item type");
+          }
+
+          const Model = it.type === "folder" ? Directory : File;
+
+          const doc = await Model.findById(it.id).lean();
+
+          if (!doc) {
+            throw new Error("Item not found");
+          }
+
+          emailItem = {
+            name: sanitizeText(doc.name),
+            type: it.type,
+            url: `${process.env.CLIENT_URL}/${it.type === "folder" ? "directory" : "file"}/${it.id}`,
+            isPublic: doc.isPublic,
+            publicRole: doc.publicRole,
+          };
+        }
+
+        validItems.push({
+          id: it.id,
+          emailItem,
+        });
+      } catch (error) {
+        failed.push({
+          id: it.id,
+          reason: error.message,
+        });
+      }
+    }
+
+    // One email per recipient containing all selected items
+    let successfulRecipients = 0;
+
+    for (const toEmail of recipients) {
+      try {
+        await sendLinkEmail({
+          toEmail,
+          fromName: sanitizeText(sender.name),
+          fromEmail: sender.email,
+          message: cleanMessage,
+          items: validItems.map((entry) => entry.emailItem),
+        });
+
+        successfulRecipients++;
+      } catch (error) {
+        failed.push({
+          recipient: toEmail,
+          reason: error.message,
+        });
+      }
+    }
+
+    const sent =
+      successfulRecipients > 0 ? validItems.length : 0;
+
+    if (!sent) {
+      return res.status(500).json({
+        message: "Failed to send links",
+        sent: 0,
+        failed,
       });
     }
-    return res
-      .status(200)
-      .json({ message: `${notifyPeople ? "Link sent" : "Item Shared"}` });
+
+    return res.status(200).json({
+      message:
+        failed.length > 0
+          ? `Successfully sent links to ${successfulRecipients} of ${recipients.length} recipients`
+          : recipients.length > 1
+            ? `Links sent to ${recipients.length} recipients`
+            : "Links sent",
+      sent,
+      failed,
+      successfulRecipients,
+    });
   } catch (error) {
     next(error);
   }
 };
+
 
 export const toggleItemStar = async (req, res, next) => {
   try {

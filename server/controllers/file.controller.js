@@ -34,6 +34,7 @@ import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
 import { getCreateCloudfrontSignedUrl } from "../services/s3/cloudfront.js";
+import { sanitizeText } from "../utils/sanitizeText.js";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -1503,390 +1504,670 @@ export const toggleFilePublic = async (req, res, next) => {
     next(error);
   }
 };
-export const giveAccessById = async (req, res, next) => {
-  try {
-    const { usersArray, message, type, confirmCascade, notifyPeople } =
-      req.body;
-    const id = req.params.id;
 
-    if (!Array.isArray(usersArray) || usersArray.length === 0) {
-      return res.status(400).json({ message: "No users provided" });
+async function grantGoogleAccess({
+  id,
+  usersArray,
+  driveToken,
+  itemInfo = {},
+}) {
+  if (!driveToken) {
+    return {
+      status: 401,
+      body: {
+        message: "Missing Google Drive access token",
+        permissions: [],
+      },
+      notify: [],
+    };
+  }
+
+  const drive = getDriveClient(driveToken);
+
+  const responses = [];
+  const notify = [];
+
+  let existingPermissions = [];
+
+  try {
+    const { data } = await drive.permissions.list({
+      fileId: id,
+      supportsAllDrives: true,
+      fields: "permissions(id,type,role,emailAddress)",
+    });
+
+    existingPermissions = data.permissions || [];
+  } catch (error) {
+    return {
+      status: 500,
+      body: {
+        message:
+          error.response?.data?.error?.message || error.message,
+        permissions: [],
+      },
+      notify: [],
+    };
+  }
+
+  for (const user of usersArray) {
+    const email = (
+      user.emailAddress || user.email || ""
+    ).trim().toLowerCase();
+
+    if (
+      !email ||
+      !["reader", "commenter", "writer"].includes(user.role)
+    ) {
+      responses.push({
+        email,
+        success: false,
+        message: "Invalid email or permission role",
+      });
+      continue;
     }
 
-    // Google Drive
-    if (type === "google") {
-      const { drive_access_token } = req.signedCookies;
-
-      if (!drive_access_token) {
-        return res.status(401).json({ message: "Missing token" });
-      }
-
-      const drive = getDriveClient(drive_access_token);
-      const ROLE_PRIORITY = { reader: 1, writer: 2 };
-
-      const findAllPermissionSources = async (fileId, email) => {
-        const chain = [];
-        let currentId = fileId;
-        let isFirst = true;
-
-        while (currentId) {
-          const { data: permData } = await drive.permissions.list({
-            fileId: currentId,
-            fields: "permissions(id,type,role,emailAddress)",
-          });
-
-          const existing = permData.permissions?.find(
-            (p) =>
-              p.type === "user" &&
-              p.emailAddress?.toLowerCase() === email?.toLowerCase(),
-          );
-
-          const { data: fileMeta } = await drive.files.get({
-            fileId: currentId,
-            fields: "id, name, parents",
-          });
-
-          if (existing) {
-            chain.push({
-              fileId: currentId,
-              name: fileMeta.name,
-              role: existing.role,
-              permissionId: existing.id,
-              isCurrentFile: isFirst,
-            });
-          }
-
-          if (!fileMeta.parents?.length) break;
-          currentId = fileMeta.parents?.[0];
-          isFirst = false;
-        }
-
-        return chain.reverse();
-      };
-
-      const usersWithSources = await Promise.all(
-        usersArray.map(async (user) => {
-          const email = user.emailAddress || user.email;
-          const chain = await findAllPermissionSources(id, email);
-          return { user, email, chain };
-        }),
+    try {
+      const existing = existingPermissions.find(
+        (permission) =>
+          permission.type === "user" &&
+          permission.emailAddress?.toLowerCase() === email
       );
 
-      const cascadeConflicts = [];
+      let permission;
+      let action;
 
-      for (const { user, chain } of usersWithSources) {
-        for (const source of chain) {
-          if (source.isCurrentFile) continue;
-          if (source.role === "owner") continue;
-          if (source.name === "My Drive") continue;
-          if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role]) continue;
+      if (existing) {
+        if (existing.role === user.role) {
+          permission = existing;
+          action = "unchanged";
+        } else {
+          const updated = await drive.permissions.update({
+            fileId: id,
+            permissionId: existing.id,
+            supportsAllDrives: true,
+            requestBody: {
+              role: user.role,
+            },
+            fields: "id,type,role,emailAddress",
+          });
 
-          cascadeConflicts.push({
-            userId: user.id,
-            ancestorId: source.fileId,
-            ancestorName: source.name,
-            previousRole: source.role,
-            requestedRole: user.role,
+          permission = updated.data;
+          action = "updated";
+        }
+      } else {
+        const created = await drive.permissions.create({
+          fileId: id,
+          supportsAllDrives: true,
+          requestBody: {
+            type: "user",
+            role: user.role,
+            emailAddress: email,
+          },
+          sendNotificationEmail: false,
+          fields: "id,type,role,emailAddress",
+        });
+
+        permission = created.data;
+        action = "created";
+
+        existingPermissions.push(permission);
+      }
+
+      responses.push({
+        ...permission,
+        email,
+        success: true,
+        action,
+        avatar: user.avatar || null,
+      });
+
+      if (action !== "unchanged" && user.id) {
+        notify.push({
+          userId: user.id,
+          role: user.role,
+          item: {
+            id,
+            name: itemInfo.name || "Shared item",
+            url: itemInfo.url || itemInfo.webViewLink || null,
+            isFolder: Boolean(itemInfo.isFolder),
+          },
+        });
+      }
+    } catch (error) {
+      responses.push({
+        email,
+        success: false,
+        message:
+          error.response?.data?.error?.message ||
+          error.message,
+      });
+    }
+  }
+
+  const failures = responses.filter(
+    (permission) => permission.success === false
+  );
+
+  return {
+    status:
+      failures.length === responses.length ? 500 : 200,
+    body: {
+      message: "Google Drive permissions processed",
+      permissions: responses,
+    },
+    notify,
+  };
+}
+
+async function grantLocalAccess({
+  id,
+  type,
+  usersArray,
+  message,
+  notifyPeople,
+  confirmCascade,
+}) {
+  if (!["file", "folder"].includes(type)) {
+    return {
+      status: 400,
+      body: { message: "Invalid resource type" },
+      notify: [],
+    };
+  }
+
+  const Model = type === "folder" ? Directory : File;
+
+  const item = await Model.findById(id)
+    .populate("parentDirId")
+    .populate("userId", "name email")
+    .lean();
+
+  if (!item) {
+    return {
+      status: 404,
+      body: { message: `${type} not found` },
+      notify: [],
+    };
+  }
+
+  if (type === "folder") {
+    const owner = await User.findById(
+      item.userId?._id || item.userId
+    )
+      .select("parentDirId")
+      .lean();
+
+    if (
+      owner?.parentDirId &&
+      item._id.toString() === owner.parentDirId.toString()
+    ) {
+      return {
+        status: 400,
+        body: { message: "Root directory cannot be shared" },
+        notify: [],
+      };
+    }
+  }
+
+  const findDirectPermission = async (object, userId) => {
+    const result = await fgaClient.read({
+      user: getFgaObject("user", userId),
+      object,
+    });
+
+    const tuple = (result?.tuples || []).find((t) =>
+      ["shared_reader", "shared_writer", "reader", "writer"].includes(
+        t.key?.relation
+      )
+    );
+
+    return tuple?.key || null;
+  };
+
+  const findExistingPermissionSource = async (
+    resourceType,
+    resourceId,
+    userId
+  ) => {
+    let currentType = resourceType;
+    let currentId = resourceId;
+    let resourceName = null;
+
+    while (currentId) {
+      const currentObject = getFgaObject(currentType, currentId);
+
+      const direct = await findDirectPermission(
+        currentObject,
+        userId
+      );
+
+      if (direct) {
+        return {
+          object: currentObject,
+          id: currentId,
+          role: direct.relation,
+          name: resourceName,
+          isCurrentObject:
+            currentId.toString() === resourceId.toString(),
+        };
+      }
+
+      const currentModel =
+        currentType === "folder" ? Directory : File;
+
+      const resource = await currentModel
+        .findById(currentId)
+        .select("name parentDirId")
+        .populate("parentDirId", "name")
+        .lean();
+
+      if (!resource?.parentDirId) break;
+
+      currentType = "folder";
+      resourceName = resource.parentDirId.name;
+      currentId = resource.parentDirId._id;
+    }
+
+    return null;
+  };
+
+  for (const user of usersArray) {
+    if (!user.id) {
+      return {
+        status: 400,
+        body: { message: "User id is required" },
+        notify: [],
+      };
+    }
+
+    if (!["reader", "writer"].includes(user.role)) {
+      return {
+        status: 400,
+        body: { message: `Invalid role: ${user.role}` },
+        notify: [],
+      };
+    }
+  }
+
+  const usersWithSource = await Promise.all(
+    usersArray.map(async (user) => ({
+      user,
+      source: await findExistingPermissionSource(
+        type,
+        id,
+        user.id
+      ),
+    }))
+  );
+
+  const cascadeConflicts = [];
+
+  for (const { user, source } of usersWithSource) {
+    if (!source || source.isCurrentObject) continue;
+    if (source.role === user.role) continue;
+
+    const rootOwner = await User.findOne({
+      parentDirId: source.id,
+    })
+      .select("_id")
+      .lean();
+
+    if (rootOwner) {
+      return {
+        status: 400,
+        body: {
+          message:
+            "Cannot change an inherited permission from the root directory",
+        },
+        notify: [],
+      };
+    }
+
+    cascadeConflicts.push({
+      userId: user.id,
+      ancestorId: source.id,
+      ancestorName: source.name,
+      previousRole: source.role,
+      requestedRole: user.role,
+    });
+  }
+
+  if (cascadeConflicts.length && !confirmCascade) {
+    return {
+      status: 200,
+      body: {
+        needsConfirmation: true,
+        conflict: cascadeConflicts,
+      },
+      notify: [],
+    };
+  }
+
+  const targetObject = getFgaObject(type, id);
+  const notify = [];
+
+  for (const { user, source } of usersWithSource) {
+    const fgaUser = getFgaObject("user", user.id);
+
+    try {
+      if (source?.isCurrentObject) {
+        const existing = await fgaClient.read({
+          user: fgaUser,
+          object: targetObject,
+        });
+
+        const relevant = (existing?.tuples || []).filter((t) =>
+          ["reader", "writer", "shared_reader", "shared_writer"].includes(
+            t.key?.relation
+          )
+        );
+
+        for (const tuple of relevant) {
+          await fgaClient.write({
+            deletes: [
+              {
+                user: fgaUser,
+                relation: tuple.key.relation,
+                object: targetObject,
+              },
+            ],
           });
         }
       }
 
-      if (cascadeConflicts.length && confirmCascade !== true) {
-        return res.status(200).json({
-          needsConfirmation: true,
-          conflict: cascadeConflicts,
-        });
+      const sharedRelation =
+        user.role === "reader" ? "shared_reader" : "shared_writer";
+
+      await fgaClient.write(
+        {
+          writes: [
+            {
+              user: fgaUser,
+              relation: user.role,
+              object: targetObject,
+            },
+          ],
+        },
+        { transaction: { disable: true } }
+      );
+
+      await fgaClient.write(
+        {
+          writes: [
+            {
+              user: fgaUser,
+              relation: sharedRelation,
+              object: targetObject,
+            },
+          ],
+        },
+        { transaction: { disable: true } }
+      );
+
+      if (!source) {
+        await SharedAccess.updateOne(
+          {
+            itemId: id,
+            itemType: type,
+            userId: user.id,
+          },
+          {
+            $setOnInsert: {
+              sharedWithMeTime: new Date(),
+            },
+          },
+          { upsert: true }
+        );
       }
 
-      const responses = await Promise.all(
-        usersWithSources.map(async ({ user, email, chain }) => {
-          for (const source of chain) {
-            if (source.isCurrentFile) continue;
-            if (source.role === "owner") continue;
-            if (source.name === "My Drive") continue;
-            if (ROLE_PRIORITY[source.role] <= ROLE_PRIORITY[user.role])
-              continue;
+      if (notifyPeople && user.id) {
+        const userData = await User.findById(user.id)
+          .select("name email")
+          .lean();
 
-            await drive.permissions.update({
-              fileId: source.fileId,
-              permissionId: source.permissionId,
-              requestBody: { role: user.role },
-              fields: "id,type,role",
-            });
-          }
+        if (userData) {
+          notify.push({
+            userId: user.id,
+            role: user.role,
+            item: {
+              id,
+              name: item.name,
+              url: `${process.env.CLIENT_URL}/${
+                type === "folder" ? "directory" : "file"
+              }/${id}`,
+              isFolder: type === "folder",
+            },
+          });
+        }
+      }
+    } catch (error) {
+      return {
+        status: 500,
+        body: {
+          message: `Failed to update access for ${user.id}: ${error.message}`,
+        },
+        notify: [],
+      };
+    }
+  }
 
-          const directOnFile = chain.find((s) => s.isCurrentFile);
+  const finalResult = await resolveRole(
+    item,
+    type,
+    item?.userId?._id,
+    item.parentDirId,
+    true
+  );
 
-          if (directOnFile) {
-            const response = drive.permissions.update({
-              fileId: id,
-              permissionId: directOnFile.permissionId,
-              requestBody: { role: user.role },
-              fields: "id,type,role,emailAddress,displayName,photoLink",
-            });
+  return {
+    status: 200,
+    body: {
+      message: `${type} access updated successfully`,
+      ...finalResult,
+    },
+    notify,
+  };
+}
 
-            return {
-              ...response.data,
-              avatar: user.avatar || response.data?.photoLink || null,
+
+export const giveAccessById = async (req, res, next) => {
+  try {
+    const {
+      usersArray,
+      message,
+      type,
+      confirmCascade,
+      notifyPeople,
+    } = req.body || {};
+
+    const isBatch = Array.isArray(req.body?.items);
+
+    const items = isBatch
+      ? req.body.items
+      : [{ id: req.params.id, type }];
+
+    if (!Array.isArray(usersArray) || !usersArray.length) {
+      return res.status(400).json({
+        message: "No users provided",
+      });
+    }
+
+    if (!items.length || items.length > 50) {
+      return res.status(400).json({
+        message: "Send between 1 and 50 items",
+      });
+    }
+
+    const uniqueItems = [
+      ...new Map(
+        items.map((item) => [
+          `${item.type}:${item.id}`,
+          item,
+        ])
+      ).values(),
+    ];
+
+    for (const item of uniqueItems) {
+      if (
+        !item.id ||
+        !["file", "folder", "google"].includes(item.type)
+      ) {
+        return res.status(400).json({
+          message: "Invalid item id or type",
+          item,
+        });
+      }
+    }
+
+    const driveToken =
+      req.signedCookies?.drive_access_token;
+
+    const results = [];
+    const notifications = {};
+
+    for (const itemInfo of uniqueItems) {
+      let result;
+
+      try {
+        if (itemInfo.type === "google") {
+          result = await grantGoogleAccess({
+            id: itemInfo.id,
+            usersArray,
+            driveToken,
+            itemInfo,
+          });
+        } else {
+          result = await grantLocalAccess({
+            id: itemInfo.id,
+            type: itemInfo.type,
+            usersArray,
+            message,
+            notifyPeople,
+            confirmCascade,
+          });
+        }
+
+        results.push({
+          id: itemInfo.id,
+          type: itemInfo.type,
+          status: result.status,
+          ...result.body,
+        });
+
+        for (const notification of result.notify || []) {
+          if (!notifications[notification.userId]) {
+            notifications[notification.userId] = {
+              role: notification.role,
+              items: [],
             };
           }
 
-          const response = await drive.permissions.create({
-            fileId: id,
-            requestBody: { type: "user", role: user.role, emailAddress: email },
-            sendNotificationEmail: notifyPeople,
-            fields: "id,type,role,emailAddress,displayName",
-          });
-
-          return {
-            ...response.data,
-            avatar: user.avatar || response.data.photoLink || null,
-          };
-        }),
-      );
-
-      return res.status(200).json({
-        message: message || "Permissions updated successfully!",
-        permissions: responses,
-      });
-    }
-
-    // Local
-    if (!["file", "folder"].includes(type)) {
-      return res.status(400).json({ message: "Invalid resource type" });
-    }
-
-    const Model = type === "folder" ? Directory : File;
-
-    const item = await Model.findById(id)
-      .populate("parentDirId")
-      .populate("userId", "name email")
-      .lean();
-
-    if (!item) {
-      return res.status(404).json({ message: `${type} not found` });
-    }
-
-    if (type === "folder") {
-      const owner = await User.findById(item.userId?._id || item.userId)
-        .select("parentDirId")
-        .lean();
-
-      if (
-        owner?.parentDirId &&
-        item._id.toString() === owner.parentDirId.toString()
-      ) {
-        return res
-          .status(400)
-          .json({ message: "Root directory cannot be shared" });
-      }
-    }
-
-    const findDirectPermission = async (object, userId) => {
-      const result = await fgaClient.read({
-        user: getFgaObject("user", userId),
-        object,
-      });
-      const tuples = result?.tuples || [];
-
-      const tuple = tuples.find((t) =>
-        ["shared_reader", "shared_writer", "reader", "writer"].includes(
-          t.key?.relation,
-        ),
-      );
-
-      return tuple?.key || null;
-    };
-
-    const findExistingPermissionSource = async (
-      resourceType,
-      resourceId,
-      userId,
-    ) => {
-      let currentType = resourceType;
-      let currentId = resourceId;
-      let resourceName = null;
-
-      while (currentId) {
-        const currentObject = getFgaObject(currentType, currentId);
-        const direct = await findDirectPermission(currentObject, userId);
-
-        if (direct) {
-          return {
-            object: currentObject,
-            id: currentId,
-            role: direct.relation,
-            name: resourceName,
-            isCurrentObject: currentId.toString() === resourceId.toString(),
-          };
+          notifications[notification.userId].items.push(
+            notification.item
+          );
         }
+      } catch (error) {
+        console.error("ITEM SHARE ERROR:", {
+          id: itemInfo.id,
+          type: itemInfo.type,
+          message: error.message,
+          googleError: error.response?.data,
+        });
 
-        const currentModel = currentType === "folder" ? Directory : File;
-        const resource = await currentModel
-          .findById(currentId)
-          .select("name parentDirId")
-          .populate("parentDirId", "name")
-          .lean();
-
-        if (!resource?.parentDirId) break;
-
-        currentType = "folder";
-        resourceName = resource.parentDirId.name;
-        currentId = resource.parentDirId._id;
-      }
-
-      return null;
-    };
-
-    for (const user of usersArray) {
-      if (!user.id)
-        return res.status(400).json({ message: "User id is required" });
-      if (!["reader", "writer"].includes(user.role)) {
-        return res.status(400).json({ message: `Invalid role: ${user.role}` });
-      }
-    }
-
-    const usersWithSource = await Promise.all(
-      usersArray.map(async (user) => {
-        const source = await findExistingPermissionSource(type, id, user.id);
-        return { user, source };
-      }),
-    );
-
-    const cascadeConflicts = [];
-
-    for (const { user, source } of usersWithSource) {
-      if (!source || source.isCurrentObject) continue;
-      if (source.role === user.role) continue;
-      const rootOwner = await User.findOne({ parentDirId: source.id })
-        .select("_id")
-        .lean();
-      if (rootOwner) {
-        return res.status(400).json({
+        results.push({
+          id: itemInfo.id,
+          type: itemInfo.type,
+          status: 500,
           message:
-            "Cannot change an inherited permission from the root directory",
+            error.response?.data?.error?.message ||
+            error.message,
+          permissions: [],
         });
       }
-
-      cascadeConflicts.push({
-        userId: user.id,
-        ancestorId: source.id,
-        ancestorName: source.name,
-        previousRole: source.role,
-        requestedRole: user.role,
-      });
     }
 
-    if (cascadeConflicts.length && confirmCascade !== true) {
+    const conflicts = results.filter(
+      (result) => result.needsConfirmation
+    );
+
+    if (conflicts.length) {
       return res.status(200).json({
         needsConfirmation: true,
-        conflict: cascadeConflicts,
+        results,
+        conflict: results.flatMap(
+          (result) => result.conflict || []
+        ),
       });
     }
 
-    // apply the changes
-    const targetObject = getFgaObject(type, id);
+    const emailFailedFor = [];
 
-    await Promise.all(
-      usersWithSource.map(async ({ user, source }) => {
-        const fgaUser = getFgaObject("user", user.id);
+    if (notifyPeople && Object.keys(notifications).length) {
+      const sender = await User.findById(req.user._id)
+        .select("name email")
+        .lean();
 
-        if (source?.isCurrentObject) {
-          const existing = await fgaClient.read({
-            user: fgaUser,
-            object: targetObject,
-          });
-          const relevant = (existing?.tuples || []).filter((t) =>
-            ["reader", "writer", "shared_reader", "shared_writer"].includes(
-              t.key?.relation,
-            ),
-          );
-
-          if (relevant.length) {
-            await Promise.all(
-              relevant.map((t) =>
-                fgaClient.write({
-                  deletes: [
-                    {
-                      user: fgaUser,
-                      relation: t.key.relation,
-                      object: targetObject,
-                    },
-                  ],
-                }),
-              ),
-            );
-          }
-        }
-
-        const newSharedRelation =
-          user.role === "reader" ? "shared_reader" : "shared_writer";
-
-        await Promise.all([
-          fgaClient.write(
-            {
-              writes: [
-                { user: fgaUser, relation: user.role, object: targetObject },
-              ],
-            },
-            { transaction: { disable: true } },
-          ),
-          fgaClient.write(
-            {
-              writes: [
-                {
-                  user: fgaUser,
-                  relation: newSharedRelation,
-                  object: targetObject,
-                },
-              ],
-            },
-            { transaction: { disable: true } },
-          ),
-        ]);
-
-        if (!source) {
-          await SharedAccess.updateOne(
-            { itemId: id, itemType: type, userId: user.id },
-            { $setOnInsert: { sharedWithMeTime: new Date() } },
-            { upsert: true },
-          );
-
-          const userData = await User.findById(user.id)
-            .select("name email avatar")
+      for (const [userId, notification] of Object.entries(
+        notifications
+      )) {
+        try {
+          const recipient = await User.findById(userId)
+            .select("name email")
             .lean();
 
-          if (userData && notifyPeople) {
-            await sendAccessEmail({
-              toEmail: userData.email,
-              toName: userData.name,
-              fromName: item.userId.name,
-              fromEmail: item.userId.email,
-              itemName: item.name,
-              itemType: type,
-              itemUrl: `${process.env.CLIENT_URL}/${type === "folder" ? "directory" : "file"}/${id}`,
-              role: user.role,
-              message,
-            });
-          }
+          if (!recipient) continue;
+
+          await sendAccessEmail({
+            toEmail: recipient.email,
+            toName: sanitizeText(recipient.name),
+            fromName: sanitizeText(sender?.name),
+            fromEmail: sender?.email,
+            role: notification.role,
+            message: sanitizeText(message || ""),
+            items: notification.items,
+          });
+        } catch (error) {
+          console.error("SHARE EMAIL ERROR:", error.message);
+          emailFailedFor.push(userId);
         }
-      }),
-    );
-    const finalResult = await resolveRole(
-      item,
-      type,
-      item?.userId._id,
-      item.parentDirId,
-      true,
-    );
+      }
+    }
+
+    if (!isBatch) {
+      const {
+        id,
+        type: itemType,
+        status,
+        ...body
+      } = results[0];
+
+      return res.status(status).json(body);
+    }
 
     return res.status(200).json({
-      message: `${type} access updated successfully`,
-      ...finalResult,
+      results,
+      emailFailedFor,
+      summary: {
+        total: uniqueItems.length,
+        successful: results.filter(
+          (result) =>
+            result.status >= 200 &&
+            result.status < 300 &&
+            result.permissions?.some(
+              (permission) => permission.success !== false
+            )
+        ).length,
+        failed: results.filter(
+          (result) => result.status < 200 || result.status >= 300
+        ).length,
+      },
     });
   } catch (error) {
-    console.error("giveAccessById error:", error);
-    next(error);
+    console.error("GIVE ACCESS ERROR:", error);
+
+    return res.status(500).json({
+      message: error.message || "Failed to grant access",
+    });
   }
 };
 
@@ -1903,121 +2184,146 @@ export const revokeAccessById = async (req, res, next) => {
     }
 
     // Google Drive permission
-    if (type === "google") {
-      const { drive_access_token } = req.signedCookies;
+   
+if (type === "google") {
+  const { drive_access_token } = req.signedCookies;
 
-      if (!drive_access_token) {
-        return res.status(401).json({ message: "Missing token" });
-      }
+  if (!drive_access_token) {
+    return res.status(401).json({
+      message: "Missing token",
+    });
+  }
 
-      const drive = getDriveClient(drive_access_token);
-      const isPublicLink = permissionId === "anyoneWithLink";
+  const drive = getDriveClient(drive_access_token);
+  const isPublicLink = permissionId === "anyoneWithLink";
 
-      const findPermission = async (fileId) => {
-        const { data } = await drive.permissions.list({
-          fileId,
-          fields: "permissions(id,type,role,emailAddress,permissionDetails)",
+  const findPermission = async (fileId) => {
+    const { data } = await drive.permissions.list({
+      fileId,
+      fields:
+        "permissions(id,type,role,emailAddress,permissionDetails(inherited,permissionType,role))",
+    });
+
+    return isPublicLink
+      ? data.permissions?.find((p) => p.type === "anyone")
+      : data.permissions?.find(
+          (p) => p.type === "user" && p.id === permissionId
+        );
+  };
+
+  const targetPermission = await findPermission(id);
+
+  if (!targetPermission) {
+    return res.status(404).json({
+      message: "Permission not found",
+    });
+  }
+
+  const hasInherited = targetPermission.permissionDetails?.some(
+    (d) => d.inherited === true
+  );
+
+  // Inherited permission confirmation
+  if (hasInherited && confirmCascade !== true) {
+    const { data: fileMeta } = await drive.files.get({
+      fileId: id,
+      fields: "parents",
+    });
+
+    let ancestorId = fileMeta.parents?.[0];
+    let ancestorMatch = null;
+
+    while (ancestorId) {
+      const perm = await findPermission(ancestorId);
+
+      if (perm) {
+        const { data: ancestorMeta } = await drive.files.get({
+          fileId: ancestorId,
+          fields: "id,name,parents",
         });
 
-        return isPublicLink
-          ? data.permissions?.find((p) => p.type === "anyone")
-          : data.permissions?.find(
-              (p) => p.type === "user" && p.id === permissionId,
-            );
-      };
+        ancestorMatch = {
+          fileId: ancestorId,
+          name: ancestorMeta.name,
+          permission: perm,
+        };
 
-      const targetPermission = await findPermission(id);
-
-      if (!targetPermission) {
-        return res.status(404).json({ message: "Permission not found" });
+        break;
       }
 
-      const hasInherited = targetPermission.permissionDetails?.some(
-        (d) => d.inherited === true,
-      );
-
-      if (hasInherited && confirmCascade !== true) {
-        const { data: fileMeta } = await drive.files.get({
-          fileId: id,
-          fields: "parents",
-        });
-
-        let ancestorId = fileMeta.parents?.[0];
-        let ancestorMatch = null;
-
-        while (ancestorId) {
-          const perm = await findPermission(ancestorId);
-
-          if (perm) {
-            const { data: ancestorMeta } = await drive.files.get({
-              fileId: ancestorId,
-              fields: "id, name, parents",
-            });
-            ancestorMatch = {
-              fileId: ancestorId,
-              name: ancestorMeta.name,
-              permission: perm,
-            };
-            break;
-          }
-
-          const { data: nextMeta } = await drive.files.get({
-            fileId: ancestorId,
-            fields: "parents",
-          });
-          ancestorId = nextMeta.parents?.[0];
-        }
-
-        return res.status(200).json({
-          needsConfirmation: true,
-          conflict: ancestorMatch
-            ? {
-                ancestorId: ancestorMatch.fileId,
-                ancestorName: ancestorMatch.name,
-                previousRole: ancestorMatch.permission.role,
-              }
-            : null,
-        });
-      }
-
-      if (hasInherited && confirmCascade === true) {
-        const { data: fileMeta } = await drive.files.get({
-          fileId: id,
-          fields: "parents",
-        });
-        let ancestorId = fileMeta?.parents?.[0];
-        while (ancestorId) {
-          const perm = await findPermission(ancestorId);
-
-          if (perm) {
-            drive.permissions.delete({
-              fileId: ancestorId,
-              permissionId: perm.id,
-            });
-            break;
-          }
-
-          const { data: nextMeta } = await drive.files.get({
-            fileId: ancestorId,
-            fields: "parents",
-          });
-          ancestorId = nextMeta.parents?.[0];
-        }
-
-        return res
-          .status(200)
-          .json({ message: "Permission revoked successfully" });
-      }
-
-      drive.permissions.delete({
-        fileId: id,
-        permissionId: targetPermission.id,
+      const { data: nextMeta } = await drive.files.get({
+        fileId: ancestorId,
+        fields: "parents",
       });
 
-      return res
-        .status(200)
-        .json({ message: "Permission revoked successfully" });
+      ancestorId = nextMeta.parents?.[0];
     }
+
+    return res.status(200).json({
+      needsConfirmation: true,
+      conflict: ancestorMatch
+        ? {
+            ancestorId: ancestorMatch.fileId,
+            ancestorName: ancestorMatch.name,
+            previousRole: ancestorMatch.permission.role,
+          }
+        : null,
+    });
+  }
+
+  // Confirmed inherited permission removal
+  if (hasInherited && confirmCascade === true) {
+    const { data: fileMeta } = await drive.files.get({
+      fileId: id,
+      fields: "parents",
+    });
+
+    let ancestorId = fileMeta.parents?.[0];
+    let revoked = false;
+
+    while (ancestorId) {
+      const perm = await findPermission(ancestorId);
+
+      if (perm) {
+        await drive.permissions.delete({
+          fileId: ancestorId,
+          permissionId: perm.id,
+        });
+
+        revoked = true;
+        break;
+      }
+
+      const { data: nextMeta } = await drive.files.get({
+        fileId: ancestorId,
+        fields: "parents",
+      });
+
+      ancestorId = nextMeta.parents?.[0];
+    }
+
+    if (!revoked) {
+      return res.status(404).json({
+        message: "Parent permission not found",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Permission revoked successfully",
+    });
+  }
+
+  // Direct permission removal
+  await drive.permissions.delete({
+    fileId: id,
+    permissionId: targetPermission.id,
+  });
+
+  return res.status(200).json({
+    message: "Permission revoked successfully",
+  });
+}
+
 
     // Local (FGA) permission
     const objectType = type === "folder" ? "folder" : "file";
