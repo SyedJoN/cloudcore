@@ -10,7 +10,7 @@ import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import { useAuth, useGDrive } from "../../Contexts";
 import { Divider } from "../Divider";
 import { useCallback, useEffect, useRef } from "react";
-
+import "./MobileListRow.css"
 const currentYear = new Date().getFullYear();
 
 // same helper as in ListRow, move it to Utils/formatDate and import it in both
@@ -45,12 +45,9 @@ export default function MobileListRow({
   owner,
   isStarred = {},
   selected,
-  showInputCircle,
-  setShowInputCircle,
-  selectedItemsSize,
+  selectionMode,
+  setSelectionMode,
   setSelectedItems,
-  combinedItems,
-  handleSelectAll,
   onContextMenu,
   onSelect,
   onDoubleClick,
@@ -123,6 +120,7 @@ export default function MobileListRow({
 
   // for mobile double click
   const handleTouchEnd = () => {
+    if (selectionMode) return;
     const now = Date.now();
 
     if (now - lastTap.current < 300) {
@@ -132,58 +130,14 @@ export default function MobileListRow({
       lastTap.current = now;
     }
   };
-  useEffect(() => {
-    if (selectedItemsSize === 0) {
-      setShowInputCircle(false);
-    }
-  }, [selectedItemsSize]);
   return (
     <>
-      {showInputCircle && (
-        <div className="gd-mobile-selected-header w-full h-16 flex items-center fixed top-0 left-0 bg-(--surface-container) z-400">
-          <button
-            onClick={() => {
-              setSelectedItems(new Set());
-              setShowInputCircle(false);
-            }}
-            aria-label="Back"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
-          >
-            {selectedItemsSize >= combinedItems.length ? (
-              <MdClose className="h-6 w-6" />
-            ) : (
-              <ChevronLeftIcon className="h-6 w-6" />
-            )}
-          </button>
-          <div className="flex items-center justify-between flex-1">
-            <p>{selectedItemsSize} Selected</p>
-            <div className="flex">
-              <button
-                onClick={() => handleSelectAll?.()}
-                aria-label="Back"
-                className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
-              >
-                <MdOutlineSelectAll className="h-6 w-6" />
-              </button>
-              <button
-                onClick={(e) => onContextMenu?.(e, itemId)}
-                aria-label="Back"
-                className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
-              >
-                <EllipsisVerticalIcon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+ 
       <div
-        className={`gd-mobile-list-row flex items-center gap-2 pr-1.5 active:bg-black/5 border-b border-(--divider) py-1.5 px-1 rounded-2xl ${
-          selected ? "selected bg-(--surface-container-dark-hover)" : ""
-        }`}
+       className={`mlr-card ${selected ? "selected" : ""}`}
         data-id={itemId}
         onClick={() => {
-          if (showInputCircle) {
+          if (selectionMode) {
             handleToggle(itemId); // selection mode: parent call nahi hoga
             return;
           }
@@ -191,15 +145,14 @@ export default function MobileListRow({
           onRowClick?.(type, itemId, item.isDeleted);
         }}
         onTouchEnd={() => {
-          if (showInputCircle) return; // selection mode mein double tap nahi
           handleTouchEnd();
         }}
         onContextMenu={(e) => {
-          if (showInputCircle) return;
+          if (selectionMode) return;
           e.preventDefault();
           e.stopPropagation();
           setSelectedItems(new Set([itemId])); // long press: sirf yeh file select
-          setShowInputCircle(true);
+          setSelectionMode(true);
         }}
       >
         {/* icon */}
@@ -225,10 +178,10 @@ export default function MobileListRow({
         {/* kebab / checkbox */}
         <button
           type="button"
-          aria-label={showInputCircle ? "Select item" : "More actions"}
+          aria-label={selectionMode ? "Select item" : "More actions"}
           onClick={(e) => {
             e.stopPropagation();
-            if (showInputCircle) {
+            if (selectionMode) {
               handleToggle(itemId);
               return;
             }
@@ -238,7 +191,7 @@ export default function MobileListRow({
           }}
           className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
         >
-          {showInputCircle ? (
+          {selectionMode ? (
             <div
               className={`h-5 w-5 rounded-full border-2 flex items-center justify-center
     ${selected ? "bg-white" : "bg-transparent border-white"}`}

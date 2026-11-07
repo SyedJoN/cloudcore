@@ -2819,15 +2819,27 @@ export const completeFolderUpload = async (req, res, next) => {
 };
 
 
+
 export const copyItems = async (req, res, next) => {
   try {
     const userId = req.user?._id;
     const providerType = req.body?.providerType;
 
-    // Support both single and multiple items
-    const items = req.body?.items ?? (req.body?.item ? [req.body.item] : []);
+    const items =
+      req.body?.items ??
+      (req.body?.item ? [req.body.item] : []);
 
     const allowedProviderTypes = ["local", "google"];
+
+    // =========================================
+    // VALIDATION
+    // =========================================
+
+    if (!userId) {
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
 
     if (!items.length) {
       return res.status(400).json({
@@ -2841,7 +2853,6 @@ export const copyItems = async (req, res, next) => {
       });
     }
 
-    // Resolve item types
     const normalizedItems = items.map((item) => ({
       ...item,
       itemId: item?._id || item?.id,
@@ -2853,7 +2864,7 @@ export const copyItems = async (req, res, next) => {
     for (const item of normalizedItems) {
       if (!item.itemId) {
         return res.status(400).json({
-          message: "Item id is required",
+          message: "Item ID is required",
         });
       }
 
@@ -2864,121 +2875,161 @@ export const copyItems = async (req, res, next) => {
       }
     }
 
-    const copiedItems = [];
-
     // =========================================
     // GOOGLE DRIVE
     // =========================================
+
     if (providerType === "google") {
       const { drive_access_token } = req.signedCookies;
 
       if (!drive_access_token) {
         return res.status(401).json({
-          message: "Missing token",
+          message: "Missing Google Drive token",
         });
       }
 
       const drive = getDriveClient(drive_access_token);
 
-      async function copyGoogleFolder(
+      const GOOGLE_FOLDER_MIME =
+        "application/vnd.google-apps.folder";
+
+      const GOOGLE_FIELDS = [
+        "id",
+        "name",
+        "mimeType",
+        "parents",
+        "webViewLink",
+        "owners",
+        "createdTime",
+        "modifiedTime",
+        "capabilities",
+      ].join(",");
+
+      // -----------------------------------------
+      // Fetch complete copied item information
+      // -----------------------------------------
+
+      const getGoogleItemDetails = async (fileId) => {
+        const [fileResponse, permissionsResponse] =
+          await Promise.all([
+            drive.files.get({
+              fileId,
+              fields: GOOGLE_FIELDS,
+            }),
+
+            drive.permissions.list({
+              fileId,
+              fields:
+                "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
+            }),
+          ]);
+
+        return {
+          ...fileResponse.data,
+          owners: fileResponse.data.owners || [],
+          capabilities: fileResponse.data.capabilities || {},
+          permissions:
+            permissionsResponse.data.permissions || [],
+        };
+      };
+
+      // -----------------------------------------
+      // Recursively copy Google Drive folders
+      // -----------------------------------------
+
+      const copyGoogleFolder = async (
         sourceFolderId,
         destinationParentId,
         newName,
-      ) {
-        const folder = await drive.files.create({
+      ) => {
+        const folderResponse = await drive.files.create({
           requestBody: {
             name: newName,
-            mimeType: "application/vnd.google-apps.folder",
+            mimeType: GOOGLE_FOLDER_MIME,
             parents: [destinationParentId],
           },
-          fields:
-            "id,name,mimeType,parents,webViewLink,owners,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+          fields: "id",
         });
 
-        const newFolderId = folder.data.id;
+        const newFolderId = folderResponse.data.id;
 
-        const response = await drive.files.list({
-          q: `'${sourceFolderId}' in parents and trashed = false`,
-          fields: "files(id,name,mimeType)",
-        });
+        let nextPageToken;
 
-        for (const file of response.data.files || []) {
-          if (file.mimeType === "application/vnd.google-apps.folder") {
-            await copyGoogleFolder(
-              drive,
-              file.id,
-              newFolderId,
-              file.name,
-            );
-          } else {
-            await drive.files.copy({
-              fileId: file.id,
-              requestBody: {
-                name: file.name,
-                parents: [newFolderId],
-              },
-            });
+        do {
+          const response = await drive.files.list({
+            q: `'${sourceFolderId}' in parents and trashed = false`,
+            fields: "nextPageToken,files(id,name,mimeType)",
+            pageToken: nextPageToken,
+            pageSize: 1000,
+          });
+
+          for (const file of response.data.files || []) {
+            if (file.mimeType === GOOGLE_FOLDER_MIME) {
+              await copyGoogleFolder(
+                file.id,
+                newFolderId,
+                file.name,
+              );
+            } else {
+              await drive.files.copy({
+                fileId: file.id,
+                requestBody: {
+                  name: file.name,
+                  parents: [newFolderId],
+                },
+                fields: "id",
+              });
+            }
           }
-        }
 
-        const permissions = await drive.permissions.list({
-          fileId: newFolderId,
-          fields:
-            "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
-        });
+          nextPageToken = response.data.nextPageToken;
+        } while (nextPageToken);
 
-        return {
-          ...folder.data,
-          owners: folder.data.owners || [],
-          capabilities: folder.data.capabilities || {},
-          permissions: permissions.data.permissions || [],
-        };
-      }
+        return getGoogleItemDetails(newFolderId);
+      };
+
+      // -----------------------------------------
+      // Copy selected items
+      // -----------------------------------------
+
+      const copiedItems = [];
 
       for (const item of normalizedItems) {
         if (item.type === "file") {
           const copiedFile = await drive.files.copy({
             fileId: item.itemId,
             requestBody: {
-              name: `Copy of ${item.name}`,
+              name: `Copy of ${item.name || "file"}`,
             },
-            fields:
-              "id,name,mimeType,webViewLink,owners,createdTime,modifiedTime,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive)",
+            fields: "id",
           });
 
-          const permissions = await drive.permissions.list({
-            fileId: copiedFile.data.id,
-            fields:
-              "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
-          });
+          const copiedItem = await getGoogleItemDetails(
+            copiedFile.data.id,
+          );
 
           copiedItems.push({
-            copiedItem: {
-              ...copiedFile.data,
-              owners: copiedFile.data.owners || [],
-              capabilities: copiedFile.data.capabilities || {},
-              permissions: permissions.data.permissions || [],
-            },
+            copiedItem,
           });
-
         } else {
           const sourceFolder = await drive.files.get({
             fileId: item.itemId,
-            fields: "id,name,mimeType,parents",
+            fields: "id,name,parents,mimeType",
           });
 
-          const destinationParentId = sourceFolder.data.parents?.[0];
+          const destinationParentId =
+            sourceFolder.data.parents?.[0];
 
           if (!destinationParentId) {
             return res.status(400).json({
-              message: `Could not determine destination parent for ${item.name}`,
+              message: `Could not determine destination parent for ${sourceFolder.data.name}`,
             });
           }
 
           const copiedFolder = await copyGoogleFolder(
             item.itemId,
             destinationParentId,
-            `Copy of ${item.name}`,
+            `Copy of ${sourceFolder.data.name}`,
           );
 
           copiedItems.push({
@@ -2999,7 +3050,10 @@ export const copyItems = async (req, res, next) => {
     // LOCAL STORAGE
     // =========================================
 
-    // Check permissions for all selected items
+    // -----------------------------------------
+    // Check copy permissions
+    // -----------------------------------------
+
     const checks = await Promise.all(
       normalizedItems.map((item) =>
         fgaClient.check({
@@ -3012,20 +3066,24 @@ export const copyItems = async (req, res, next) => {
 
     if (checks.some((check) => !check.allowed)) {
       return res.status(403).json({
-        message: "Unauthorized!",
+        message: "Unauthorized! You cannot copy one or more items.",
       });
     }
 
     const relationships = [];
+    const createdItems = [];
 
+    // -----------------------------------------
     // Recursively copy local files and folders
-    async function copyLocalItem(
+    // -----------------------------------------
+
+    const copyLocalItem = async (
       source,
       type,
       parentDirId,
       path,
       name,
-    ) {
+    ) => {
       const Model = type === "folder" ? Directory : File;
 
       const copiedItem = new Model({
@@ -3042,8 +3100,11 @@ export const copyItems = async (req, res, next) => {
         copiedItem.extension = source.extension;
         copiedItem.isUploading = true;
 
-        const newS3Key = `${copiedItem._id}${copiedItem.extension}`;
-        const oldS3Key = `${source._id}${source.extension}`;
+        const newS3Key =
+          `${copiedItem._id}${copiedItem.extension}`;
+
+        const oldS3Key =
+          `${source._id}${source.extension}`;
 
         await copyS3File(oldS3Key, newS3Key);
 
@@ -3052,6 +3113,7 @@ export const copyItems = async (req, res, next) => {
 
       await copiedItem.save();
 
+      // Collect OpenFGA relationships
       relationships.push(
         {
           user: getFgaObject("user", userId),
@@ -3065,19 +3127,26 @@ export const copyItems = async (req, res, next) => {
         },
       );
 
+      // Track newly created documents
+      createdItems.push(copiedItem);
+
       // Recursively copy folder contents
       if (type === "folder") {
-        const [childFolders, childFiles] = await Promise.all([
-          Directory.find({
-            parentDirId: source._id,
-          }).lean(),
+        const [childFolders, childFiles] =
+          await Promise.all([
+            Directory.find({
+              parentDirId: source._id,
+            }).lean(),
 
-          File.find({
-            parentDirId: source._id,
-          }).lean(),
-        ]);
+            File.find({
+              parentDirId: source._id,
+            }).lean(),
+          ]);
 
-        const childPath = [...path, copiedItem._id];
+        const childPath = [
+          ...path,
+          copiedItem._id,
+        ];
 
         for (const folder of childFolders) {
           await copyLocalItem(
@@ -3101,16 +3170,27 @@ export const copyItems = async (req, res, next) => {
       }
 
       return copiedItem;
-    }
+    };
+
+    // -----------------------------------------
+    // Create copied items
+    // -----------------------------------------
+
+    const copiedDocuments = [];
 
     for (const item of normalizedItems) {
-      const Model = item.type === "folder" ? Directory : File;
+      const Model =
+        item.type === "folder" ? Directory : File;
 
-      const dbItem = await Model.findById(item.itemId).lean();
+      const dbItem = await Model.findById(
+        item.itemId,
+      ).lean();
 
       if (!dbItem) {
         return res.status(404).json({
-          message: `${item.type === "folder" ? "Folder" : "File"} not found: ${item.itemId}`,
+          message: `${
+            item.type === "folder" ? "Folder" : "File"
+          } not found: ${item.itemId}`,
         });
       }
 
@@ -3122,29 +3202,63 @@ export const copyItems = async (req, res, next) => {
         `Copy of ${dbItem.name}`,
       );
 
-      const { owners, capabilities, permissions } = await resolveRole(
+      copiedDocuments.push({
         copiedItem,
-        item.type,
-        userId,
-        copiedItem.parentDirId,
-      );
-
-      copiedItems.push({
-        copiedItem,
-        owners,
-        capabilities,
-        permissions,
+        type: item.type,
       });
     }
 
-    // Write OpenFGA relationships in batches
+    // -----------------------------------------
+    // Write OpenFGA relationships BEFORE
+    // resolving capabilities
+    // -----------------------------------------
+
     const batchSize = 100;
 
-    for (let i = 0; i < relationships.length; i += batchSize) {
+    for (
+      let i = 0;
+      i < relationships.length;
+      i += batchSize
+    ) {
       await fgaClient.write({
-        writes: relationships.slice(i, i + batchSize),
+        writes: relationships.slice(
+          i,
+          i + batchSize,
+        ),
       });
     }
+
+    // -----------------------------------------
+    // Resolve permissions AFTER relationships
+    // -----------------------------------------
+
+    const copiedItems = await Promise.all(
+      copiedDocuments.map(
+        async ({ copiedItem, type }) => {
+          const {
+            owners,
+            capabilities,
+            permissions,
+          } = await resolveRole(
+            copiedItem,
+            type,
+            userId,
+            copiedItem.parentDirId,
+          );
+
+          return {
+            copiedItem,
+            owners,
+            capabilities,
+            permissions,
+          };
+        },
+      ),
+    );
+
+    // =========================================
+    // SUCCESS RESPONSE
+    // =========================================
 
     return res.status(201).json({
       message: `${copiedItems.length} item(s) copied successfully`,
@@ -3157,15 +3271,20 @@ export const copyItems = async (req, res, next) => {
 
     if (error?.code === 403) {
       return res.status(403).json({
-        message: error?.cause?.message || "You can't copy this item",
+        message:
+          error?.cause?.message ||
+          "You can't copy this item",
       });
     }
 
     return res.status(500).json({
-      message: error.message || "Something went wrong while copying items",
+      message:
+        error.message ||
+        "Something went wrong while copying items",
     });
   }
 };
+
 
 
 export const moveItems = async (req, res, next) => {

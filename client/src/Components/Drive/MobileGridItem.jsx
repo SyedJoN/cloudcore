@@ -20,11 +20,8 @@ export default function MobileGridItem({
   owner,
   selected,
   setSelectedItems,
-  combinedItems = [],
-  selectedItemsSize,
-  showInputCircle,
-  setShowInputCircle,
-  handleSelectAll,
+  selectionMode,
+  setSelectionMode,
   onSelect,
   onRowClick,
   onDoubleClick,
@@ -52,7 +49,6 @@ export default function MobileGridItem({
 
   const modified = item.modifiedTime ? new Date(item.modifiedTime).getTime() : 0;
   const viewed = item.viewedByMeTime ? new Date(item.viewedByMeTime).getTime() : 0;
-  const isOpened = viewed > modified;
 
   const handleToggle = useCallback(
     (id) => {
@@ -66,11 +62,8 @@ export default function MobileGridItem({
     [setSelectedItems],
   );
 
-  useEffect(() => {
-    if (selectedItemsSize === 0) setShowInputCircle(false);
-  }, [selectedItemsSize]);
-
    const handleTouchEnd = () => {
+    if (selectionMode) return;
     const now = Date.now();
 
     if (now - lastTap.current < 300) {
@@ -83,7 +76,7 @@ export default function MobileGridItem({
 
 
   const handleClick = () => {
-    if (showInputCircle) {
+    if (selectionMode) {
       handleToggle(itemId);
       return;
     }
@@ -93,14 +86,14 @@ export default function MobileGridItem({
   const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (showInputCircle) return;
+    if (selectionMode) return;
     setSelectedItems(new Set([itemId]));
-    setShowInputCircle(true);
+    setSelectionMode(true);
   };
 
   const handleKebab = (e) => {
     e.stopPropagation();
-    if (showInputCircle) {
+    if (selectionMode) {
       handleToggle(itemId);
       return;
     }
@@ -128,7 +121,7 @@ export default function MobileGridItem({
 
   return (
     <>
-      {showInputCircle && (
+      {/* {selectionMode && (
         <div className="mgi-selection-bar">
           <button
             type="button"
@@ -136,7 +129,7 @@ export default function MobileGridItem({
             aria-label="Exit selection"
             onClick={() => {
               setSelectedItems(new Set());
-              setShowInputCircle(false);
+              setSelectionMode(false);
             }}
           >
             {selectedItemsSize >= combinedItems.length ? (
@@ -163,7 +156,7 @@ export default function MobileGridItem({
             <EllipsisVerticalIcon className="h-6 w-6" />
           </button>
         </div>
-      )}
+      )} */}
 
       <div
         className={`mgi-card ${selected ? "selected" : ""}`}
@@ -185,10 +178,10 @@ export default function MobileGridItem({
           <button
             type="button"
             className="mgi-trailing"
-            aria-label={showInputCircle ? "Select item" : "More actions"}
+            aria-label={selectionMode ? "Select item" : "More actions"}
             onClick={handleKebab}
           >
-            {showInputCircle ? (
+            {selectionMode ? (
               <span className={`mgi-check ${selected ? "on" : ""}`}>
                 {selected && (
                   <svg viewBox="0 0 24 24" width="12" height="12">

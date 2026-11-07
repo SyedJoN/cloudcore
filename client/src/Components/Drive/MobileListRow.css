@@ -1,0 +1,220 @@
+/* ---------- Grid wrapper: exactly 2 columns, edge to edge ---------- */
+.mlr-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  row-gap: 24px;
+  column-gap: 16px;
+  padding: 4px 0 16px !important;
+  margin: 0 !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  align-items: start;
+}
+.mlr-grid > * {
+  min-width: 0;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.mlr-section-label {
+  padding: 12px 4px 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary, #9aa0a6);
+}
+
+/* ---------- Card (folders AND files, same size) ---------- */
+.mlr-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 6px;
+  padding-block: 6px;
+  border-radius: 16px;
+  border-bottom: 1px solid var(--divider);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mlr-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--surface-container-dark-hover, #2a2b2d);
+
+  clip-path: inset(0 50% 0 50%);
+}
+
+.mlr-card:active::before {
+  opacity: 0.8;
+  filter: blur(40px);
+  clip-path: inset(0 0 0 0);
+  transition: clip-path 200ms ease-out;
+}
+.mlr-card.selected {
+  background: var(--surface-container-dark-hover, #2a2b2d);
+}
+
+/* Header */
+.mlr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 2px 0 10px;
+  flex-shrink: 0;
+}
+.mlr-head-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.mlr-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Menu / checkbox button (smaller so names get more room) */
+.mlr-trailing {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary, #e3e3e3);
+  cursor: pointer;
+}
+.mlr-trailing:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+.mlr-check {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #000000;
+  border-radius: 50%;
+  color: none;
+  transition:
+    background 150ms,
+    border-color 150ms;
+}
+.mlr-check.on {
+  color: black;
+  background: transparent;
+}
+
+/* Preview area fills all remaining space */
+.mlr-preview {
+  flex: 1;
+  min-height: 0;
+  margin: 0 8px 8px;
+  border-radius: 10px;
+  background: transparent;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.mlr-preview > img,
+.mlr-preview > div,
+.mlr-preview > video {
+  width: 100%;
+  height: 100%;
+}
+.mlr-preview img,
+.mlr-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Activity row */
+.mlr-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.mlr-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.mlr-avatar-letter {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #fff;
+}
+.mlr-activity-text {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9aa0a6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Selection top bar */
+.mlr-selection-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 400;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  background: var(--surface-container, #1e1f20);
+  animation: mgi-fade 150ms ease both;
+}
+.mlr-bar-count {
+  flex: 1;
+  margin: 0 0 0 4px;
+  font-size: 18px;
+  color: var(--text-primary, #e3e3e3);
+}
+.mlr-bar-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary, #e3e3e3);
+}
+.mlr-bar-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+@keyframes mgi-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

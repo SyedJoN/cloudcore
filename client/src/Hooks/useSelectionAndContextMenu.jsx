@@ -22,48 +22,58 @@ export function useSelectionAndContextMenu({
   }, [combinedItems]);
 
   const handleContextMenu = useCallback(
-    (e, id) => {
-      e.stopPropagation();
-      e.preventDefault();
-      const spaceLeft = e.clientX;
-      const spaceRight = window.innerWidth - e.clientX;
+  (e, id) => {
+    e.stopPropagation();
+    e.preventDefault();
 
-      let left = false;
-      let x = e.clientX;
+    // Toggle off if clicking the same item again
+    if (open && contextItem?.id === id) {
+      setOpen(false);
+      setContextItem(null);
+      return;
+    }
 
-      if (spaceRight >= CONTEXT_MENU_WIDTH) {
-        left = false;
-        x = e.clientX;
-      } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
-        left = true;
-        x = e.clientX - CONTEXT_MENU_WIDTH;
-      } else {
-        left = spaceLeft > spaceRight;
-        x = left ? 0 : e.clientX;
-      }
+    const spaceLeft = e.clientX;
+    const spaceRight = window.innerWidth - e.clientX;
 
-      setOpenLeft(left);
-      setOpen(true);
-      setContextPos({ x, y: e.clientY });
+    let left = false;
+    let x = e.clientX;
 
-      const parentMatch = combinedItems.find(
-        (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id,
-      );
+    if (spaceRight >= CONTEXT_MENU_WIDTH) {
+      left = false;
+      x = e.clientX;
+    } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
+      left = true;
+      x = e.clientX - CONTEXT_MENU_WIDTH;
+    } else {
+      left = spaceLeft > spaceRight;
+      x = left ? 0 : e.clientX;
+    }
 
-      const itemMatch = combinedItems.find((i) => (i.id ?? i._id) === id);
+    setOpenLeft(left);
+    setOpen(true);
+    setContextPos({ x, y: e.clientY });
 
-      setContextItem(
-        parentMatch ? lastDirectory : (itemMatch ?? lastDirectory),
-      );
-    },
-    [combinedItems, lastDirectory],
-  );
+    const parentMatch = combinedItems.find(
+      (i) => (i.parentDirId?.id ?? i.parentDirId?._id) === id,
+    );
+
+    const itemMatch = combinedItems.find(
+      (i) => (i.id ?? i._id) === id,
+    );
+
+    setContextItem(
+      parentMatch ? lastDirectory : (itemMatch ?? lastDirectory),
+    );
+  },
+  [open, contextItem, combinedItems, lastDirectory],
+);
 
   const handleMainMouseDown = useCallback(
     (e) => {
       if (
         e.target.closest(
-          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay, .gd-icon-btn, .sort-btn, .mv-screen, .mgi-card, .mgi-selection-bar",
+          ".gd-grid-item, .gd-list-row, .gd-mobile-list-row, .gd-mobile-selected-header, .gd-context-menu, .gd-modal-overlay, .gd-icon-btn, .sort-btn, .mv-screen, .mgi-card, .mlr-card, .mgi-selection-bar, .mlr-selection-bar",
         )
       ) {
         return;

@@ -25,7 +25,7 @@ import { useAuth, useToast } from "../../Contexts";
 
 import {
   ChevronLeftIcon,
-    InformationCircleIcon,
+  InformationCircleIcon,
   EllipsisVerticalIcon,
   StarIcon,
 } from "@heroicons/react/24/outline";
@@ -35,7 +35,6 @@ import DetailsPageMobile from "../Drive/DetailsPageMobile";
 import { Divider } from "../Divider";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
-
 
 export default function FileViewerMobile({
   item,
@@ -70,18 +69,17 @@ export default function FileViewerMobile({
 
   const route = location.pathname.startsWith("/google-drive");
 
-    // details sheet
-    const [detailsItem, setDetailsItem] = useState(null);
-  
-    const detailsSheet = (
-      <DetailsPageMobile
-        open={Boolean(detailsItem)}
-        item={detailsItem}
-        onClose={() => setDetailsItem(null)}
-        onShare={onShare}
-      />
-    );
-  
+  // details sheet
+  const [detailsItem, setDetailsItem] = useState(null);
+
+  const detailsSheet = (
+    <DetailsPageMobile
+      open={Boolean(detailsItem)}
+      item={detailsItem}
+      onClose={() => setDetailsItem(null)}
+      onShare={onShare}
+    />
+  );
 
   /* ---------- item info ---------- */
 
@@ -266,8 +264,7 @@ export default function FileViewerMobile({
   }, [item?._id, item?.id]);
 
   /* ---------- everything below needs an item ---------- */
-    if (!item) return detailsSheet;
-
+  if (!item) return detailsSheet;
 
   if (!item) return null;
 
@@ -345,226 +342,242 @@ export default function FileViewerMobile({
 
   return (
     <>
-    <div className="fixed inset-0 z-500 flex flex-col bg-(--surface-white)">
-      {/* ── Top bar ── */}
-      <div
-        className="flex shrink-0 items-center gap-1 px-1 pb-1"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 4px)" }}
-      >
-        {!meta && (
+      <div className="fixed inset-0 z-500 flex flex-col bg-(--surface-white)">
+        {/* ── Top bar ── */}
+        <div
+          className="flex shrink-0 items-center gap-1 px-1 pb-1"
+          style={{ paddingTop: "calc(env(safe-area-inset-top) + 4px)" }}
+        >
+          {!meta && (
+            <button
+              onClick={onClose}
+              aria-label="Back"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
+            >
+              <ChevronLeftIcon className="h-6 w-6" />
+            </button>
+          )}
+
+          <div className="min-w-0 flex-1 px-2">
+            <div
+              className="truncate text-[16px] font-medium text-(--text-primary)"
+              title={item.name}
+            >
+              {item.name}
+            </div>
+          </div>
+
+          {meta && <UserAccountBar />}
+
           <button
-            onClick={onClose}
-            aria-label="Back"
+            onClick={() => setSheetOpen(true)}
+            aria-label="More actions"
             className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
           >
-            <ChevronLeftIcon className="h-6 w-6" />
+            <EllipsisVerticalIcon className="h-6 w-6" />
           </button>
-        )}
-
-        <div className="min-w-0 flex-1 px-2">
-          <div
-            className="truncate text-[16px] font-medium text-(--text-primary)"
-            title={item.name}
-          >
-            {item.name}
-          </div>
         </div>
 
-        {meta && <UserAccountBar />}
-
-        <button
-          onClick={() => setSheetOpen(true)}
-          aria-label="More actions"
-          className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
-        >
-          <EllipsisVerticalIcon className="h-6 w-6" />
-        </button>
-      </div>
-
-      {/* ── Viewer: previous | current | next, follows the finger ── */}
-      <div
-        ref={viewerRef}
-        className="relative min-h-0 flex-1 overflow-hidden"
-        style={{ touchAction: "pan-y pinch-zoom" }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-      >
+        {/* ── Viewer: previous | current | next, follows the finger ── */}
         <div
-          onTransitionEnd={(e) =>
-            e.target === e.currentTarget && finishSlide()
-          }
-          style={{
-            display: "flex",
-            width: "300%",
-            height: "100%",
-            transform: `translateX(calc(-33.3333% + ${offset}px))`,
-            transition: animating
-              ? "transform 260ms cubic-bezier(0.22, 0.8, 0.3, 1)"
-              : "none",
-            willChange: "transform",
-          }}
+          ref={viewerRef}
+          className="relative min-h-0 flex-1 overflow-hidden"
+          style={{ touchAction: "pan-y pinch-zoom" }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
         >
-          {/* previous */}
           <div
-            className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
-            style={{ flex: "0 0 33.3333%" }}
-            aria-hidden="true"
+            onTransitionEnd={(e) =>
+              e.target === e.currentTarget && finishSlide()
+            }
+            style={{
+              display: "flex",
+              width: "300%",
+              height: "100%",
+              transform: `translateX(calc(-33.3333% + ${offset}px))`,
+              transition: animating
+                ? "transform 260ms cubic-bezier(0.22, 0.8, 0.3, 1)"
+                : "none",
+              willChange: "transform",
+            }}
           >
-            {renderNeighbor(prevFile)}
-          </div>
+            {/* previous */}
+            <div
+              className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+              style={{ flex: "0 0 33.3333%" }}
+              aria-hidden="true"
+            >
+              {renderNeighbor(prevFile)}
+            </div>
 
-          {/* current */}
-          <div
-            className="relative h-full overflow-hidden bg-(--surface-white)"
-            style={{ flex: "0 0 33.3333%" }}
-          >
-            {renderViewer()}
-          </div>
+            {/* current */}
+            <div
+              className="relative h-full overflow-hidden bg-(--surface-white)"
+              style={{ flex: "0 0 33.3333%" }}
+            >
+              {renderViewer()}
+            </div>
 
-          {/* next */}
-          <div
-            className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
-            style={{ flex: "0 0 33.3333%" }}
-            aria-hidden="true"
-          >
-            {renderNeighbor(nextFile)}
+            {/* next */}
+            <div
+              className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+              style={{ flex: "0 0 33.3333%" }}
+              aria-hidden="true"
+            >
+              {renderNeighbor(nextFile)}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Actions sheet ── */}
-      <BottomSheet
-        zIndex={600}
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={item.name}
-      >
-
-        <div className="max-h-[65vh] overflow-y-auto py-2">
-          {/* Deleted item: restore / delete forever */}
-          {isDeleted ? (
-            canDelete && (
-              <>
-                <SheetItem
-                  icon={<IconRestore size={22} />}
-                  label="Restore"
-                  onClick={run(() => onRestore?.())}
-                  
-                />
-                <SheetItem
-                  icon={<IconTrash size={22} />}
-                  label="Delete forever"
-                  onClick={run(() => onDeleteForever?.())}
-                />
-              </>
-            )
-          ) : (
-            <>
-              {canShare && (
-                <SheetItem
-                  icon={<IconShare size={22} />}
-                  label="Share"
-                  onClick={run(() => onShare?.())}
-                />
-              )}
-
-              {canRead && (
-                <SheetItem
-                  icon={<IconLink size={22} />}
-                  label="Copy link"
-                  onClick={handleCopyLink}
-                />
-              )}
-
-              {(canShare || canRead) && <Divider />}
-
-               <SheetItem
-  icon={<InformationCircleIcon className="h-6 w-6" />}
-  label="View Information"
-  onClick={() => {
-    setDetailsItem(item);
-    setSheetOpen(false); // close only the actions sheet, not the viewer
-  }}
-/>
-              <Divider />
-
-              {canDownload && (
-                <SheetItem
-                  icon={<IconDownload size={22} />}
-                  label="Download"
-                  onClick={run(() => onDownload?.(item))}
-                />
-              )}
-
-              {canRename && (
-                <SheetItem
-                  icon={<IconRename size={22} />}
-                  label="Rename"
-                  onClick={run(() => onRename?.(item))}
-                />
-              )}
-
-              {!isGoogle && (
-                <SheetItem
-                  icon={
-                    starred ? (
-                      <StarIconSolid className="h-6 w-6" />
-                    ) : (
-                      <StarIcon className="h-6 w-6" />
-                    )
-                  }
-                  label={starred ? "Remove from starred" : "Add to starred"}
-                  onClick={run(() => onStar?.(item))}
-                />
-              )}
-
-              {/* Open in Google Drive */}
-              {isGDrive && item.webViewLink && (
-                <SheetItem
-                  icon={
-                    <svg viewBox="0 0 87.3 78" width="22" height="22">
-                      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
-                      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47" />
-                      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
-                      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
-                      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
-                      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
-                    </svg>
-                  }
-                  label="Open in Google Drive"
-                  onClick={run(() =>
-                    window.open(item.webViewLink, "_blank", "noreferrer"),
-                  )}
-                />
-              )}
-
-              {/* Trash / delete */}
-              {((!isGDrive && canTrash) || (isGDrive && canDelete)) && (
+        {/* ── Actions sheet ── */}
+        <BottomSheet
+          zIndex={600}
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          title={item.name}
+        >
+          <div className="max-h-[65vh] overflow-y-auto py-2">
+            {/* Deleted item: restore / delete forever */}
+            {isDeleted ? (
+              canDelete && (
                 <>
-                  <Divider />
-                  {!isGDrive && canTrash && (
-                    <SheetItem
-                      icon={<IconTrash size={22} />}
-                      label="Move to trash"
-                      onClick={run(handleTrash)}
-                    />
-                  )}
-                  {isGDrive && canDelete && (
-                    <SheetItem
-                      icon={<IconTrash size={22} />}
-                      label="Delete forever"
-                      onClick={run(() => onDeleteForever?.())}
-                    />
-                  )}
+                  <SheetItem
+                    icon={<IconRestore size={22} />}
+                    label="Restore"
+                    onClick={run(() => onRestore?.())}
+                  />
+                  <SheetItem
+                    icon={<IconTrash size={22} />}
+                    label="Delete forever"
+                    onClick={run(() => onDeleteForever?.())}
+                  />
                 </>
-              )}
-            </>
-          )}
-        </div>
-      </BottomSheet>
-    </div>
+              )
+            ) : (
+              <>
+                {canShare && (
+                  <SheetItem
+                    icon={<IconShare size={22} />}
+                    label="Share"
+                    onClick={run(() => onShare?.())}
+                  />
+                )}
+
+                {canRead && (
+                  <SheetItem
+                    icon={<IconLink size={22} />}
+                    label="Copy link"
+                    onClick={handleCopyLink}
+                  />
+                )}
+
+                {(canShare || canRead) && <Divider />}
+
+                <SheetItem
+                  icon={<InformationCircleIcon className="h-6 w-6" />}
+                  label="View Information"
+                  onClick={() => {
+                    setDetailsItem(item);
+                    setSheetOpen(false); // close only the actions sheet, not the viewer
+                  }}
+                />
+                <Divider />
+
+                {canDownload && (
+                  <SheetItem
+                    icon={<IconDownload size={22} />}
+                    label="Download"
+                    onClick={run(() => onDownload?.(item))}
+                  />
+                )}
+
+                {canRename && (
+                  <SheetItem
+                    icon={<IconRename size={22} />}
+                    label="Rename"
+                    onClick={run(() => onRename?.(item))}
+                  />
+                )}
+
+                {!isGoogle && (
+                  <SheetItem
+                    icon={
+                      starred ? (
+                        <StarIconSolid className="h-6 w-6" />
+                      ) : (
+                        <StarIcon className="h-6 w-6" />
+                      )
+                    }
+                    label={starred ? "Remove from starred" : "Add to starred"}
+                    onClick={run(() => onStar?.(item))}
+                  />
+                )}
+
+                {/* Open in Google Drive */}
+                {isGDrive && item.webViewLink && (
+                  <SheetItem
+                    icon={
+                      <svg viewBox="0 0 87.3 78" width="22" height="22">
+                        <path
+                          d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                          fill="#0066da"
+                        />
+                        <path
+                          d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z"
+                          fill="#00ac47"
+                        />
+                        <path
+                          d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+                          fill="#ea4335"
+                        />
+                        <path
+                          d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                          fill="#00832d"
+                        />
+                        <path
+                          d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                          fill="#2684fc"
+                        />
+                        <path
+                          d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                          fill="#ffba00"
+                        />
+                      </svg>
+                    }
+                    label="Open in Google Drive"
+                    onClick={run(() =>
+                      window.open(item.webViewLink, "_blank", "noreferrer"),
+                    )}
+                  />
+                )}
+
+                {/* Trash / delete */}
+                {((!isGDrive && canTrash) || (isGDrive && canDelete)) && (
+                  <>
+                    <Divider />
+                    {!isGDrive && canTrash && (
+                      <SheetItem
+                        icon={<IconTrash size={22} />}
+                        label="Move to trash"
+                        onClick={run(handleTrash)}
+                      />
+                    )}
+                    {isGDrive && canDelete && (
+                      <SheetItem
+                        icon={<IconTrash size={22} />}
+                        label="Delete forever"
+                        onClick={run(() => onDeleteForever?.())}
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </BottomSheet>
+      </div>
       {detailsSheet}
     </>
   );

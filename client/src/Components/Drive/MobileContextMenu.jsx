@@ -54,8 +54,8 @@ function SheetHeader({ title, onBack }) {
 
 export default function MobileContextMenu({
   open,
-  item: itemProp = null, // single item (backward compatible)
-  items = null, // NEW: array of items
+  item: itemProp = null, 
+  items = null, 
   route,
   isStarred = {},
   dirId,
@@ -72,11 +72,11 @@ export default function MobileContextMenu({
   onPreview,
 }) {
   const { toast } = useToast();
-console.log({itemProp, items})
+  console.log({ itemProp, items });
   // Normalise: always an array. `item` is the first one.
-const raw = items?.length ? items : itemProp;
-const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
-  
+  const raw = items?.length ? items : itemProp;
+  const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
+
   const isMulti = targets.length > 1;
   const item = targets[0];
 
@@ -95,21 +95,41 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
   const openWithPanelRef = useRef(null);
   const [panelHeight, setPanelHeight] = useState(undefined);
 
+  const panelKey = targets.map((it) => String(it?._id ?? it?.id)).join("|");
+  useEffect(() => {
+    setView("main");
+    setPanelHeight(undefined);
+  }, [panelKey]);
+
+  // Measure the currently visible panel
   useLayoutEffect(() => {
+    if (!open) return;
+
     const el =
       view === "openWith" ? openWithPanelRef.current : mainPanelRef.current;
+
     if (!el) return;
 
-   const update = () => {
-  const h = el.scrollHeight;
-  if (h > 0) setPanelHeight(h);
-};
-    update();
+    const updateHeight = () => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
 
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [view, open, item, isMulti]);
+      if (height > 0) {
+        setPanelHeight((previous) => (previous === height ? previous : height));
+      }
+    };
+
+    // Initial measurement
+    updateHeight();
+
+    // Watch content changes
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [view, open, panelKey, isMulti]);
 
   // details sheet (single item only)
   const [detailsItem, setDetailsItem] = useState(null);
@@ -240,10 +260,7 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
                       label="Delete forever"
                       disabled={!canDelete}
                       onClick={run(() =>
-                        onDeleteForever(
-                          isGoogle ? "google" : "local",
-                          payload,
-                        ),
+                        onDeleteForever(isGoogle ? "google" : "local", payload),
                       )}
                     />
                   </>
@@ -335,7 +352,9 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
                       }
                       // single: the id, multiple: array of ids
                       onClick={run(() =>
-                        onMove(isMulti ? targets.map((it) => it._id) : item._id),
+                        onMove(
+                          isMulti ? targets.map((it) => it._id) : item._id,
+                        ),
                       )}
                     />
                     <SheetItem
@@ -348,9 +367,7 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
                       }
                       label={starred ? "Remove from starred" : "Add to starred"}
                       disabled={isDeleted || isGoogleDriveRoute}
-                      onClick={run(() =>
-                        onStar(isMulti ? starTargets : item),
-                      )}
+                      onClick={run(() => onStar(isMulti ? starTargets : item))}
                     />
 
                     {(!isDeleted && !isGoogleDriveRoute) ||
@@ -394,10 +411,7 @@ const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
                 className="w-full shrink-0"
                 aria-hidden={view !== "openWith"}
               >
-                <SheetHeader
-                  title="Open with"
-                  onBack={() => setView("main")}
-                />
+                <SheetHeader title="Open with" onBack={() => setView("main")} />
 
                 <div className="max-h-[70vh] overflow-y-auto py-2">
                   <SheetItem

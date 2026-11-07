@@ -182,7 +182,7 @@
   background: var(--surface-container, #1e1f20);
   animation: mgi-fade 150ms ease both;
 }
-.mgi-bar-count {
+.mgi-bar-count{
   flex: 1;
   margin: 0 0 0 4px;
   font-size: 18px;
