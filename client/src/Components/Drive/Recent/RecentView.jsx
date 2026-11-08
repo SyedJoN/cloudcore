@@ -67,6 +67,7 @@ export default function RecentView({
                 owner={item.userId?.name || item.owners?.[0].displayName}
                 email={item.userId?.email || item.owners?.[0]?.emailAddress}
                 selected={selectedItems.has(item.id ?? item._id)}
+                selectedItems={selectedItems}
                 onSelect={onSelect}
                 selectionActive={selectedItems.size > 0}
                 onRowClick={onRowClick}

@@ -326,7 +326,6 @@ export default function FileViewPage({ route = null }) {
     }
   }
   async function handleMoveToTrash(item) {
-
     try {
       const url = item.isDirectory
         ? `/directory/soft-delete/${item._id}`
@@ -362,7 +361,7 @@ export default function FileViewPage({ route = null }) {
             ? () => setShareItem(item[0])
             : (item) => setShareItem(item)
         }
-        onTrash={() => handleMoveToTrash(item[0])}
+        onTrash={() => {console.log("hi");handleMoveToTrash(item[0])}}
         onStar={() => handleToggleStar(item)}
         onDownload={() =>
           window.open(

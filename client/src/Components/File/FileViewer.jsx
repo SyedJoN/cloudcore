@@ -335,7 +335,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn"
                 title="Share"
-                onClick={() => onShare?.()}
+                onClick={() => onShare?.(item)}
               >
                 <IconShare size={20} />
               </button>
@@ -344,7 +344,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn"
                 title="Star"
-                onClick={onStar}
+                onClick={()=>onStar(item)}
               >
                 {isStarred[item?._id || ""] ? (
                   <StarIconSolid className="w-5 h-5" />
@@ -384,7 +384,7 @@ export default function FileViewer({
                 className="fv-action-btn gd-icon-btn fv-action-danger"
                 title="Move to trash"
                 onClick={async () => {
-                  await onTrash?.();
+                  await onTrash?.(item);
 
                   onDeleteSuccess?.(item?._id);
 
@@ -401,7 +401,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn"
                 title="Restore"
-                onClick={() => onRestore?.()}
+                onClick={() => onRestore?.(item)}
               >
                 <IconRestore size={20} />
               </button>
@@ -413,7 +413,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn fv-action-danger"
                 title="Delete Forever"
-                onClick={() => onDeleteForever?.()}
+                onClick={() => onDeleteForever?.(item)}
               >
                 <IconTrash size={20} />
               </button>
@@ -425,7 +425,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn fv-action-danger"
                 title="Delete Forever"
-                onClick={() => onDeleteForever?.()}
+                onClick={() => onDeleteForever?.(item)}
               >
                 <IconTrash size={20} />
               </button>

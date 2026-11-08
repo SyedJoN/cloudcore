@@ -50,6 +50,7 @@ const DefaultView = ({
   setOpen,
   setContextItem,
 }) => {
+  
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
   const { device } = useDevice();

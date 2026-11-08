@@ -30,10 +30,8 @@ export default function GridItem({
   onContextMenu,
 }) {
   const { user } = useAuth();
-  const { device } = useDevice();
   const [hasImgError, setHasImgError] = useState(false);
   const { isGoogleDrive } = useGDrive();
-  const lastTap = useRef(0);
 
   const location = useLocation();
   const isDriveRoute = location.pathname.endsWith("/drive");
@@ -90,31 +88,6 @@ export default function GridItem({
     ? new Date(item.viewedByMeTime).getTime()
     : 0;
   const isOpened = viewed > modified;
-
-  // for mobile double click
-  const handleTouchEnd = () => {
-    const now = Date.now();
-
-    if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.name);
-      lastTap.current = 0;
-    } else {
-      lastTap.current = now;
-    }
-  };
-
-  // add / remove, baqi selection ko nahi chherta
-  const handleToggle = useCallback(
-    (id) => {
-      setSelectedItems((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-    },
-    [setSelectedItems],
-  );
 
   return (
     <div

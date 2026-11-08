@@ -325,7 +325,6 @@ export default function DirectoryView({ route }) {
     setFilesList,
     setDirectoriesList,
     getDirectoryItems,
-    getTrashItems,
     lastDirectory,
     setLastDirectory,
     combinedItems,
@@ -345,9 +344,10 @@ export default function DirectoryView({ route }) {
   });
 
   const [path, setPath] = useState([]);
+  CascadeConfirmationModal
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
-      type === "google" || isGoogleDrive
+      type === "google" || isGoogleDriveRoute
         ? "google-drive"
         : isSharedRoute
           ? "shared"
@@ -426,11 +426,13 @@ export default function DirectoryView({ route }) {
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory });
 
+
   useEffect(() => {
     if (selectedItems.size === 0) {
       setSelectionMode(false);
     }
   }, [selectedItems]);
+
   useEffect(() => {
     if (!isStarredRoute) return;
     setIsStarred((prev) => {
@@ -513,7 +515,7 @@ export default function DirectoryView({ route }) {
       }
     };
     return () => channel.close();
-  }, [setFilesList]);
+  }, []);
 
   useEffect(() => {
     setError("");
@@ -1966,6 +1968,7 @@ export default function DirectoryView({ route }) {
     setCreateMenuPos({ x, y: e.clientY });
   }, []);
 
+
   if (needsAccess) {
     return <RequestAccess dirId={dirId} />;
   }
@@ -2209,7 +2212,7 @@ export default function DirectoryView({ route }) {
             ) : (
               <>
                 {combinedItems.length === 0 && !dirId ? (
-                  <DriveEmptyState isGoogleDriveRoute={isGoogleDriveRoute} isMobile={isMobile}/>
+                  <DriveEmptyState route={route} isMobile={isMobile}/>
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
                     items={isRecentRoute ? filteredFiles : combinedItems}
@@ -2780,83 +2783,111 @@ export default function DirectoryView({ route }) {
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
-          onMove={(item) => {
-            if (item) setMoveItem(item);
-          }}
-          onDownload={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
+              onContextMenu={handleContextMenu}
+          onDownload={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
 
             if (!items.length) return;
 
             for (const item of items) {
-              if (item.isDirectory) {
-                await handleDownloadFolder(item);
-              } else {
-                handleDownload(item);
-              }
+              try {
+                if (item.isDirectory) {
+                  await handleDownloadFolder(item);
+                } else {
+                  handleDownload(item);
+                }
 
-              await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              } catch (error) {
+                console.error(`Failed to download ${item.name}:`, error);
+              }
             }
           }}
-          onStar={async (item) => {
+          onCopy={async () => {
             const items = combinedItems.filter((item) =>
               selectedItems.has(item.id ?? item._id),
             );
 
-            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
+            if (!items.length && selectedItems.has(lastDirectory._id)) {
               items.push(lastDirectory);
             }
 
             if (!items.length) return;
+
+            await handleCopyItems(items);
+          }}
+          onMove={(payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
+            // Move dialog receives the selected items.
+            setMoveItem(items);
+          }}
+          onStar={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
             await handleToggleStar(items);
           }}
           onRename={(item) => {
             if (item) openRename(item);
           }}
-          onShare={() => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-
-            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
-            }
+          onShare={(payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
 
             if (!items.length) return;
+
             setShareItem(items);
           }}
-          onTrash={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-
-            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
-            }
+          onTrash={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
 
             if (!items.length) return;
+
             await handleMoveToTrash(items);
           }}
-          onRestore={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
-            }
+          onRestore={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
             if (!items.length) return;
+
             await handleRestoreItem(items);
           }}
-          onDeleteForever={async (type) => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (items.length === 0 && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
-            }
+          onDeleteForever={async (type, payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
             if (!items.length) return;
+
             await handleDelete(items, type);
           }}
           onPreview={(item) => setViewItem(item)}
@@ -2870,46 +2901,113 @@ export default function DirectoryView({ route }) {
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
-          onStar={async () => {
+              onContextMenu={handleContextMenu}
+          onDownload={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
+            for (const item of items) {
+              try {
+                if (item.isDirectory) {
+                  await handleDownloadFolder(item);
+                } else {
+                  handleDownload(item);
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              } catch (error) {
+                console.error(`Failed to download ${item.name}:`, error);
+              }
+            }
+          }}
+          onCopy={async () => {
             const items = combinedItems.filter((item) =>
               selectedItems.has(item.id ?? item._id),
             );
+
+            if (!items.length && selectedItems.has(lastDirectory._id)) {
+              items.push(lastDirectory);
+            }
+
             if (!items.length) return;
+
+            await handleCopyItems(items);
+          }}
+          onMove={(payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
+            // Move dialog receives the selected items.
+            setMoveItem(items);
+          }}
+          onStar={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
             await handleToggleStar(items);
           }}
-          onShare={() => {
-            const id = [...selectedItems][0];
-            const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-            if (item) setShareItem(item);
+          onRename={(item) => {
+            if (item) openRename(item);
           }}
-          onRename={() => {
-            selectedItems.forEach((id) => {
-              const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-              if (item) openRename(item);
-            });
-          }}
-          onTrash={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
+          onShare={(payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
             if (!items.length) return;
+
+            setShareItem(items);
+          }}
+          onTrash={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
             await handleMoveToTrash(items);
           }}
-          onDeleteForever={async (type) => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
+          onRestore={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
             if (!items.length) return;
-            await handleDelete(items, type);
-          }}
-          onRestore={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-            if (!items.length) return;
+
             await handleRestoreItem(items);
           }}
-          onDownload={handleDownload}
+          onDeleteForever={async (type, payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
+            await handleDelete(items, type);
+          }}
         />
       )}
 
