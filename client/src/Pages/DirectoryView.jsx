@@ -74,6 +74,8 @@ const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 export default function DirectoryView({ route }) {
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
   const { device } = useDevice();
+  const isDesktop = device === "windows";
+  const isMobile = device === "mobile";
   const { user, refreshUser } = useAuth();
   const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
     useGDrive();
@@ -146,7 +148,7 @@ export default function DirectoryView({ route }) {
   };
 
   useEffect(() => {
-    if (location.pathname.startsWith("/directory") && device === "mobile") {
+    if (location.pathname.startsWith("/directory") && isMobile) {
       setAnimate(true);
       setInDirectory(true);
     } else {
@@ -579,7 +581,7 @@ export default function DirectoryView({ route }) {
       navigate(`/directory/${id}`, {
         state: { dirContext: previousDirContext.current },
       });
-      if (device === "mobile") {
+      if (isMobile) {
         setPath((prev) => [...prev, { id, name }]);
         restartAnimation();
         setMobileHeaderDirName(name);
@@ -887,7 +889,7 @@ export default function DirectoryView({ route }) {
         setViewItem((prev) => ({ ...prev, name: renameValue }));
       }
 
-      if (device === "mobile") {
+      if (isMobile) {
         setPath((prev) =>
           prev.map((item) =>
             item.id === renameId ? { ...item, name: renameValue } : item,
@@ -1805,7 +1807,7 @@ export default function DirectoryView({ route }) {
       });
 
       const isInsideItem =
-        device === "mobile" &&
+        isMobile &&
         items.some((item) => String(item._id) === String(lastDirectory?._id));
 
       if (isInsideItem) return;
@@ -2026,7 +2028,7 @@ export default function DirectoryView({ route }) {
         onUploadFromDrive={() => setShowDrivePicker(true)}
         disabled={isUploading}
       />
-      {device === "mobile" ? (
+      {isMobile ? (
         <DriveTopBarMobile
           dirId={dirId}
           dirContext={dirContext}
@@ -2086,9 +2088,9 @@ export default function DirectoryView({ route }) {
       )}
 
       <div
-        className={`gd-body ${device === "mobile" ? "mobile" : ""} ${animate ? "animation" : ""}`}
+        className={`gd-body ${isMobile ? "mobile" : ""} ${animate ? "animation" : ""}`}
       >
-        {device === "windows" && user.email && (
+        {isDesktop && user.email && (
           <DriveSidebar
             enqueueItem={enqueueItem}
             setItemProgress={setItemProgress}
@@ -2108,19 +2110,19 @@ export default function DirectoryView({ route }) {
           />
         )}
         <div
-          className={`gd-main-container ${device === "mobile" ? "mobile" : ""}`}
+          className={`gd-main-container ${isMobile ? "mobile" : ""}`}
         >
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className={`gd-main ${device === "mobile" ? "mobile" : ""}`}
+            className={`gd-main ${isMobile ? "mobile" : ""}`}
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
             onContextMenu={(e) => handleCreateNewMenu(e)}
             onMouseLeave={handleMainMouseUp}
           >
-            {device === "windows" && (
+            {isDesktop && (
               <DriveToolbar
                 dirId={dirId}
                 crumbs={crumbs}
@@ -2162,7 +2164,7 @@ export default function DirectoryView({ route }) {
               </div>
             )}
             {moveItem &&
-              (device === "mobile" ? (
+              (isMobile ? (
                 <MobileMoveModal
                   currentDirId={dirId}
                   item={selectedItem}
@@ -2201,13 +2203,13 @@ export default function DirectoryView({ route }) {
               ))}
 
             {isLoading ? (
-              <div className={`gd-loading ${device === "mobile" ? "mobile" : ""}`}>
+              <div className={`gd-loading ${isMobile ? "mobile" : ""}`}>
                 <div className="gd-spinner" />
               </div>
             ) : (
               <>
                 {combinedItems.length === 0 && !dirId ? (
-                  <DriveEmptyState />
+                  <DriveEmptyState isGoogleDriveRoute={isGoogleDriveRoute} isMobile={isMobile}/>
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
                     items={isRecentRoute ? filteredFiles : combinedItems}
@@ -2341,7 +2343,7 @@ export default function DirectoryView({ route }) {
           />
         )}
       </div>
-      {device === "mobile" && (
+      {isMobile && (
         <DriveBottomBar
           enqueueItem={enqueueItem}
           setItemProgress={setItemProgress}
@@ -2378,7 +2380,7 @@ export default function DirectoryView({ route }) {
           onClose={() => setShowRename(false)}
         />
       )}
-      {device === "windows" && (
+      {isDesktop && (
         <SelectionBar
           dirId={dirId}
           item={selectedItem}
@@ -2500,7 +2502,7 @@ export default function DirectoryView({ route }) {
       )}
 
       {contextItem &&
-        (device === "mobile" ? (
+        (isMobile ? (
           <MobileContextMenu
             open={open}
             openLeft={openLeft}
@@ -2769,7 +2771,7 @@ export default function DirectoryView({ route }) {
           />
         ))}
 
-      {viewItem && device === "mobile" ? (
+      {viewItem && isMobile ? (
         <FileViewerMobile
           key={viewItem?._id}
           item={viewItem}
@@ -2912,7 +2914,7 @@ export default function DirectoryView({ route }) {
       )}
 
       {shareItem &&
-        (device === "mobile" ? (
+        (isMobile ? (
           <ShareModalMobile
             selectedUsers={selectedUsers}
             setSelectedUsers={setSelectedUsers}
