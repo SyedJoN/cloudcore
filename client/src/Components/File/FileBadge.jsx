@@ -7,7 +7,10 @@ const BADGE_MAP = {
   alt:     { label: "FILE", cls: "badge-alt"     },
 };
 
-export default function FileBadge({ type }) {
+export default function FileBadge({ size, type }) {
   const { label, cls } = BADGE_MAP[type] || BADGE_MAP.alt;
-  return <span className={`gd-file-badge ${cls}`}>{label}</span>;
+  return <span  style={{
+      width: size,
+      height: size,
+    }} className={`gd-file-badge ${cls}`}>{label}</span>;
 }

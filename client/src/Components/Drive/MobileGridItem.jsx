@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronLeftIcon,
-  EllipsisVerticalIcon,
-} from "@heroicons/react/24/solid";
+
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
 import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
-import { formatDate } from "../../../Utils/formatDate";
 import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
-import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import "./MobileGridItem.css";
 
 export default function MobileGridItem({
@@ -32,6 +27,10 @@ export default function MobileGridItem({
   const [hasImgError, setHasImgError] = useState(false);
   const lastTap = useRef(0);
 
+  // press state (scale + state layer)
+  const [pressed, setPressed] = useState(false);
+  const pressTimer = useRef(null);
+
   const location = useLocation();
   const path = location.pathname;
   const isGoogleDriveRoute = path.endsWith("/google-drive");
@@ -47,8 +46,27 @@ export default function MobileGridItem({
   const iconType = item.isDirectory ? null : getFileType(item?.name || "");
   const itemId = item._id ?? item.id;
 
-  const modified = item.modifiedTime ? new Date(item.modifiedTime).getTime() : 0;
-  const viewed = item.viewedByMeTime ? new Date(item.viewedByMeTime).getTime() : 0;
+  const modified = item.modifiedTime
+    ? new Date(item.modifiedTime).getTime()
+    : 0;
+  const viewed = item.viewedByMeTime
+    ? new Date(item.viewedByMeTime).getTime()
+    : 0;
+
+  useEffect(() => () => clearTimeout(pressTimer.current), []);
+
+  const handlePressStart = (e) => {
+    // kebab / checkbox button pe card press effect na aaye
+    if (e.target.closest(".mgi-trailing")) return;
+    clearTimeout(pressTimer.current);
+    setPressed(true);
+  };
+
+  const handlePressEnd = () => {
+    clearTimeout(pressTimer.current);
+    // quick tap me bhi press 120ms tak dikhe
+    pressTimer.current = setTimeout(() => setPressed(false), 120);
+  };
 
   const handleToggle = useCallback(
     (id) => {
@@ -62,7 +80,7 @@ export default function MobileGridItem({
     [setSelectedItems],
   );
 
-   const handleTouchEnd = () => {
+  const handleTouchEnd = () => {
     if (selectionMode) return;
     const now = Date.now();
 
@@ -74,13 +92,12 @@ export default function MobileGridItem({
     }
   };
 
-
   const handleClick = () => {
     if (selectionMode) {
       handleToggle(itemId);
       return;
     }
-    onRowClick?.(itemId);
+    onDoubleClick?.(type, itemId, item.name); 
   };
 
   const handleContextMenu = (e) => {
@@ -120,98 +137,61 @@ export default function MobileGridItem({
     );
 
   return (
-    <>
-      {/* {selectionMode && (
-        <div className="mgi-selection-bar">
-          <button
-            type="button"
-            className="mgi-bar-btn"
-            aria-label="Exit selection"
-            onClick={() => {
-              setSelectedItems(new Set());
-              setSelectionMode(false);
-            }}
-          >
-            {selectedItemsSize >= combinedItems.length ? (
-              <MdClose className="h-6 w-6" />
-            ) : (
-              <ChevronLeftIcon className="h-6 w-6" />
-            )}
-          </button>
-          <p className="mgi-bar-count">{selectedItemsSize} selected</p>
-          <button
-            type="button"
-            className="mgi-bar-btn"
-            aria-label="Select all"
-            onClick={() => handleSelectAll?.()}
-          >
-            <MdOutlineSelectAll className="h-6 w-6" />
-          </button>
-          <button
-            type="button"
-            className="mgi-bar-btn"
-            aria-label="More actions"
-            onClick={(e) => onContextMenu?.(e, itemId)}
-          >
-            <EllipsisVerticalIcon className="h-6 w-6" />
-          </button>
-        </div>
-      )} */}
-
-      <div
-        className={`mgi-card ${selected ? "selected" : ""}`}
-        data-id={itemId}
-        onClick={handleClick}
-        onTouchEnd={handleTouchEnd}
-        onContextMenu={handleContextMenu}
-      >
-        {/* Header: small icon + name + menu */}
-        <div className="mgi-head">
-          <span className="mgi-head-icon">
-            {item.isDirectory ? (
-              <IconFolder size={20} style={{ color: "#c4c7c5" }} />
-            ) : (
-              <FileBadge type={iconType} />
-            )}
-          </span>
-          <span className="mgi-name">{item.name}</span>
-          <button
-            type="button"
-            className="mgi-trailing"
-            aria-label={selectionMode ? "Select item" : "More actions"}
-            onClick={handleKebab}
-          >
-            {selectionMode ? (
-              <span className={`mgi-check ${selected ? "on" : ""}`}>
-                {selected && (
-                  <svg viewBox="0 0 24 24" width="12" height="12">
-                    <path
-                      d="m5 12 4 4L19 6"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </span>
-            ) : (
-              <IconDots className="h-5 w-5" />
-            )}
-          </button>
-        </div>
-
-        {/* Preview: big folder icon, or the file thumbnail */}
-        <div className="mgi-preview">
+    <div
+      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""}`}
+      data-id={itemId}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onPointerDown={handlePressStart}
+      onPointerUp={handlePressEnd}
+      onPointerLeave={handlePressEnd}
+      onPointerCancel={handlePressEnd}
+    >
+      {/* Header: small icon + name + menu */}
+      <div className="mgi-head">
+        <span className="mgi-head-icon">
           {item.isDirectory ? (
-            <IconFolder size={100} />
+            <IconFolder size={20} style={{ color: "#c4c7c5" }} />
           ) : (
-            <FilePreview item={item} />
+            <FileBadge type={iconType} />
           )}
-        </div>
-
+        </span>
+        <span className="mgi-name">{item.name}</span>
+        <button
+          type="button"
+          className="mgi-trailing"
+          aria-label={selectionMode ? "Select item" : "More actions"}
+          onClick={handleKebab}
+        >
+          {selectionMode ? (
+            <span className={`mgi-check ${selected ? "on" : ""}`}>
+              {selected && (
+                <svg viewBox="0 0 24 24" width="12" height="12">
+                  <path
+                    d="m5 12 4 4L19 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </span>
+          ) : (
+            <IconDots className="h-5 w-5" />
+          )}
+        </button>
       </div>
-    </>
+
+      {/* Preview: big folder icon, or the file thumbnail */}
+      <div className="mgi-preview">
+        {item.isDirectory ? (
+          <IconFolder size={100} />
+        ) : (
+          <FilePreview item={item} />
+        )}
+      </div>
+    </div>
   );
 }

@@ -10,7 +10,7 @@ import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import { useAuth, useGDrive } from "../../Contexts";
 import { Divider } from "../Divider";
 import { useCallback, useEffect, useRef } from "react";
-import "./MobileListRow.css"
+import "./MobileListRow.css";
 const currentYear = new Date().getFullYear();
 
 // same helper as in ListRow, move it to Utils/formatDate and import it in both
@@ -132,20 +132,15 @@ export default function MobileListRow({
   };
   return (
     <>
- 
       <div
-       className={`mlr-card ${selected ? "selected" : ""}`}
+        className={`mlr-card ${selected ? "selected" : ""}`}
         data-id={itemId}
         onClick={() => {
           if (selectionMode) {
             handleToggle(itemId); // selection mode: parent call nahi hoga
             return;
           }
-
-          onRowClick?.(type, itemId, item.isDeleted);
-        }}
-        onTouchEnd={() => {
-          handleTouchEnd();
+          onDoubleClick?.(type, itemId, item.name);
         }}
         onContextMenu={(e) => {
           if (selectionMode) return;

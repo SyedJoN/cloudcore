@@ -1,31 +1,34 @@
 import { axiosWithCreds } from "./axiosInstances";
 
-export async function getRootDirectory() {
-  const response = await axiosWithCreds.get(`/directory/`);
-  return response;
-}
-export async function getDirectory(dirId) {
-  const response = await axiosWithCreds.get(`/directory/${dirId || ""}`);
-  return response;
-}
-export async function getTrash(dirId) {
-  const response = await axiosWithCreds.get(`/trash/${dirId || ""}`);
+export async function getRootDirectory(_id, config = {}) {
+  const response = await axiosWithCreds.get(`/directory/`, config);
   return response;
 }
 
-export async function getGoogleDrive() {
-  const response = await axiosWithCreds.get("/auth/google-drive/files");
-  return response;
-}
-export async function getSharedItems() {
-  const response = await axiosWithCreds.get(`/shared`);
-  return response;
-}
-export async function getStarredItems() {
-  const response = await axiosWithCreds.get(`/starred`);
+export async function getDirectory(dirId, config = {}) {
+  const response = await axiosWithCreds.get(`/directory/${dirId || ""}`, config);
   return response;
 }
 
+export async function getTrash(dirId, config = {}) {
+  const response = await axiosWithCreds.get(`/trash/${dirId || ""}`, config);
+  return response;
+}
+
+export async function getGoogleDrive(_id, config = {}) {
+  const response = await axiosWithCreds.get("/auth/google-drive/files", config);
+  return response;
+}
+
+export async function getSharedItems(_id, config = {}) {
+  const response = await axiosWithCreds.get(`/shared`, config);
+  return response;
+}
+
+export async function getStarredItems(_id, config = {}) {
+  const response = await axiosWithCreds.get(`/starred`, config);
+  return response;
+}
 export async function initiateFolderUpload(data) {
   const response = await axiosWithCreds.post(
     "directory/uploads/initiate",

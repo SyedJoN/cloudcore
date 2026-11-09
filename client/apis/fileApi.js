@@ -105,8 +105,8 @@ export async function revokeFileAccess(
   return data;
 }
 
-export async function getRecentFiles() {
-  const response = await axiosWithCreds.get(`/file/recent-files`);
+export async function getRecentFiles(_id, config = {}) {
+  const response = await axiosWithCreds.get(`/file/recent-files`, config); // apna URL rakho
   return response;
 }
 export async function fetchUserFiles() {

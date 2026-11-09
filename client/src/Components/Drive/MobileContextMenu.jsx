@@ -11,6 +11,7 @@ import {
   IconNewTab,
   IconLink,
   IconRestore,
+  IconFolder,
 } from "../Icons/Icons";
 import {
   ChevronLeftIcon,
@@ -23,10 +24,12 @@ import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
 import { Divider } from "../Divider";
-import { getCountLabel } from "../../../Utils/displayUtils";
+import { getCountLabel, getFileType } from "../../../Utils/displayUtils";
+import FileBadge from "../File/FileBadge";
 
 /* File name at the top; becomes a back row inside the "Open with" view */
-function SheetHeader({ title, onBack }) {
+
+export function SheetHeader({ title, onBack, item, iconType }) {
   return (
     <div className="flex items-center gap-3 px-6 pb-3 pt-1">
       {onBack && (
@@ -38,12 +41,27 @@ function SheetHeader({ title, onBack }) {
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
       )}
-      <div className="min-w-0 flex-1 truncate text-[15px] font-medium text-(--text-primary)">
-        {title}
+
+      <div className="flex min-w-0 flex-1 items-center gap-2 truncate text-[18px] font-medium text-(--text-primary)">
+        {item && (
+          <div className="flex shrink-0 items-center">
+            {item.isDirectory ? (
+              <IconFolder
+                size={26}
+                style={{ color: "#5f6368", flexShrink: 0 }}
+              />
+            ) : (
+              <FileBadge size={26} type={iconType} />
+            )}
+          </div>
+        )}
+
+        <span className="min-w-0 truncate px-2 text-base">{title}</span>
       </div>
     </div>
   );
 }
+
 
 export default function MobileContextMenu({
   open,
@@ -72,6 +90,7 @@ export default function MobileContextMenu({
 
   const isMulti = targets.length > 1;
   const item = targets[0];
+  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
 
   // "main" = full menu, "openWith" = Preview / Open in new tab (single only)
   const [view, setView] = useState("main");
@@ -260,7 +279,7 @@ export default function MobileContextMenu({
               className="mobile-context-menu w-full shrink-0"
               aria-hidden={view === "openWith"}
             >
-              <SheetHeader title={headerTitle} />
+              <SheetHeader title={headerTitle} item={item} iconType={iconType} />
 
               <div className="max-h-[70vh] overflow-y-auto py-2">
                 {showDeleteActions ? (

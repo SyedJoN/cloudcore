@@ -789,7 +789,31 @@
 .gd-cascade-to {
   color: var(--text-primary);
 }
+.drive-progress-bar {
+  position: absolute;
+  height: 100%;
+  width: 35%;
+  background: #1a73e8;
+  border-radius: 999px;
+  animation: drive-progress 1.5s
+    cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
 
+@keyframes drive-progress {
+  0% {
+    transform: translateX(-100%);
+    width: 35%;
+  }
+
+  50% {
+    width: 55%;
+  }
+
+  100% {
+    transform: translateX(300%);
+    width: 35%;
+  }
+}
 @keyframes gdTooltipGrow {
   from {
     opacity: 0;

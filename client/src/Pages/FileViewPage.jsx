@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import FileViewer from "../Components/File/FileViewer";
+import FileViewerMobile from "../Components/File/FileViewerMobile";
 import {
   getFileByMetaId,
   toggleFilePublic,
@@ -9,20 +10,38 @@ import {
 } from "../../apis/fileApi";
 import ShareModal from "../Components/Modals/ShareModal";
 import { axiosWithCreds } from "../../apis/axiosInstances";
-import { useRef } from "react";
-import { useAuth, useGDrive, useToast } from "../Contexts";
+import { useAuth, useToast } from "../Contexts";
 import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES } from "../../Utils/displayUtils";
 import { toggleItemStar } from "../../apis/resourceApi";
+import ShareModalMobile from "../Components/Modals/ShareModalMobile";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
+
+// agar tumhare paas pehle se useIsMobile hook hai to ye hata ke wohi import karo
+function useIsMobile(query = "(max-width: 768px)") {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = (e) => setIsMobile(e.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+
+  return isMobile;
+}
 
 export default function FileViewPage({ route = null }) {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const { fileId } = useParams();
+  const isMobile = useIsMobile();
 
   const [item, setItem] = useState(null);
   const [error, setError] = useState(null);
@@ -38,7 +57,7 @@ export default function FileViewPage({ route = null }) {
   const [prevPermissions, setPrevPermissions] = useState([]);
   const [linkAccess, setLinkAccess] = useState("");
   const [linkRole, setLinkRole] = useState("");
-  const [isStarred, setIsStarred] = useState(false);
+  const [isStarred, setIsStarred] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
 
   const usersLoadedRef = useRef(null);
@@ -91,7 +110,6 @@ export default function FileViewPage({ route = null }) {
     try {
       const itemId = item._id ?? item.id;
       const type = getResourceType(item);
-      const isGoogleDrive = type.startsWith("google-drive");
 
       const restricted = access === "restricted";
       const userRole = DRIVE_ROLES[role] ?? "reader";
@@ -261,6 +279,7 @@ export default function FileViewPage({ route = null }) {
     }
     loadAllUsers();
   }, [fileId]);
+
   const getFileById = async (fileId) => {
     try {
       const data = await getFileByMetaId(fileId);
@@ -307,7 +326,7 @@ export default function FileViewPage({ route = null }) {
     try {
       await Promise.all(
         item.map((i) => {
-          const type = item.isDirectory ? "folder" : "file";
+          const type = i.isDirectory ? "folder" : "file";
           setIsStarred((prev) => ({
             ...prev,
             [i._id]: !prev[i._id],
@@ -325,6 +344,7 @@ export default function FileViewPage({ route = null }) {
       setError(error.message);
     }
   }
+
   async function handleMoveToTrash(item) {
     try {
       const url = item.isDirectory
@@ -343,34 +363,75 @@ export default function FileViewPage({ route = null }) {
     }
   }
 
+  // tab band na ho sake (mobile browser me direct open) to drive pe wapas
+  const closeViewer = () => {
+    window.close();
+    setTimeout(() => navigate("/drive"), 150);
+  };
+
+  const handleShare =
+    route === "direct"
+      ? () => setShareItem(item[0])
+      : (item) => setShareItem(item);
+
+  const handleDownload = () =>
+    window.open(`${BASE_URL}/file/${item[0]._id}?action=download`, "_blank");
+
   return (
     <>
-      <FileViewer
-        key={item[0]._id}
-        isStarred={isStarred}
-        shareItem={shareItem}
-        item={item[0]}
-        onClose={() => window.close()}
-        meta={true}
-        isGDrive={false}
-        onRename={(item) => {
-          openRename(item);
-        }}
-        onShare={
-          route === "direct"
-            ? () => setShareItem(item[0])
-            : (item) => setShareItem(item)
-        }
-        onTrash={() => {console.log("hi");handleMoveToTrash(item[0])}}
-        onStar={() => handleToggleStar(item)}
-        onDownload={() =>
-          window.open(
-            `${BASE_URL}/file/${item[0]._id}?action=download`,
-            "_blank",
-          )
-        }
-      />
+      {isMobile ? (
+        <FileViewerMobile
+          key={item[0]._id}
+          item={item[0]}
+          meta={true}
+          isStarred={isStarred}
+          onClose={closeViewer}
+          onRename={openRename}
+          onShare={handleShare}
+          onTrash={() => handleMoveToTrash(item[0])}
+          onStar={() => handleToggleStar(item)}
+          onDownload={handleDownload}
+          onDeleteSuccess={() => {}}
+        />
+      ) : (
+        <FileViewer
+          key={item[0]._id}
+          isStarred={isStarred}
+          shareItem={shareItem}
+          item={item[0]}
+          onClose={() => window.close()}
+          meta={true}
+          isGDrive={false}
+          onRename={openRename}
+          onShare={handleShare}
+          onTrash={() => handleMoveToTrash(item[0])}
+          onStar={() => handleToggleStar(item)}
+          onDownload={handleDownload}
+        />
+      )}
+
       {shareItem && (
+        isMobile ? <ShareModalMobile
+         item={shareItem}
+          setItem={setItem}
+          onClose={handleToggleResourcePublic}
+          onUpdateRoleAfterSave={handleSharedRoleUpdate}
+          setShareItem={setShareItem}
+          isShareLoading={isShareLoading}
+          setIsShareLoading={setIsShareLoading}
+          selectedUsers={selectedUsers}
+          setSelectedUsers={setSelectedUsers}
+          peopleWithAccess={peopleWithAccess}
+          prevPermissions={prevPermissions}
+          setPrevPermissions={setPrevPermissions}
+          linkAccess={linkAccess}
+          setLinkAccess={setLinkAccess}
+          linkRole={linkRole}
+          setLinkRole={setLinkRole}
+          setPeopleWithAccess={setPeopleWithAccess}
+          allUsers={allUsers}
+          setAllUsers={setAllUsers}
+        /> :
         <ShareModal
           item={shareItem}
           setItem={setItem}

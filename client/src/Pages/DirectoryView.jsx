@@ -237,7 +237,7 @@ export default function DirectoryView({ route }) {
       const items = undoAction?.items;
 
       if (undoAction.type === "trash") {
-        await handleRestoreItem(items);
+        await handleRestoreItem(items, true);
 
         const folders = items.filter((item) => item.isDirectory);
         const files = items.filter((item) => !item.isDirectory);
@@ -248,19 +248,31 @@ export default function DirectoryView({ route }) {
         }
       }
       if (undoAction.type === "restore") {
-        await handleMoveToTrash(items);
+        await handleMoveToTrash(items, true);
         const folders = items.filter((item) => item.isDirectory);
         const files = items.filter((item) => !item.isDirectory);
 
-        if (isTrashRoute) {
+        if (previousDirContext === "trash") {
           setDirectoriesList((prev) => [...prev, ...folders]);
           setFilesList((prev) => [...prev, ...files]);
+        } else {
+          const ids = Array.isArray(items)
+            ? new Set(items.map((item) => String(item._id ?? item.id)))
+            : new Set(items._id ?? items.id);
+
+          setDirectoriesList((prev) =>
+            prev.filter((item) => !ids.has(String(item._id))),
+          );
+
+          setFilesList((prev) =>
+            prev.filter((item) => !ids.has(String(item._id))),
+          );
         }
       }
       if (undoAction.type === "star") {
-        await handleToggleStar(items);
+        await handleToggleStar(items, true);
 
-        if (isStarredRoute) {
+        if (previousDirContext === "starred") {
           const folders = items.filter((item) => item.isDirectory);
           const files = items.filter((item) => !item.isDirectory);
 
@@ -344,7 +356,7 @@ export default function DirectoryView({ route }) {
   });
 
   const [path, setPath] = useState([]);
-  CascadeConfirmationModal
+  CascadeConfirmationModal;
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
       type === "google" || isGoogleDriveRoute
@@ -425,7 +437,6 @@ export default function DirectoryView({ route }) {
     handleMainMouseMove,
     handleMainMouseUp,
   } = useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory });
-
 
   useEffect(() => {
     if (selectedItems.size === 0) {
@@ -584,7 +595,9 @@ export default function DirectoryView({ route }) {
         state: { dirContext: previousDirContext.current },
       });
       if (isMobile) {
-        setPath((prev) => [...prev, { id, name }]);
+        setPath((prev) =>
+          [...prev, { id, name }].filter((p) => !p.name?.startsWith("root")),
+        );
         restartAnimation();
         setMobileHeaderDirName(name);
       }
@@ -607,12 +620,22 @@ export default function DirectoryView({ route }) {
     }
   };
 
-  async function handleMoveToTrash(items) {
+  async function handleMoveToTrash(input, isUndo = false) {
     try {
       showError("");
 
-      const fileIds = items.filter((i) => !i.isDirectory).map((i) => i._id);
-      const dirIds = items.filter((i) => i.isDirectory).map((i) => i._id);
+      // Normalize single item or array into an array
+      const items = Array.isArray(input) ? input : input ? [input] : [];
+
+      if (!items.length) return;
+
+      const fileIds = items
+        .filter((i) => !i.isDirectory)
+        .map((i) => i._id ?? i.id);
+
+      const dirIds = items
+        .filter((i) => i.isDirectory)
+        .map((i) => i._id ?? i.id);
 
       const responses = await Promise.all([
         fileIds.length ? softDeleteFile("/file/soft-delete", fileIds) : null,
@@ -620,9 +643,15 @@ export default function DirectoryView({ route }) {
       ]);
 
       const trashedIds = new Set(
-        responses.filter(Boolean).flatMap((r) => r.trashedIds),
+        responses
+          .filter(Boolean)
+          .flatMap((r) => r.trashedIds ?? [])
+          .map(String),
       );
-      const trashed = items.filter((i) => trashedIds.has(String(i._id)));
+
+      const trashed = items.filter((i) =>
+        trashedIds.has(String(i._id ?? i.id)),
+      );
 
       if (trashed.length) {
         await refreshUser();
@@ -632,10 +661,20 @@ export default function DirectoryView({ route }) {
           : trashed.every((i) => i.isDirectory)
             ? "folder"
             : "item";
-        const count = trashed.length;
 
+        const ids = new Set(trashed.map((i) => String(i._id ?? i.id)));
+
+        setDirectoriesList((prev) =>
+          prev.filter((i) => !ids.has(String(i._id ?? i.id))),
+        );
+
+        setFilesList((prev) =>
+          prev.filter((i) => !ids.has(String(i._id ?? i.id))),
+        );
+
+        if (isUndo) return;
         toast({
-          message: `${count} ${noun}${count === 1 ? "" : "s"} moved to trash`,
+          message: `${trashed.length} ${noun}${trashed.length === 1 ? "" : "s"} moved to trash`,
           type: "success",
           duration: 5000,
           undoAction: {
@@ -644,13 +683,6 @@ export default function DirectoryView({ route }) {
             onUndo: () => handleUndo({ type: "trash", items: trashed }),
           },
         });
-
-        setDirectoriesList((prev) =>
-          prev.filter((i) => !trashedIds.has(String(i._id))),
-        );
-        setFilesList((prev) =>
-          prev.filter((i) => !trashedIds.has(String(i._id))),
-        );
       }
 
       if (trashed.length < items.length) {
@@ -665,11 +697,12 @@ export default function DirectoryView({ route }) {
         showError("Too many requests. Please slow down.");
         return;
       }
+
       showError(err.response?.data?.message ?? err.message);
     }
   }
 
-  async function handleRestoreItem(items) {
+async function handleRestoreItem(items, isUndo = false) {
     try {
       showError("");
 
@@ -705,7 +738,14 @@ export default function DirectoryView({ route }) {
       // Update successfully restored items.
       if (restored.length) {
         await refreshUser();
+        setDirectoriesList((prev) =>
+          prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
+        );
 
+        setFilesList((prev) =>
+          prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
+        );
+        if (isUndo) return;
         toast({
           message: `${restored.length} item${restored.length === 1 ? "" : "s"} restored`,
           type: "success",
@@ -719,14 +759,6 @@ export default function DirectoryView({ route }) {
               }),
           },
         });
-
-        setDirectoriesList((prev) =>
-          prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
-        );
-
-        setFilesList((prev) =>
-          prev.filter((i) => !restoredIds.has(String(i.id ?? i._id))),
-        );
       }
 
       // Handle individual API failures.
@@ -930,59 +962,86 @@ export default function DirectoryView({ route }) {
       setIsActionLoading(false);
     }
   }
-  async function handleToggleStar(items) {
+  async function handleToggleStar(items, isUndo = false) {
     showError("");
+
+    // Support both single item and multiple items
+    const selectedItems = Array.isArray(items) ? items : [items];
+
+    if (!selectedItems.length || !selectedItems[0]) return;
+
+    const previousStates = selectedItems.map((item) => ({
+      id: String(item._id),
+      starred: Boolean(isStarred[item._id]),
+    }));
+
     try {
       await Promise.all(
-        items.map((item) => {
-          const type = item.isDirectory ? "folder" : "file";
-          setIsStarred((prev) => ({
-            ...prev,
-            [item._id]: !prev[item._id],
-          }));
-          return toggleItemStar(item._id, type);
-        }),
+        selectedItems.map((item) =>
+          toggleItemStar(item._id, item.isDirectory ? "folder" : "file"),
+        ),
       );
+
+      // Update starred state
+      setIsStarred((prev) => {
+        const updated = { ...prev };
+
+        selectedItems.forEach((item) => {
+          updated[item._id] = !Boolean(prev[item._id]);
+        });
+
+        return updated;
+      });
+
+      const ids = new Set(selectedItems.map((item) => String(item._id)));
+
       if (isStarredRoute) {
-        const starredIds = new Set(items.map((item) => item.id ?? item._id));
-        setDirectoriesList((prev) =>
-          prev.filter((item) => !starredIds.has(item.id ?? item._id)),
-        );
-        setFilesList((prev) =>
-          prev.filter((item) => !starredIds.has(item.id ?? item._id)),
-        );
+        if (isUndo) {
+          setDirectoriesList((prev) => [
+            ...prev,
+            ...selectedItems.filter((item) => item.isDirectory),
+          ]);
+
+          setFilesList((prev) => [
+            ...prev,
+            ...selectedItems.filter((item) => !item.isDirectory),
+          ]);
+        } else {
+          setDirectoriesList((prev) =>
+            prev.filter((item) => !ids.has(String(item._id))),
+          );
+
+          setFilesList((prev) =>
+            prev.filter((item) => !ids.has(String(item._id))),
+          );
+        }
       }
-      const areAllFiles = items.every((item) => !item.isDirectory);
-      const areAllFolders = items.every((item) => item.isDirectory);
-      const areAllCurrentlyStarred = items.every((item) => isStarred[item._id]);
 
-      const count = items.length;
+      if (isUndo) return;
 
-      const noun = areAllFiles ? "file" : areAllFolders ? "folder" : "item";
+      const allStarred = previousStates.every((item) => item.starred);
+      const allFiles = selectedItems.every((item) => !item.isDirectory);
+      const allFolders = selectedItems.every((item) => item.isDirectory);
 
-      const action = areAllCurrentlyStarred ? "removed from" : "added to";
+      const noun = allFiles ? "file" : allFolders ? "folder" : "item";
+      const action = allStarred ? "removed from" : "added to";
 
       toast({
-        message: `${count} ${noun}${count === 1 ? "" : "s"} ${action} starred`,
+        message: `${selectedItems.length} ${noun}${selectedItems.length === 1 ? "" : "s"} ${action} starred`,
         type: "success",
         undoAction: {
           type: "star",
-          items,
-          onUndo: async () => {
-            await handleUndo({
-              type: "star",
-              items,
-            });
-          },
+          items: selectedItems,
+          onUndo: () => handleToggleStar(selectedItems, true),
         },
       });
     } catch (error) {
-      if (error.status === 429) {
-        setError("Too many requests. Try again later.");
+      if (error.response?.status === 429 || error.status === 429) {
+        showError("Too many requests. Try again later.");
         return;
       }
-      showError(error.message);
-      setError(error.message);
+
+      showError(error.response?.data?.message ?? error.message);
     }
   }
   async function handleDownloadFolder(item) {
@@ -1968,7 +2027,6 @@ export default function DirectoryView({ route }) {
     setCreateMenuPos({ x, y: e.clientY });
   }, []);
 
-
   if (needsAccess) {
     return <RequestAccess dirId={dirId} />;
   }
@@ -2044,6 +2102,8 @@ export default function DirectoryView({ route }) {
           inDirectory={inDirectory}
           setInDirectory={setInDirectory}
           restartAnimation={restartAnimation}
+          searchQuery={searchQuery}
+          onSearch={setSearchQuery}
           disabled={isUploading}
           onShare={(itemId) => {
             const item = combinedItems.find((i) => (i.id ?? i._id) === itemId);
@@ -2112,9 +2172,7 @@ export default function DirectoryView({ route }) {
             onUploadFolders={() => folderInputRef.current?.click()}
           />
         )}
-        <div
-          className={`gd-main-container ${isMobile ? "mobile" : ""}`}
-        >
+        <div className={`gd-main-container ${isMobile ? "mobile" : ""}`}>
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
@@ -2212,7 +2270,7 @@ export default function DirectoryView({ route }) {
             ) : (
               <>
                 {combinedItems.length === 0 && !dirId ? (
-                  <DriveEmptyState route={route} isMobile={isMobile}/>
+                  <DriveEmptyState route={route} isMobile={isMobile} />
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
                     items={isRecentRoute ? filteredFiles : combinedItems}
@@ -2547,19 +2605,20 @@ export default function DirectoryView({ route }) {
                 }
               }
             }}
-            onCopy={async () => {
-              const items = combinedItems.filter((item) =>
-                selectedItems.has(item.id ?? item._id),
-              );
-
-              if (!items.length && selectedItems.has(lastDirectory._id)) {
-                items.push(lastDirectory);
-              }
+            onCopy={async (payload) => {
+              const items = Array.isArray(payload)
+                ? payload
+                : payload
+                  ? [payload]
+                  : [];
 
               if (!items.length) return;
 
               await handleCopyItems(items);
-              if (selectionMode) setSelectionMode(false);
+
+              if (selectionMode) {
+                setSelectionMode(false);
+              }
             }}
             onMove={(payload) => {
               const items = Array.isArray(payload)
@@ -2783,70 +2842,49 @@ export default function DirectoryView({ route }) {
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
-              onContextMenu={handleContextMenu}
-          onDownload={async (payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            for (const item of items) {
+          onContextMenu={handleContextMenu}
+          onDownload={async (item) => {
+            if (item) {
               try {
                 if (item.isDirectory) {
                   await handleDownloadFolder(item);
                 } else {
                   handleDownload(item);
                 }
-
-                await new Promise((resolve) => setTimeout(resolve, 500));
               } catch (error) {
                 console.error(`Failed to download ${item.name}:`, error);
               }
             }
           }}
-          onCopy={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-
-            if (!items.length && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
+          onMove={(item) => {
+            if (item) {
+              setMoveItem(item);
             }
-
-            if (!items.length) return;
-
-            await handleCopyItems(items);
           }}
-          onMove={(payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            // Move dialog receives the selected items.
-            setMoveItem(items);
-          }}
-          onStar={async (payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            await handleToggleStar(items);
+          onStar={async (item) => {
+            if (item) {
+              await handleToggleStar(item);
+            }
           }}
           onRename={(item) => {
             if (item) openRename(item);
           }}
-          onShare={(payload) => {
+          onCopy={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
+
+            if (!items.length) return;
+
+            await handleCopyItems(items);
+
+            if (selectionMode) {
+              setSelectionMode(false);
+            }
+          }}
+        onShare={(payload) => {
             const items = Array.isArray(payload)
               ? payload
               : payload
@@ -2857,38 +2895,20 @@ export default function DirectoryView({ route }) {
 
             setShareItem(items);
           }}
-          onTrash={async (payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            await handleMoveToTrash(items);
+          onTrash={async (item) => {
+            if (item) {
+              await handleMoveToTrash(item);
+            }
           }}
-          onRestore={async (payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            await handleRestoreItem(items);
+          onRestore={async (item) => {
+            if (item) {
+              await handleRestoreItem(item);
+            }
           }}
-          onDeleteForever={async (type, payload) => {
-            const items = Array.isArray(payload)
-              ? payload
-              : payload
-                ? [payload]
-                : [];
-
-            if (!items.length) return;
-
-            await handleDelete(items, type);
+          onDeleteForever={async (type, item) => {
+            if (item) {
+              await handleDelete(item, type);
+            }
           }}
           onPreview={(item) => setViewItem(item)}
         />
@@ -2901,7 +2921,7 @@ export default function DirectoryView({ route }) {
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
           onNavigate={(item) => setViewItem(item)}
-              onContextMenu={handleContextMenu}
+          onContextMenu={handleContextMenu}
           onDownload={async (payload) => {
             const items = Array.isArray(payload)
               ? payload
@@ -2925,18 +2945,20 @@ export default function DirectoryView({ route }) {
               }
             }
           }}
-          onCopy={async () => {
-            const items = combinedItems.filter((item) =>
-              selectedItems.has(item.id ?? item._id),
-            );
-
-            if (!items.length && selectedItems.has(lastDirectory._id)) {
-              items.push(lastDirectory);
-            }
+            onCopy={async (payload) => {
+            const items = Array.isArray(payload)
+              ? payload
+              : payload
+                ? [payload]
+                : [];
 
             if (!items.length) return;
 
             await handleCopyItems(items);
+
+            if (selectionMode) {
+              setSelectionMode(false);
+            }
           }}
           onMove={(payload) => {
             const items = Array.isArray(payload)

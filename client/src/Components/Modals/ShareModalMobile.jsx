@@ -32,6 +32,7 @@ import ConfirmationModal from "./ConfirmationModal.jsx";
 import { getResourceType } from "../../../Utils/getResourceType.js";
 import { updateItemState } from "../../../Utils/updateItemState.js";
 import { BottomSheet, SheetItem } from "../Drive/BottomSheet.jsx";
+import ConfirmationModalMobile from "./ConfirmationModalMobile.jsx";
 
 
 const SLIDE_MS = 300;
@@ -1053,44 +1054,57 @@ export default function ShareModalMobile({
       }}
     >
       {children}
-      {isShareLoading && (
-        <div className="absolute inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-[#1a73e8]" />
-      )}
+     {isShareLoading && (
+  <div className="absolute inset-x-0 top-0 z-100 h-0.75 overflow-hidden bg-[#d2e3fc]">
+    <div className="drive-progress-bar" />
+  </div>
+)}
     </div>
   );
 
   // a screen: slides in from the right; `shifted` nudges the one underneath
-  const layer = (visible, children, shifted = false) => (
-    <div
-      aria-hidden={!visible}
-      className="absolute inset-0 flex flex-col bg-(--surface-white,#fff)"
-      style={{
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        transform: !visible
-          ? "translateX(100%)"
-          : shifted
-            ? "translateX(-22%)"
-            : "translateX(0)",
-        visibility: visible ? "visible" : "hidden",
-        boxShadow: visible ? "-8px 0 24px rgba(0,0,0,0.12)" : "none",
-        transition: `transform ${dur}ms ${EASE}, visibility 0s linear ${visible ? 0 : dur}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
+ const layer = (visible, children, shifted = false) => (
+  <div
+    aria-hidden={!visible}
+    ref={(el) => {
+      if (el && !visible && el.contains(document.activeElement)) {
+        document.activeElement.blur();
+      }
+    }}
+    {...(!visible ? { inert: "" } : {})}
+    className="absolute inset-0 flex flex-col bg-(--surface-white,#fff)"
+    style={{
+      paddingTop: "env(safe-area-inset-top, 0px)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      transform: !visible
+        ? "translateX(100%)"
+        : shifted
+          ? "translateX(-22%)"
+          : "translateX(0)",
+      visibility: visible ? "visible" : "hidden",
+      boxShadow: visible ? "-8px 0 24px rgba(0,0,0,0.12)" : "none",
+      transition: `transform ${dur}ms ${EASE}, visibility 0s linear ${visible ? 0 : dur}ms`,
+    }}
+  >
+    {children}
+  </div>
+);
 
-  const discardDialog = isConfirmation && (
-    <ConfirmationModal
-      title="Discard unsaved changes?"
-      action_1="Cancel"
-      action_2="Discard"
-      onAction_1={() => setIsConfirmation(false)}
-      onAction_2={() => closeShare()}
-    />
-  );
-
+const discardDialog = (
+  <ConfirmationModalMobile
+    open={isConfirmation}
+    title="Discard unsaved changes?"
+    description="Your changes haven't been saved. Are you sure you want to discard them?"
+    action_1="Cancel"
+    action_2="Discard"
+    onClose={() => setIsConfirmation(false)}
+    onAction_1={() => setIsConfirmation(false)}
+    onAction_2={() => {
+      setIsConfirmation(false);
+      closeShare();
+    }}
+  />
+);
   const messageField = (
     <textarea
       className="mt-3 w-full resize-none rounded-lg border border-black/20 bg-transparent p-3 text-[15px] outline-none focus:border-[#1a73e8]"
@@ -1219,24 +1233,32 @@ export default function ShareModalMobile({
               </button>
             );
           })}
+<div
+  className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+  style={{
+    gridTemplateRows: pub ? "1fr" : "0fr",
+    opacity: pub ? 1 : 0,
+  }}
+  aria-hidden={!pub}
+  inert={pub ? undefined : ""}
+>
+  <div className="overflow-hidden">
+    <SectionLabel>Link role</SectionLabel>
 
-          {pub && (
-            <>
-              <SectionLabel>Link role</SectionLabel>
-              {["reader", "writer"].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  disabled={!canEdit}
-                  onClick={() => setRole(r)}
-                  className="flex w-full items-center justify-between px-5 py-3 text-left text-[15px] active:bg-black/5 disabled:opacity-50"
-                >
-                  {ROLE_LABEL[r]}
-                  {r === role && <IconCheck size={20} />}
-                </button>
-              ))}
-            </>
-          )}
+    {["reader", "writer"].map((r) => (
+      <button
+        key={r}
+        type="button"
+        disabled={!canEdit || !pub}
+        onClick={() => setRole(r)}
+        className="flex w-full items-center justify-between px-5 py-3 text-left text-[15px] active:bg-black/5 disabled:opacity-50"
+      >
+        {ROLE_LABEL[r]}
+        {r === role && <IconCheck size={20} />}
+      </button>
+    ))}
+  </div>
+</div>
         </div>
 
         {copyLinkBar}

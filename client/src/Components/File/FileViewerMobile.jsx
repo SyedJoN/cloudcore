@@ -6,6 +6,7 @@ import {
   IconRename,
   IconLink,
   IconRestore,
+  IconNewTab,
 } from "../Icons/Icons";
 import "./FileViewer.css"; // viewers (fv-pdf-stage etc.) still rely on these styles
 import UserAccountBar from "../UserAccountBar";
@@ -28,11 +29,17 @@ import {
   InformationCircleIcon,
   EllipsisVerticalIcon,
   StarIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "../Drive/BottomSheet";
 import DetailsPageMobile from "../Drive/DetailsPageMobile";
 import { Divider } from "../Divider";
+import { SheetHeader } from "../Drive/MobileContextMenu";
+import { getFileType } from "../../../Utils/displayUtils";
+import UserAccountDrawerMobile from "../UserAccountDrawerBar";
+import { UseAvatar } from "../../Hooks/useAvatar";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -50,13 +57,16 @@ export default function FileViewerMobile({
   onRestore,
   onDeleteForever,
   onDeleteSuccess,
+  onCopy,
+  onMove,
   meta = false,
 }) {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   // slider state
   const viewerRef = useRef(null);
@@ -68,6 +78,7 @@ export default function FileViewerMobile({
   const [animating, setAnimating] = useState(false);
 
   const route = location.pathname.startsWith("/google-drive");
+  const isSharedRoute = location.pathname.startsWith("/shared");
 
   // details sheet
   const [detailsItem, setDetailsItem] = useState(null);
@@ -83,21 +94,24 @@ export default function FileViewerMobile({
 
   /* ---------- item info ---------- */
 
+  const iconType = item?.isDirectory ? null : getFileType(item?.name || "");
+
   const isGoogle = Boolean(item?.webViewLink);
   const isDeleted = Boolean(item?.isDeleted);
   const isGDrive = route && isGoogle;
   const category = getCategory(item?.name || "");
-
   const fileUrl = isGDrive
     ? item?.webContentLink || item?.webViewLink
     : `${BASE_URL}/file/${item?._id}`;
 
-  /* ---------- capabilities ---------- */
+  /* ---------- capabilities (same rules as MobileContextMenu) ---------- */
 
   const capabilities = item?.capabilities ?? {};
-  const canRead = capabilities.canRead === true;
-  const canShare = capabilities.canShare === true;
+  const canRead = item?.webViewLink ? true : capabilities.canRead === true;
   const canDownload = capabilities.canDownload === true;
+  const canCopy = true;
+  const canMove = capabilities.canMove === true;
+  const canShare = true;
   const canRename = capabilities.canRename === true;
   const canTrash = capabilities.canTrash === true;
   const canDelete = capabilities.canDelete === true;
@@ -150,15 +164,27 @@ export default function FileViewerMobile({
   };
 
   const handleTouchStart = (e) => {
+    const t = e.touches[0];
+
+    // video ke bottom controls (seek bar) pe slide mat karo,
+    // baqi video area pe swipe chalega
+    let onVideoControls = false;
+    const video = e.target.closest("video");
+    if (video) {
+      const r = video.getBoundingClientRect();
+      onVideoControls = t.clientY > r.bottom - 72;
+    }
+
     if (
       sliding.current ||
       e.touches.length > 1 ||
-      e.target.closest("video, audio, input")
+      e.target.closest("audio, input") ||
+      onVideoControls
     ) {
       gesture.current = null;
       return;
     }
-    const t = e.touches[0];
+
     gesture.current = {
       x: t.clientX,
       y: t.clientY,
@@ -266,9 +292,8 @@ export default function FileViewerMobile({
   /* ---------- everything below needs an item ---------- */
   if (!item) return detailsSheet;
 
-  if (!item) return null;
-
   const starred = Boolean(isStarred[item._id]);
+
   /* ---------- actions ---------- */
 
   // run action, then close the sheet
@@ -280,6 +305,8 @@ export default function FileViewerMobile({
     };
 
   async function handleCopyLink() {
+    if (isDeleted) return;
+
     const url =
       item.webViewLink ??
       (item.isDirectory
@@ -288,17 +315,22 @@ export default function FileViewerMobile({
 
     try {
       await navigator.clipboard.writeText(url);
-      toast({ message: "Link copied to clipboard", type: "success" });
       setSheetOpen(false);
+      toast({ message: "Link copied to clipboard", type: "success" });
     } catch (error) {
       console.error("Failed to copy link:", error);
       toast({ message: "Failed to copy link", type: "error" });
     }
   }
 
-  async function handleTrash() {
-    await onTrash?.();
-    onDeleteSuccess?.(item._id);
+  function handleOpenInNewTab() {
+    window.open(item.webViewLink || `/file/${item._id}`, "_blank");
+    setSheetOpen(false);
+  }
+
+  async function handleTrash(target) {
+    await onTrash?.(target);
+    onDeleteSuccess?.(target._id);
     onClose?.();
   }
 
@@ -309,6 +341,7 @@ export default function FileViewerMobile({
       return (
         <div className="fv-pdf-stage">
           <iframe
+            key={item?.id}
             className="fv-pdf-frame"
             src={`https://drive.google.com/file/d/${item?.id}/preview`}
             title={item?.name}
@@ -345,7 +378,7 @@ export default function FileViewerMobile({
       <div className="fixed inset-0 z-500 flex flex-col bg-(--surface-white)">
         {/* ── Top bar ── */}
         <div
-          className="flex shrink-0 items-center gap-1 px-1 pb-1"
+          className="flex shrink-0 items-center gap-1 px-3 pb-1"
           style={{ paddingTop: "calc(env(safe-area-inset-top) + 4px)" }}
         >
           {!meta && (
@@ -366,13 +399,21 @@ export default function FileViewerMobile({
               {item.name}
             </div>
           </div>
-
-          {meta && <UserAccountBar />}
+          {meta && (
+            <button
+              type="button"
+              className="gd-mavatar"
+              aria-label="Account"
+              onClick={() => setAccountOpen(true)}
+            >
+              <UseAvatar name={user.name} avatar={user.avatar} size={32} />
+            </button>
+          )}
 
           <button
             onClick={() => setSheetOpen(true)}
             aria-label="More actions"
-            className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
+            className="flex h-11 w-11 items-center justify-end rounded-full text-(--text-primary) active:bg-black/10"
           >
             <EllipsisVerticalIcon className="h-6 w-6" />
           </button>
@@ -429,79 +470,129 @@ export default function FileViewerMobile({
               {renderNeighbor(nextFile)}
             </div>
           </div>
+
+          {/* GDrive iframe touches swallow karta hai: edge swipe zones + buttons */}
+          {isGDrive && (
+            <>
+              <div
+                className="absolute inset-y-0 left-0 w-10"
+                style={{ zIndex: 50, touchAction: "pan-y" }}
+              />
+              <div
+                className="absolute inset-y-0 right-0 w-10"
+                style={{ zIndex: 50, touchAction: "pan-y" }}
+              />
+
+              {hasPrev && (
+                <button
+                  type="button"
+                  aria-label="Previous file"
+                  onClick={() => slideTo(-1)}
+                  className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white"
+                  style={{ zIndex: 60 }}
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+              )}
+              {hasNext && (
+                <button
+                  type="button"
+                  aria-label="Next file"
+                  onClick={() => slideTo(1)}
+                  className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white"
+                  style={{ zIndex: 60 }}
+                >
+                  <ChevronLeftIcon className="h-5 w-5 rotate-180" />
+                </button>
+              )}
+            </>
+          )}
         </div>
 
-        {/* ── Actions sheet ── */}
+        {/* ── Actions sheet (same order as MobileContextMenu) ── */}
         <BottomSheet
           zIndex={600}
           open={sheetOpen}
           onClose={() => setSheetOpen(false)}
-          title={item.name}
         >
-          <div className="max-h-[65vh] overflow-y-auto py-2">
-            {/* Deleted item: restore / delete forever */}
-            {isDeleted ? (
-              canDelete && (
+          <div className="mobile-context-menu w-full shrink-0">
+            <SheetHeader title={item.name} item={item} iconType={iconType} />
+
+            <div className="max-h-[65vh] overflow-y-auto py-2">
+              {isDeleted ? (
+                /* ---------- TRASH ---------- */
                 <>
                   <SheetItem
                     icon={<IconRestore size={22} />}
                     label="Restore"
-                    onClick={run(() => onRestore?.())}
+                    disabled={!canDelete}
+                    onClick={run(() => onRestore?.(item))}
                   />
                   <SheetItem
                     icon={<IconTrash size={22} />}
                     label="Delete forever"
-                    onClick={run(() => onDeleteForever?.())}
+                    disabled={!canDelete}
+                    onClick={run(() =>
+                      onDeleteForever?.(isGoogle ? "google" : "local", item),
+                    )}
                   />
                 </>
-              )
-            ) : (
-              <>
-                {canShare && (
+              ) : (
+                /* ---------- NORMAL ---------- */
+                <>
+                  {/* Open: viewer me preview already hai, isliye seedha new tab */}
+
                   <SheetItem
                     icon={<IconShare size={22} />}
                     label="Share"
-                    onClick={run(() => onShare?.())}
+                    disabled={isDeleted || !canShare}
+                    onClick={run(() => onShare?.(item))}
                   />
-                )}
-
-                {canRead && (
                   <SheetItem
                     icon={<IconLink size={22} />}
                     label="Copy link"
+                    disabled={isDeleted}
                     onClick={handleCopyLink}
                   />
-                )}
+                  <SheetItem
+                    icon={<InformationCircleIcon className="h-6 w-6" />}
+                    label="View Information"
+                    onClick={() => {
+                      setDetailsItem(item);
+                      setSheetOpen(false); // close only the actions sheet, not the viewer
+                    }}
+                  />
+                  <Divider />
 
-                {(canShare || canRead) && <Divider />}
-
-                <SheetItem
-                  icon={<InformationCircleIcon className="h-6 w-6" />}
-                  label="View Information"
-                  onClick={() => {
-                    setDetailsItem(item);
-                    setSheetOpen(false); // close only the actions sheet, not the viewer
-                  }}
-                />
-                <Divider />
-
-                {canDownload && (
                   <SheetItem
                     icon={<IconDownload size={22} />}
                     label="Download"
+                    disabled={isDeleted || !canDownload}
                     onClick={run(() => onDownload?.(item))}
                   />
-                )}
-
-                {canRename && (
                   <SheetItem
                     icon={<IconRename size={22} />}
                     label="Rename"
+                    disabled={isDeleted || !canRename}
                     onClick={run(() => onRename?.(item))}
                   />
-                )}
+                  <SheetItem
+                    icon={<DocumentDuplicateIcon className="h-6 w-6" />}
+                    label="Make a copy"
+                    disabled={isSharedRoute || !canCopy}
+                    onClick={run(() => onCopy?.(item))}
+                  />
 
-                {!isGoogle && (
+                  <Divider />
+
+                  <SheetItem
+                    icon={<FolderInput width={22} height={22} />}
+                    label="Move"
+                    disabled={
+                      isSharedRoute || isDeleted || !canMove || isGDrive
+                    }
+                    onClick={run(() => onMove?.(item._id))}
+                  />
                   <SheetItem
                     icon={
                       starred ? (
@@ -511,73 +602,47 @@ export default function FileViewerMobile({
                       )
                     }
                     label={starred ? "Remove from starred" : "Add to starred"}
+                    disabled={isDeleted || isGDrive}
                     onClick={run(() => onStar?.(item))}
                   />
-                )}
 
-                {/* Open in Google Drive */}
-                {isGDrive && item.webViewLink && (
-                  <SheetItem
-                    icon={
-                      <svg viewBox="0 0 87.3 78" width="22" height="22">
-                        <path
-                          d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
-                          fill="#0066da"
-                        />
-                        <path
-                          d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z"
-                          fill="#00ac47"
-                        />
-                        <path
-                          d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
-                          fill="#ea4335"
-                        />
-                        <path
-                          d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
-                          fill="#00832d"
-                        />
-                        <path
-                          d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
-                          fill="#2684fc"
-                        />
-                        <path
-                          d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
-                          fill="#ffba00"
-                        />
-                      </svg>
-                    }
-                    label="Open in Google Drive"
-                    onClick={run(() =>
-                      window.open(item.webViewLink, "_blank", "noreferrer"),
-                    )}
-                  />
-                )}
+                  <Divider />
 
-                {/* Trash / delete */}
-                {((!isGDrive && canTrash) || (isGDrive && canDelete)) && (
-                  <>
-                    <Divider />
-                    {!isGDrive && canTrash && (
-                      <SheetItem
-                        icon={<IconTrash size={22} />}
-                        label="Move to trash"
-                        onClick={run(handleTrash)}
-                      />
-                    )}
-                    {isGDrive && canDelete && (
-                      <SheetItem
-                        icon={<IconTrash size={22} />}
-                        label="Delete forever"
-                        onClick={run(() => onDeleteForever?.())}
-                      />
-                    )}
-                  </>
-                )}
-              </>
-            )}
+                  {/* Move to trash */}
+                  {!isGDrive && (
+                    <SheetItem
+                      icon={<IconTrash size={22} />}
+                      label="Move to trash"
+                      disabled={!canDelete || !canTrash}
+                      onClick={run(() => handleTrash(item))}
+                    />
+                  )}
+
+                  {/* Google Drive delete */}
+                  {isGDrive && (
+                    <SheetItem
+                      icon={<IconTrash size={22} />}
+                      label="Delete forever"
+                      disabled={!canDelete}
+                      onClick={run(() =>
+                        onDeleteForever?.(isGoogle ? "google" : "local", item),
+                      )}
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </BottomSheet>
       </div>
+
+      {meta && (
+        <UserAccountDrawerMobile
+          open={accountOpen}
+          onClose={() => setAccountOpen(false)}
+        />
+      )}
+
       {detailsSheet}
     </>
   );

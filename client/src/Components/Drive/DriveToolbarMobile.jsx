@@ -109,7 +109,7 @@ export default function DriveToolbarMobile({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
-          className="gd-icon-btn"
+          className="gd-icon-btn w-5! h-5! ml-2.5"
           aria-label="Close search"
           onClick={closeSearch}
         >
@@ -117,7 +117,7 @@ export default function DriveToolbarMobile({
         </button>
 
         <form
-          className="gd-toolbar-search"
+          className="gd-toolbar-search w-full rounded-full overflow-hidden"
           onSubmit={submitSearch}
           role="search"
         >
@@ -129,6 +129,7 @@ export default function DriveToolbarMobile({
             placeholder={`Search in ${title}`}
             aria-label="Search"
             enterKeyHint="search"
+            className="w-full rounded-full px-5 py-3 outline-none"
           />
         </form>
       </div>
@@ -144,7 +145,7 @@ export default function DriveToolbarMobile({
         disabled={disabled || !canGoBack}
         onClick={handleBack}
       >
-        <ArrowLeftIcon className="h-5 w-5"/>
+        <ArrowLeftIcon className="h-5 w-5" />
       </button>
 
       <h1 className="gd-toolbar-title" title={title}>
@@ -163,9 +164,12 @@ export default function DriveToolbarMobile({
           className="gd-icon-btn"
           aria-label="More options"
           aria-haspopup="dialog"
-          onClick={(e) => {handleSelect?.(dirId); onContextMenu?.(e, dirId)}}
+          onClick={(e) => {
+            handleSelect?.(dirId);
+            onContextMenu?.(e, dirId);
+          }}
         >
-          <EllipsisVerticalIcon className="h-5 w-5"/>
+          <EllipsisVerticalIcon className="h-5 w-5" />
         </button>
       </div>
     </div>

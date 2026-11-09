@@ -151,7 +151,7 @@ export function SheetItem({ icon, label, onClick, disabled, active }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex w-full items-center gap-5 px-6 py-3.5 text-left text-[15px] text-(--text-primary) disabled:opacity-40 ${
+      className={`flex w-full items-center gap-5 px-6 py-3.5 text-left text-[14px] text-(--text-primary) disabled:opacity-40 ${
         active ? "bg-(--accent-blue-light) font-medium" : ""
       }`}
     >

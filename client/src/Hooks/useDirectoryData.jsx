@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import axios from "axios";
 import { axiosWithCreds } from "../../apis/axiosInstances";
-import { getDirectory } from "../../apis/directoryApi";
 import { useGDrive } from "../Contexts";
 import { ROUTE_CONFIG } from "../../Utils/routeConfig";
 
@@ -27,19 +27,37 @@ export function useDirectoryData({
   const [isLoading, setIsLoading] = useState(false);
   const [needsAccess, setNeedsAccess] = useState(false);
 
+  const controllerRef = useRef(null);
+
+  const startRequest = () => {
+    controllerRef.current?.abort();
+    controllerRef.current = new AbortController();
+    return controllerRef.current.signal;
+  };
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
   const getDirectoryItems = useCallback(
     async (dirType) => {
-      setIsLoading(true);
       if (!ROUTE_CONFIG[dirType]) {
         console.log("Invalid Directory Type");
         return;
       }
 
+      const signal = startRequest();
+      setIsLoading(true);
+      setDirectoriesList([]);
+      setFilesList([]);
+
       try {
         const { fetch } = ROUTE_CONFIG[dirType];
 
-        const { data } = await fetch(dirId || "");
-        setLastDirectory({ ...data, isDirectory: true });
+        const { data } = await fetch(dirId || "", { signal });
+        if (isRootName(data?.name)) {
+          setLastDirectory(null);
+        } else {
+          setLastDirectory({ ...data, isDirectory: true });
+        }
         const name =
           isSharedRoute && !dirId
             ? ROUTE_CONFIG["shared"].label
@@ -100,6 +118,8 @@ export function useDirectoryData({
         }
         setFilesList([...data.files].reverse());
       } catch (err) {
+        if (axios.isCancel(err) || signal.aborted) return;
+
         if (isGoogleDrive) setIsGoogleDrive(false);
 
         const status = err?.response?.status;
@@ -112,13 +132,17 @@ export function useDirectoryData({
           navigate("/drive");
         }
       } finally {
-        setIsLoading(false);
+        // sirf latest request loading band kare
+        if (!signal.aborted) setIsLoading(false);
       }
     },
     [
       dirId,
       dirContext,
+      route,
       isSharedRoute,
+      isRecentRoute,
+      isGoogleDriveRoute,
       isGoogleDrive,
       setIsGoogleDrive,
       navigate,
@@ -127,10 +151,15 @@ export function useDirectoryData({
 
   const getTrashItems = useCallback(
     async (showError, tab = "") => {
+      const signal = startRequest();
       setIsLoading(true);
+      setDirectoriesList([]);
+      setFilesList([]);
+
       try {
         const { data } = await axiosWithCreds.get(
           `/trash/${tab === "trash" ? dirId : ""}`,
+          { signal },
         );
 
         setDirectoryName(isTrashRoute ? "Trash" : data.name);
@@ -141,17 +170,20 @@ export function useDirectoryData({
         setDirectoriesList([...data.directories].reverse());
         setFilesList([...data.files].reverse());
       } catch (err) {
+        if (axios.isCancel(err) || signal.aborted) return;
+
         if (err?.response?.status === 403) {
           showError?.(err.message);
           return;
         }
         console.error(err);
       } finally {
-        setIsLoading(false);
+        if (!signal.aborted) setIsLoading(false);
       }
     },
     [dirId, isTrashRoute],
   );
+
   const q = searchQuery.trim().toLowerCase();
 
   const combinedItems = useMemo(
