@@ -113,6 +113,7 @@ export default function ShareModal({
   item: itemProp = null, // single item (backward compatible)
   items = null, // array of items
   setItem = null,
+  setViewItem,
   allUsers,
   setUserRole,
   selectedUsers,
@@ -346,6 +347,7 @@ export default function ShareModal({
   }
 
   function applyShareToState(it, response) {
+    
     const itemId = getItemId(it);
 
     let updatedUsers;
@@ -405,6 +407,7 @@ export default function ShareModal({
 
     setFilesList(applyPermissions);
     setDirectoriesList(applyPermissions);
+    setViewItem(applyPermissions);
 
     if (setItem) {
       updateItemState(setItem, itemId, { permissions: finalPermissions });

@@ -32,7 +32,7 @@ import { useDevice } from "../../Contexts/DeviceContext";
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function FileViewer({
-  item,
+  item: itemProp,
   onClose,
   onShare,
   onNavigate,
@@ -50,11 +50,13 @@ export default function FileViewer({
 }) {
   const { refreshUser } = useAuth();
   const { toast } = useToast();
-  const {device} = useDevice();
+  const { device } = useDevice();
 
   const location = useLocation();
 
   const route = location.pathname.startsWith("/google-drive");
+
+  const item = Array.isArray(itemProp) ? itemProp?.map((it) => it)[0] : itemProp;
 
   // BASIC ITEM INFO
 
@@ -199,7 +201,9 @@ export default function FileViewer({
       case "office-word":
       case "office-excel":
       case "office-ppt":
-        return <OfficeViewer BASE_URL={BASE_URL} item={item} category={category} />;
+        return (
+          <OfficeViewer BASE_URL={BASE_URL} item={item} category={category} />
+        );
 
       default:
         return <UnknownViewer item={item} />;
@@ -315,7 +319,7 @@ export default function FileViewer({
 
         {/* ── Action bar ── */}
 
-        {device === "windows" && 
+        {device === "windows" && (
           <div className="fv-topbar-actions">
             {/* Download */}
 
@@ -344,7 +348,7 @@ export default function FileViewer({
               <button
                 className="fv-action-btn gd-icon-btn"
                 title="Star"
-                onClick={()=>onStar(item)}
+                onClick={() => onStar(item)}
               >
                 {isStarred[item?._id || ""] ? (
                   <StarIconSolid className="w-5 h-5" />
@@ -475,7 +479,7 @@ export default function FileViewer({
               </a>
             )}
           </div>
-        }
+        )}
 
         {/* ── Viewer area ── */}
 

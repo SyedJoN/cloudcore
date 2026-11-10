@@ -75,7 +75,7 @@ export function useDriveActions({
   const [prevPermissions, setPrevPermissions] = useState([]);
   const [userRole, setUserRole] = useState([]);
   const [mobileHeaderDirName, setMobileHeaderDirName] = useState("");
-  const [viewItem, setViewItem] = useState(null);
+  const [viewItem, setViewItem] = useState([]);
   const [moveItem, setMoveItem] = useState(null);
   const [shareItem, setShareItem] = useState(null);
   const [cascadeModal, setCascadeModal] = useState(null);
@@ -153,7 +153,7 @@ export function useDriveActions({
         return;
       }
       const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-      if (item) setViewItem(item);
+      if (item) setViewItem([item]);
       if (type === "google-file") return;
       try {
         await updateFileViewTime(id);
@@ -561,8 +561,8 @@ export function useDriveActions({
 
         const applyLinkUpdate = (list) =>
           lostAccess
-            ? list.filter((resource) => !matches(resource))
-            : list.map((resource) => {
+            ? list?.filter((resource) => !matches(resource))
+            : list?.map((resource) => {
                 if (!matches(resource)) return resource;
 
                 const others = (resource.permissions ?? []).filter(
@@ -593,6 +593,9 @@ export function useDriveActions({
               });
 
         setFilesList(applyLinkUpdate);
+        setViewItem(applyLinkUpdate);
+        if (setItem) setItem(applyLinkUpdate);
+
         setDirectoriesList(applyLinkUpdate);
 
         /* ───────────── Update modal state (single mode only) ───────────── */
@@ -641,8 +644,20 @@ export function useDriveActions({
             ),
           );
 
-          const setList =
-            removeType === "folder" ? setDirectoriesList : setFilesList;
+        const setList =
+  removeType === "folder"
+    ? (value) => {
+        setDirectoriesList(value);
+        setViewItem(value);
+        setItem(value);
+
+      }
+    : (value) => {
+        setFilesList(value);
+        setViewItem(value);
+
+        setItem(value);
+      };
           const sameItem = (resource) =>
             String(resource?._id ?? resource?.id) === String(itemId);
 
@@ -684,6 +699,13 @@ export function useDriveActions({
                   ? { ...prev, permissions: updatedPeopleWithAccess }
                   : prev,
             );
+               setItem((prev) =>
+              Array.isArray(prev)
+                ? prev
+                : prev
+                  ? { ...prev, permissions: updatedPeopleWithAccess }
+                  : prev,
+            );
           }
 
           toast({ message: messages, type: "success" }); // unchanged from original
@@ -696,6 +718,7 @@ export function useDriveActions({
           setError("Too many requests. Try again later.");
           return;
         }
+        console.log('er', error)
         toast({
           message: error?.message || "Something went wrong!",
           type: "error",
@@ -714,6 +737,8 @@ export function useDriveActions({
       showConfirmModal,
       setFilesList,
       setDirectoriesList,
+      setViewItem,
+      setItem,
       toast,
     ],
   );
@@ -930,6 +955,8 @@ export function useDriveActions({
         setDirectoriesList((prev) => update(prev));
         setPeopleWithAccess(updatedPeopleWithAccess);
         setPrevPermissions(updatedPeopleWithAccess);
+        setViewItem((prev) => update(prev));
+        if (item && setItem) setItem((prev) => update(prev));
         setShareItem(null);
 
         toast({ message: "Access updated", type: "success" });
@@ -956,6 +983,8 @@ export function useDriveActions({
       peopleWithAccess,
       prevPermissions,
       isGoogleDriveRoute,
+      setViewItem,
+      setItem,
       showConfirmModal,
       showCascadeConfirm,
       setFilesList,
@@ -984,7 +1013,7 @@ export function useDriveActions({
 
         const isInsideItem =
           isMobile &&
-          items.some((item) => String(item._id) === String(lastDirectory?._id));
+          items.some((item) => String(item._id) === String(user?.parentDirId));
 
         if (isInsideItem) return;
 
@@ -1296,7 +1325,7 @@ export function useDriveActions({
             type: "success",
           });
 
-          setViewItem(null);
+          setViewItem([]);
 
           setDirectoriesList((prev) =>
             prev.filter((i) => !deletedIds.has(String(i._id ?? i.id))),
@@ -1547,45 +1576,110 @@ export function useDriveActions({
     ],
   );
   const handleMoveItems = useCallback(
-    async (items, destinationId, destinationName, isUndo = false) => {
+    async (
+      items,
+      destinationId,
+      destinationName,
+      isUndo = false,
+      movedToId = null,
+    ) => {
       try {
         if (!items?.length || !destinationId) return;
 
+        // The "already in that folder" guard only applies to normal moves.
+        // On undo, items still carry their old parentDirId, which would
+        // wrongly match the folder we are moving them back to.
+        const movable = isUndo
+          ? items
+          : items.filter(
+              (i) =>
+                String(i._id ?? i.id) !== String(destinationId) &&
+                String(i.parentDirId) !== String(destinationId),
+            );
+
+        if (!movable.length) {
+          toast({ message: "Items are already in that folder", type: "info" });
+          return;
+        }
+
         const message = await moveItemFunction({
-          items,
+          items: movable,
           destinationId,
           destinationName,
         });
 
-        const movedIds = new Set(items.map((i) => String(i._id ?? i.id)));
+        const movedIds = new Set(movable.map((i) => String(i._id ?? i.id)));
 
-        // Current lists se moved items remove karo
+        // Keep your existing line for this (dirId is empty at My Drive root)
+        const currentDirId = dirId || user.parentDirId;
+
+        /* ── Undo ── */
+        if (isUndo) {
+          const viewing = String(currentDirId);
+
+          if (viewing === String(movedToId)) {
+            // Viewing the folder they were moved to -> remove them from the view
+            setDirectoriesList((prev) =>
+              prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+            );
+            setFilesList((prev) =>
+              prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+            );
+          } else if (viewing === String(destinationId)) {
+            // Viewing the folder they came from -> show them again
+            const back = movable.map((i) => ({
+              ...i,
+              parentDirId: destinationId,
+            }));
+            setDirectoriesList((prev) => [
+              ...back.filter((i) => i.isDirectory),
+              ...prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+            ]);
+            setFilesList((prev) => [
+              ...back.filter((i) => !i.isDirectory),
+              ...prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+            ]);
+          }
+          // anywhere else: do nothing
+          return;
+        }
+
+        /* ── Normal move: remove from the folder being viewed ── */
         setDirectoriesList((prev) =>
           prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
         );
-
         setFilesList((prev) =>
           prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
         );
 
-        if (isUndo) return;
+        const undoPayload = {
+          type: "move",
+          items: movable,
+          previousDestinationId: currentDirId, // where they came from
+          previousDestinationName: lastDirectory?.name || "My Drive",
+          movedToId: destinationId, // where they are now
+        };
 
         toast({
           message: message || "Items moved successfully",
           type: "success",
           duration: 5000,
+
+          goToFolder: {
+            onClick: () => {
+              if (destinationId === user.parentDirId) {
+                navigate("/drive");
+              } else {
+                navigate(
+                  destinationId ? `/directory/${destinationId}` : "/drive",
+                );
+              }
+            },
+          },
+
           undoAction: {
-            type: "move",
-            items,
-            previousDestinationId: dirId,
-            previousDestinationName: lastDirectory?.name || "My Drive",
-            onUndo: () =>
-              handleUndoRef.current?.({
-                type: "move",
-                items,
-                previousDestinationId: dirId,
-                previousDestinationName: lastDirectory?.name || "My Drive",
-              }),
+            ...undoPayload,
+            onUndo: () => handleUndoRef.current?.(undoPayload),
           },
         });
 
@@ -1602,6 +1696,7 @@ export function useDriveActions({
     },
     [
       dirId,
+      user,
       lastDirectory,
       setDirectoriesList,
       setFilesList,
@@ -1622,6 +1717,7 @@ export function useDriveActions({
             undoAction.previousDestinationId,
             undoAction.previousDestinationName,
             true,
+            undoAction.movedToId, // folder the items are in right now
           );
         }
         if (undoAction.type === "trash") {
@@ -1674,6 +1770,7 @@ export function useDriveActions({
     },
     [
       handleRestoreItem,
+      handleMoveItems,
       handleMoveToTrash,
       handleToggleStar,
       isTrashRoute,

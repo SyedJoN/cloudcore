@@ -406,23 +406,29 @@ export default function DirectoryView({ route }) {
   });
 
   const handleMove = async (ids, destinationId, destinationName) => {
-  const validItems = combinedItems.filter((item) =>
-    ids.some(
-      (id) => String(id) === String(item._id ?? item.id)
-    )
-  );
+    console.log("path", breadcrumbs);
+    console.log("user:", user);
+    console.log("lastDirectory:", lastDirectory);
+    console.log("user?.parentDirId:", user?.parentDirId);
+    // Sidebar "My Drive" and the root breadcrumb pass null
+    const targetId = destinationId ?? user?.parentDirId;
 
-  if (!validItems.length) {
-    console.log("Items not found:", ids);
-    return;
-  }
+    if (!targetId) {
+      toast({
+        message: "Could not find the destination folder",
+        type: "error",
+      });
+      return;
+    }
 
-  await handleMoveItems(
-    validItems,
-    destinationId,
-    destinationName
-  );
-};
+    const validItems = combinedItems.filter((item) =>
+      ids.some((id) => String(id) === String(item._id ?? item.id)),
+    );
+
+    if (!validItems.length) return;
+
+    await handleMoveItems(validItems, targetId, destinationName);
+  };
   useEffect(() => {
     if (selectedItems.size === 0) {
       setSelectionMode(false);
@@ -822,6 +828,7 @@ export default function DirectoryView({ route }) {
             handleCancelUpload={handleCancelUpload}
             setDbFileId={setDbFileId}
             onDropToTrash={handleDropOnTrash}
+            onMove={handleMove}
             refreshCurrentDirectory={refreshCurrentDirectory}
             showError={showError}
             dirId={dirId}
@@ -850,6 +857,8 @@ export default function DirectoryView({ route }) {
                 setCrumbs={setCrumbs}
                 dirContext={dirContext}
                 directoryName={directoryName}
+                onDropToTrash={handleDropOnTrash}
+                onMove={handleMove}
                 isSharedRoute={isSharedRoute}
                 breadcrumbs={breadcrumbs}
                 setBreadcrumbs={setBreadcrumbs}
@@ -1356,7 +1365,7 @@ export default function DirectoryView({ route }) {
 
               if (selectionMode) setSelectionMode(false);
             }}
-            onPreview={(item) => setViewItem(item)}
+            onPreview={(item) => setViewItem([item])}
           />
         ) : (
           <ContextMenu
@@ -1485,7 +1494,7 @@ export default function DirectoryView({ route }) {
 
               await handleDelete(items, type);
             }}
-            onPreview={(item) => setViewItem(item)}
+            onPreview={(item) => setViewItem([item])}
           />
         ))}
 
@@ -1494,11 +1503,11 @@ export default function DirectoryView({ route }) {
           key={viewItem?._id}
           item={viewItem}
           isStarred={isStarred}
-          onClose={() => setViewItem(null)}
+          onClose={() => setViewItem([])}
           handleSelect={handleSelect}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
-          onNavigate={(item) => setViewItem(item)}
+          onNavigate={(item) => setViewItem([item])}
           onContextMenu={handleContextMenu}
           onDownload={async (item) => {
             if (item) {
@@ -1567,7 +1576,7 @@ export default function DirectoryView({ route }) {
               await handleDelete(item, type);
             }
           }}
-          onPreview={(item) => setViewItem(item)}
+          onPreview={(item) => setViewItem([item])}
         />
       ) : (
         <FileViewer
@@ -1577,8 +1586,7 @@ export default function DirectoryView({ route }) {
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
           files={filteredFiles}
-          onNavigate={(item) => setViewItem(item)}
-          onContextMenu={handleContextMenu}
+          onNavigate={(item) => setViewItem([item])}
           onDownload={async (payload) => {
             const items = Array.isArray(payload)
               ? payload
@@ -1693,11 +1701,14 @@ export default function DirectoryView({ route }) {
       {shareItem &&
         (isMobile ? (
           <ShareModalMobile
+            setDirectoriesList={setDirectoriesList}
+            setFilesList={setFilesList}
+            item={selectedItem}
+            setViewItem={setViewItem}
             selectedUsers={selectedUsers}
             setSelectedUsers={setSelectedUsers}
             peopleWithAccess={peopleWithAccess}
             setPeopleWithAccess={setPeopleWithAccess}
-            item={selectedItem}
             items={shareItem}
             allUsers={allUsers}
             setUserRole={setUserRole}
@@ -1711,8 +1722,6 @@ export default function DirectoryView({ route }) {
             prevPermissions={prevPermissions}
             setPrevPermissions={setPrevPermissions}
             isShareLoading={isShareLoading}
-            setDirectoriesList={setDirectoriesList}
-            setFilesList={setFilesList}
             isGoogleDriveRoute={isGoogleDriveRoute}
             setIsShareLoading={setIsShareLoading}
           />
@@ -1724,6 +1733,7 @@ export default function DirectoryView({ route }) {
             setPeopleWithAccess={setPeopleWithAccess}
             item={selectedItem}
             items={shareItem}
+            setViewItem={setViewItem}
             allUsers={allUsers}
             setUserRole={setUserRole}
             onUpdateRoleAfterSave={handleSharedRoleUpdate}

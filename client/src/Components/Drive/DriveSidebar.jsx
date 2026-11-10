@@ -33,7 +33,7 @@ import { useAuth, useGDrive } from "../../Contexts";
 import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import GoogleDriveBrowser from "./GoogleDriveBrowser";
 import CircularLoader from "../Loaders/CircularLoader";
-import { useTrashDropZone } from "../../Hooks/useTrashDropZone";
+import { useDropZone } from "../../Hooks/useDropZone";
 
 export const NAV_ITEMS = [
   {
@@ -247,24 +247,22 @@ export function GDrivePicker({
 
 const NOOP = () => {};
 
-/**
- * One sidebar nav button. Extracted from the .map() so the drop-zone hook can
- * be called per item (hooks can't be called inside a loop callback).
- * Only the Trash button actually gets the drag & drop handlers.
- */
-function NavButton({ navItem, active, onNavigate, onDropToTrash }) {
+
+function NavButton({ navItem, active, onNavigate, onDrop }) {
   const { key, label, path, Icon, IconSolid } = navItem;
   const isTrash = key === "trash";
 
-  const { isOver, dropProps } = useTrashDropZone(onDropToTrash ?? NOOP);
+  const { isOver, dropProps } = useDropZone(onDrop ?? NOOP, {
+    enabled: !!onDrop,
+  });
 
   const DisplayIcon = active ? IconSolid : Icon;
 
   return (
     <button
-      className={`gd-nav-item ${active ? "active" : ""} ${isTrash ? "gd-sidebar-trash" : ""} ${isTrash && isOver ? "gd-drop-over" : ""}`}
+      className={`gd-nav-item ${active ? "active" : ""} ${isOver ? (isTrash ? "gd-drop-target" : "gd-drop-target") : ""}`}
       onClick={() => onNavigate(path)}
-      {...(isTrash ? dropProps : {})}
+      {...dropProps}
     >
       <DisplayIcon className="w-5 h-5" size={20} /> {label}
     </button>
@@ -287,7 +285,8 @@ export default function DriveSidebar({
   completeItem,
   handleCancelUpload,
   setDbFileId,
-  onDropToTrash, // (ids: string[]) => void  — items dropped on the Trash button
+  onDropToTrash,
+  onMove,
 }) {
   const { isGoogleDrive } = useGDrive();
   const { user } = useAuth();
@@ -301,6 +300,17 @@ export default function DriveSidebar({
     0,
     Math.min((user.totalUsage / Number(user.totalStorage)) * 100, 100),
   );
+
+  // Already at My Drive root -> dropping there would be a no-op, so don't accept drops
+  const isAtMyDriveRoot = dirContext === "root" && !dirId;
+
+  const dropHandlers = {
+    trash: onDropToTrash,
+    root:
+      onMove && !isAtMyDriveRoot
+        ? (ids) => onMove(ids, null, "My Drive")
+        : undefined,
+  };
 
   return (
     <aside className="gd-sidebar">
@@ -358,7 +368,7 @@ export default function DriveSidebar({
               navItem={navItem}
               active={navItem.isActive({ dirContext, dirId })}
               onNavigate={navigate}
-              onDropToTrash={onDropToTrash}
+              onDrop={dropHandlers[navItem.key]}
             />
           );
         })}

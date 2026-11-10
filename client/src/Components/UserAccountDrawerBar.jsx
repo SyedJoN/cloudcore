@@ -9,9 +9,11 @@ import { useAuth } from "../Contexts/AuthContext";
 import { useGDrive } from "../Contexts/GoogleDriveAuthContext";
 import GoogleDriveBtn from "./ThirdPartyButtons/GoogleDrive";
 import { UseAvatar } from "../Hooks/useAvatar";
+import { useDevice } from "../Contexts/DeviceContext";
 
 export default function UserAccountDrawerMobile({ open, onClose }) {
   const { user, loggedIn, logout, logoutAll } = useAuth();
+  const { device } = useDevice();
   const { isGoogleDrive } = useGDrive();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -120,7 +122,7 @@ export default function UserAccountDrawerMobile({ open, onClose }) {
                 </button>
               )}
 
-              {!isGoogleDrive && (
+              {!isGoogleDrive && device === "windows" && (
                 <button className="gd-user-menu-gdrive flex">
                   <GoogleDriveBtn
                     width={20}

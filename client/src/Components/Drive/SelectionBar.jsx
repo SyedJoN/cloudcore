@@ -216,7 +216,7 @@ export default function SelectionBar({
           title="Move"
           disabled={moveDisabled}
           onClick={() => {
-            onMove(isMulti ? targets.map((it) => it._id) : item._id);
+            onMove(isMulti ? targets.map((it) => it) : item);
           }}
         >
           <FolderInput size={18} />

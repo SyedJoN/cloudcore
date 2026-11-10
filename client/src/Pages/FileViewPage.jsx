@@ -58,7 +58,7 @@ export default function FileViewPage({ route = null }) {
               : isStarredRoute
                 ? "starred"
                 : "root");
-  const [item, setItem] = useState(null);
+  const [item, setItem] = useState([]);
   const [error, setError] = useState(null);
   const [renameId, setRenameId] = useState(null);
   const [renameType, setRenameType] = useState("");
@@ -84,7 +84,7 @@ export default function FileViewPage({ route = null }) {
     });
   }, [item]);
 
-    function showError(message, autoClear = false) {
+  function showError(message, autoClear = false) {
     setError(message);
     if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
     if (autoClear) {
@@ -142,6 +142,9 @@ export default function FileViewPage({ route = null }) {
     linkRole,
     setLinkRole,
     linkAccess,
+    viewItem,
+    setUserRole,
+    setViewItem,
     setLinkAccess,
     cascadeModal,
     confirmModal,
@@ -383,6 +386,7 @@ export default function FileViewPage({ route = null }) {
     try {
       const data = await getFileByMetaId(fileId);
       setItem([data]);
+      setViewItem([data])
     } catch (error) {
       setError(error.message || "Failed to load file");
       console.log(error);
@@ -498,8 +502,8 @@ export default function FileViewPage({ route = null }) {
       )}
       {isMobile ? (
         <FileViewerMobile
-          key={item[0]._id}
-          item={item[0]}
+           key={item.map((it) => it?._id)}
+          item={item}
           meta={true}
           isStarred={isStarred}
           onClose={closeViewer}
@@ -514,10 +518,10 @@ export default function FileViewPage({ route = null }) {
         />
       ) : (
         <FileViewer
-          key={item[0]._id}
+          key={item.map((it) => it?._id)}
+          item={item}
           isStarred={isStarred}
           shareItem={shareItem}
-          item={item[0]}
           onClose={() => window.close()}
           meta={true}
           isGDrive={false}
@@ -532,8 +536,12 @@ export default function FileViewPage({ route = null }) {
       {shareItem &&
         (isMobile ? (
           <ShareModalMobile
-            item={shareItem}
+             item={shareItem}
             setItem={setItem}
+            setDirectoriesList={setDirectoriesList}
+            setFilesList={setFilesList}
+            setUserRole={setUserRole}
+            setViewItem={setItem}
             onClose={handleToggleResourcePublic}
             onUpdateRoleAfterSave={handleSharedRoleUpdate}
             setShareItem={setShareItem}
@@ -556,6 +564,10 @@ export default function FileViewPage({ route = null }) {
           <ShareModal
             item={shareItem}
             setItem={setItem}
+            setDirectoriesList={setDirectoriesList}
+            setFilesList={setFilesList}
+            setUserRole={setUserRole}
+            setViewItem={setItem}
             onClose={handleToggleResourcePublic}
             onUpdateRoleAfterSave={handleSharedRoleUpdate}
             setShareItem={setShareItem}

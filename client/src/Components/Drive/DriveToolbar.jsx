@@ -3,6 +3,28 @@ import { IconGrid, IconList, IconInfo } from "../Icons/Icons";
 import { useAuth } from "../../Contexts/AuthContext";
 import { getRouteConfig } from "../../../Utils/routeConfig";
 import { useDevice } from "../../Contexts/DeviceContext";
+import { useDropZone } from "../../Hooks/useDropZone";
+
+/**
+ * Breadcrumb button that can optionally accept dropped drive items.
+ * Separate component because hooks can't be called inside .map().
+ */
+function CrumbButton({ disabled, onClick, onDrop, children, className = "" }) {
+  const { isOver, dropProps } = useDropZone(onDrop, {
+    enabled: !!onDrop && !disabled,
+  });
+
+  return (
+    <button
+      disabled={disabled}
+      className={`gd-breadcrumb-item ${className} ${isOver ? "gd-drop-target" : ""}`}
+      onClick={onClick}
+      {...dropProps}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function DriveToolbar({
   dirContext,
@@ -12,30 +34,45 @@ export default function DriveToolbar({
   viewMode,
   onToggleView,
   toggleDetailsBar,
+  onMove, // (ids: string[], targetFolderId: string | null, targetName: string) => void
 }) {
   const navigate = useNavigate();
   const { loggedIn } = useAuth();
-const {device} = useDevice();
+  const { device } = useDevice();
   const {
     label: rootLabel,
     path: rootPath,
     flatBreadcrumb,
   } = getRouteConfig(dirContext);
 
+  // Only My Drive supports moving via breadcrumb
+  const canDrop = !!onMove && dirContext === "root";
+
+  // At the root (no crumbs) the root button is the current location -> not a target
+  const rootDrop =
+    canDrop && crumbs.length > 0
+      ? (ids) => onMove(ids, null, rootLabel)
+      : undefined;
+
+  const rootButton = (
+    <CrumbButton
+      disabled={disabled}
+      className={loggedIn ? "" : "hide"}
+      onClick={() => {
+        setCrumbs([]);
+        navigate(rootPath);
+      }}
+      onDrop={rootDrop}
+    >
+      {loggedIn ? rootLabel : ""}
+    </CrumbButton>
+  );
+
   return (
     <div className="gd-toolbar" onMouseDown={(e) => e.stopPropagation()}>
       {!flatBreadcrumb ? (
         <div className="gd-breadcrumb">
-          <button
-            disabled={disabled}
-            className={`${loggedIn ? "gd-breadcrumb-item" : "hide"}`}
-            onClick={() => {
-              setCrumbs([]);
-              navigate(rootPath);
-            }}
-          >
-            {loggedIn ? rootLabel : ""}
-          </button>
+          {rootButton}
 
           {crumbs.map((crumb, i) => (
             <span
@@ -56,33 +93,28 @@ const {device} = useDevice();
                   {crumb.name}
                 </span>
               ) : (
-                <button
-                  className="gd-breadcrumb-item"
+                <CrumbButton
                   disabled={disabled}
                   onClick={() => {
                     navigate(`/directory/${crumb.id}`, {
                       state: { dirContext },
                     });
                   }}
+                  onDrop={
+                    canDrop && crumb.id
+                      ? (ids) => onMove(ids, crumb.id, crumb.name)
+                      : undefined
+                  }
                 >
                   {crumb.name}
-                </button>
+                </CrumbButton>
               )}
             </span>
           ))}
         </div>
       ) : (
         <div className="gd-breadcrumb">
-          <button
-            disabled={disabled}
-            className={`${loggedIn ? "gd-breadcrumb-item" : "hide"}`}
-            onClick={() => {
-              setCrumbs([]);
-              navigate(rootPath);
-            }}
-          >
-            {loggedIn ? rootLabel : ""}
-          </button>
+          {rootButton}
           <span style={{ display: "flex", alignItems: "center" }}>
             <span className="gd-breadcrumb-sep">
               {Object.keys(crumbs[0] ?? []).length === 0 ? "" : "›"}

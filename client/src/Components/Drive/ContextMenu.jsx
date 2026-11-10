@@ -532,7 +532,7 @@ function ContextMenuContent({
                 disabled={isSharedRoute || isDeleted || !canMove}
                 // single: the id, multiple: array of ids
                 onClick={close(() =>
-                  onMove(isMulti ? targets.map((it) => it._id) : item._id),
+                  onMove(isMulti ? targets.map((it) => it) : item),
                 )}
               >
                 <FolderInput width={18} height={18} />

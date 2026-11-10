@@ -1,6 +1,6 @@
+
 import { createContext, useContext, useState, useCallback } from "react";
 import { useDevice } from "./DeviceContext";
-
 
 const ToastContext = createContext(null);
 
@@ -8,9 +8,20 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const toast = useCallback(
-    ({ message, type = "info", undoAction = null, duration = 5000 }) => {
+    ({
+      message,
+      type = "info",
+      undoAction = null,
+      goToFolder = null,
+      duration = 5000,
+    }) => {
       const id = `${Date.now()}-${Math.random()}`;
-      setToasts(() => [{ id, message, type, undoAction }]);
+
+      setToasts((prev) => [
+        ...prev,
+        { id, message, type, undoAction, goToFolder },
+      ]);
+
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, duration);
@@ -32,9 +43,11 @@ export function ToastProvider({ children }) {
 
 export function useToast() {
   const context = useContext(ToastContext);
+
   if (!context) {
     throw new Error("useToast must be used inside ToastProvider");
   }
+
   return context;
 }
 
@@ -61,10 +74,11 @@ function ToastContainer({ toasts, onRemove }) {
         >
           <span style={styles.message}>{t.message}</span>
 
+          {/* Undo */}
           {typeof t.undoAction?.onUndo === "function" && (
             <button
               type="button"
-              style={styles.undo}
+              style={styles.action}
               onClick={async () => {
                 try {
                   await t.undoAction.onUndo();
@@ -77,6 +91,26 @@ function ToastContainer({ toasts, onRemove }) {
               Undo
             </button>
           )}
+
+          {/* Go to folder */}
+          {typeof t.goToFolder?.onClick === "function" && (
+            <button
+              type="button"
+              style={styles.action}
+              onClick={() => {
+                try {
+                  t.goToFolder.onClick();
+                  onRemove(t.id);
+                } catch (error) {
+                  console.error("Navigation failed:", error);
+                }
+              }}
+            >
+              Go to folder
+            </button>
+          )}
+
+          {/* Close */}
           <button
             type="button"
             aria-label="Dismiss"
@@ -101,9 +135,9 @@ const styles = {
     gap: 8,
     zIndex: 9999,
     alignItems: "flex-start",
-    pointerEvents: "none", // container never blocks the page
+    pointerEvents: "none",
   },
-  // mobile: spans the full screen width, pinned to the bottom edge
+
   containerMobile: {
     left: 0,
     right: 0,
@@ -111,7 +145,7 @@ const styles = {
     gap: 0,
     alignItems: "stretch",
   },
-  // one look for every type: dark background, white text
+
   toast: {
     display: "flex",
     alignItems: "center",
@@ -128,6 +162,7 @@ const styles = {
     maxWidth: 480,
     animation: "slideUp 0.2s ease",
   },
+
   toastMobile: {
     width: "100%",
     minWidth: 0,
@@ -139,7 +174,22 @@ const styles = {
     padding: "16px 16px",
     paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
   },
-  message: { flex: 1, minWidth: 0 },
+
+  message: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  action: {
+    background: "none",
+    border: "none",
+    color: "#8ab4f8",
+    cursor: "pointer",
+    fontWeight: 600,
+    padding: 0,
+    whiteSpace: "nowrap",
+  },
+
   close: {
     marginLeft: "auto",
     background: "none",
@@ -149,12 +199,5 @@ const styles = {
     opacity: 0.7,
     fontSize: 14,
     padding: 0,
-  },
-  undo: {
-    background: "none",
-    border: "none",
-    color: "#8ab4f8",
-    cursor: "pointer",
-    fontWeight: 600,
   },
 };

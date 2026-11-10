@@ -34,7 +34,6 @@ import { updateItemState } from "../../../Utils/updateItemState.js";
 import { BottomSheet, SheetItem } from "../Drive/BottomSheet.jsx";
 import ConfirmationModalMobile from "./ConfirmationModalMobile.jsx";
 
-
 const SLIDE_MS = 300;
 const EASE = "cubic-bezier(0.22, 0.8, 0.24, 1)";
 
@@ -67,6 +66,14 @@ const getAnyonePermission = (it) =>
 const hasAnyone = (it) => Boolean(getAnyonePermission(it));
 
 const emailOf = (p) => (p?.emailAddress ?? p?.email ?? "").toLowerCase();
+
+// Always resolve a readable name, whatever shape the user/permission has
+const nameOf = (p) =>
+  p?.displayName ||
+  p?.name ||
+  p?.username ||
+  (p?.emailAddress ?? p?.email ?? "").split("@")[0] ||
+  "Unknown";
 
 function getCommonPermissions(list) {
   const people = (it) =>
@@ -135,6 +142,7 @@ function SectionLabel({ children }) {
 
 function PersonRow({ avatar, name, title, subtitle, trailing, onClick }) {
   const Tag = onClick ? "button" : "div";
+
   return (
     <Tag
       type={onClick ? "button" : undefined}
@@ -142,16 +150,19 @@ function PersonRow({ avatar, name, title, subtitle, trailing, onClick }) {
       className="flex w-full items-center gap-3 px-5 py-2.5 text-left active:bg-black/5"
     >
       <UseAvatar avatar={avatar} name={name} size={40} />
+
       <div className="min-w-0 flex-1">
         <div className="truncate text-[15px] text-(--text-primary)">
-          {title}
+          {title ?? name}
         </div>
+
         {subtitle && (
           <div className="truncate text-[13px] text-(--text-secondary)">
             {subtitle}
           </div>
         )}
       </div>
+
       {trailing}
     </Tag>
   );
@@ -162,12 +173,12 @@ function Chip({ user, onRemove }) {
     <div className="flex max-w-full items-center gap-1.5 rounded-full border border-black/15 py-0.5 pl-0.5 pr-2 text-[14px]">
       <UseAvatar
         avatar={user.avatar || user.photoLink}
-        name={user.name || user.displayName}
+        name={nameOf(user)}
         size={24}
         fontSize={12}
       />
       <span className="truncate">
-        {user.email ?? user.emailAddress ?? user.name ?? user.displayName}
+        {user.email ?? user.emailAddress ?? nameOf(user)}
       </span>
       <button
         type="button"
@@ -204,6 +215,7 @@ export default function ShareModalMobile({
   setSelectedUsers,
   setDirectoriesList,
   setFilesList,
+  setViewItem,
   onClose,
   prevPermissions,
   setPrevPermissions,
@@ -325,7 +337,6 @@ export default function ShareModalMobile({
     setIsChanged(!equal);
   }, [prevPermissions, peopleWithAccess]);
 
-
   const matches = (u, q) =>
     u.name?.toLowerCase().includes(q.toLowerCase()) ||
     u.email?.toLowerCase().includes(q.toLowerCase());
@@ -391,7 +402,9 @@ export default function ShareModalMobile({
   // slide the whole screen back out to the right, then unmount
   function closeShare() {
     setEntered(false);
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     setTimeout(() => setShareItem(null), reduce ? 0 : SLIDE_MS);
   }
 
@@ -414,6 +427,7 @@ export default function ShareModalMobile({
   }
 
   function applyShareToState(it, response) {
+    
     const itemId = getItemId(it);
 
     let updatedUsers;
@@ -421,19 +435,19 @@ export default function ShareModalMobile({
     if (!isGoogleDriveRoute) {
       updatedUsers = selectedUsers.map((u) => ({
         id: u.id,
-        photoLink: u.avatar,
-        displayName: u.name,
+        photoLink: u.avatar || u.photoLink,
+        displayName: nameOf(u),
         type: "user",
-        emailAddress: u.email,
+        emailAddress: u.email ?? u.emailAddress,
         role: DRIVE_ROLES[u.role] ?? u.role,
       }));
     } else {
       updatedUsers = response?.permissions?.map((u) => ({
         id: u.id,
-        photoLink: u.avatar,
-        displayName: u.displayName,
+        photoLink: u.photoLink || u.avatar,
+        displayName: nameOf(u),
         type: "user",
-        emailAddress: u.emailAddress,
+        emailAddress: u.emailAddress ?? u.email,
         role: DRIVE_ROLES[u.role] ?? u.role,
       }));
     }
@@ -469,6 +483,7 @@ export default function ShareModalMobile({
 
     setFilesList(applyPermissions);
     setDirectoriesList(applyPermissions);
+    setViewItem(applyPermissions);
 
     if (setItem) {
       updateItemState(setItem, itemId, { permissions: finalPermissions });
@@ -981,7 +996,8 @@ export default function ShareModalMobile({
         return {
           ...resource,
           permissions: resource.permissions.map((permission) => {
-            if (String(permission?.id) !== String(person?.id)) return permission;
+            if (String(permission?.id) !== String(person?.id))
+              return permission;
             const { pendingOwner, ...clean } = permission;
             return clean;
           }),
@@ -1016,8 +1032,7 @@ export default function ShareModalMobile({
   const applyLinkChange = (role, access) =>
     shareItems.forEach((it) => onClose(it, role, access));
 
-  const applyLinkChangeToItem = (it, role, access) =>
-    onClose(it, role, access);
+  const applyLinkChangeToItem = (it, role, access) => onClose(it, role, access);
 
   function handleSaveSingle() {
     onUpdateRoleAfterSave(item, type, message);
@@ -1047,67 +1062,67 @@ export default function ShareModalMobile({
   // root: slides in from the right on open
   const shell = (children) => (
     <div
-      className="fixed inset-0 z-1000 overflow-hidden bg-black/0 text-(--text-primary)"
+      className="fixed inset-0 z-500 overflow-hidden bg-black/0 text-(--text-primary)"
       style={{
         transform: entered ? "translateX(0)" : "translateX(100%)",
         transition: `transform ${dur}ms ${EASE}`,
       }}
     >
       {children}
-     {isShareLoading && (
-  <div className="absolute inset-x-0 top-0 z-100 h-0.75 overflow-hidden bg-[#d2e3fc]">
-    <div className="drive-progress-bar" />
-  </div>
-)}
+      {isShareLoading && (
+        <div className="absolute inset-x-0 top-0 z-100 h-0.75 overflow-hidden bg-[#d2e3fc]">
+          <div className="drive-progress-bar" />
+        </div>
+      )}
     </div>
   );
 
   // a screen: slides in from the right; `shifted` nudges the one underneath
- const layer = (visible, children, shifted = false) => (
-  <div
-    aria-hidden={!visible}
-    ref={(el) => {
-      if (el && !visible && el.contains(document.activeElement)) {
-        document.activeElement.blur();
-      }
-    }}
-    {...(!visible ? { inert: "" } : {})}
-    className="absolute inset-0 flex flex-col bg-(--surface-white,#fff)"
-    style={{
-      paddingTop: "env(safe-area-inset-top, 0px)",
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      transform: !visible
-        ? "translateX(100%)"
-        : shifted
-          ? "translateX(-22%)"
-          : "translateX(0)",
-      visibility: visible ? "visible" : "hidden",
-      boxShadow: visible ? "-8px 0 24px rgba(0,0,0,0.12)" : "none",
-      transition: `transform ${dur}ms ${EASE}, visibility 0s linear ${visible ? 0 : dur}ms`,
-    }}
-  >
-    {children}
-  </div>
-);
+  const layer = (visible, children, shifted = false) => (
+    <div
+      aria-hidden={!visible}
+      ref={(el) => {
+        if (el && !visible && el.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
+      }}
+      {...(!visible ? { inert: "" } : {})}
+      className="absolute inset-0 flex flex-col bg-(--surface-white,#fff)"
+      style={{
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        transform: !visible
+          ? "translateX(100%)"
+          : shifted
+            ? "translateX(-22%)"
+            : "translateX(0)",
+        visibility: visible ? "visible" : "hidden",
+        boxShadow: visible ? "-8px 0 24px rgba(0,0,0,0.12)" : "none",
+        transition: `transform ${dur}ms ${EASE}, visibility 0s linear ${visible ? 0 : dur}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
 
-const discardDialog = (
-  <ConfirmationModalMobile
-    open={isConfirmation}
-    title="Discard unsaved changes?"
-    description="Your changes haven't been saved. Are you sure you want to discard them?"
-    action_1="Cancel"
-    action_2="Discard"
-    onClose={() => setIsConfirmation(false)}
-    onAction_1={() => setIsConfirmation(false)}
-    onAction_2={() => {
-      setIsConfirmation(false);
-      closeShare();
-    }}
-  />
-);
+  const discardDialog = (
+    <ConfirmationModalMobile
+      open={isConfirmation}
+      title="Discard unsaved changes?"
+      description="Your changes haven't been saved. Are you sure you want to discard them?"
+      action_1="Cancel"
+      action_2="Discard"
+      onClose={() => setIsConfirmation(false)}
+      onAction_1={() => setIsConfirmation(false)}
+      onAction_2={() => {
+        setIsConfirmation(false);
+        closeShare();
+      }}
+    />
+  );
   const messageField = (
     <textarea
-      className="mt-3 w-full resize-none rounded-lg border border-black/20 bg-transparent p-3 text-[15px] outline-none focus:border-[#1a73e8]"
+      className="mt-3 w-full resize-none rounded-lg border border-(--divider) bg-transparent p-3 text-[15px] outline-none focus:border-[#1a73e8]"
       placeholder="Message"
       value={message}
       onChange={(e) => setMessage(e.target.value)}
@@ -1123,11 +1138,7 @@ const discardDialog = (
         className="flex items-center gap-2 rounded-full border border-black/20 px-4 py-2 text-[14px] font-medium text-[#1a73e8] active:bg-black/5"
       >
         {copyFeedback ? <IconCheck size={16} /> : <IconLink size={16} />}
-        {copyFeedback
-          ? "Copied!"
-          : isMulti
-            ? "Copy links"
-            : "Copy link"}
+        {copyFeedback ? "Copied!" : isMulti ? "Copy links" : "Copy link"}
       </button>
       <div className="flex-1 text-[13px] text-(--text-secondary)">
         {isChanged && "Pending changes"}
@@ -1157,8 +1168,7 @@ const discardDialog = (
           [getItemId(it)]: { pub: opt === "anyone", role },
         }));
         applyLinkChangeToItem(it, role, opt);
-      }
-      else {
+      } else {
         setLinkAccess(opt);
         applyLinkChange(linkRole, opt);
       }
@@ -1172,8 +1182,7 @@ const discardDialog = (
           [getItemId(it)]: { pub: true, role: r },
         }));
         applyLinkChangeToItem(it, r, "anyone");
-      }
-      else {
+      } else {
         setLinkRole(r);
         applyLinkChange(r, linkAccess);
       }
@@ -1233,32 +1242,32 @@ const discardDialog = (
               </button>
             );
           })}
-<div
-  className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
-  style={{
-    gridTemplateRows: pub ? "1fr" : "0fr",
-    opacity: pub ? 1 : 0,
-  }}
-  aria-hidden={!pub}
-  inert={pub ? undefined : ""}
->
-  <div className="overflow-hidden">
-    <SectionLabel>Link role</SectionLabel>
+          <div
+            className="grid transition-[grid-template-rows,opacity] duration-300 ease-out"
+            style={{
+              gridTemplateRows: pub ? "1fr" : "0fr",
+              opacity: pub ? 1 : 0,
+            }}
+            aria-hidden={!pub}
+            inert={pub ? undefined : ""}
+          >
+            <div className="overflow-hidden">
+              <SectionLabel>Link role</SectionLabel>
 
-    {["reader", "writer"].map((r) => (
-      <button
-        key={r}
-        type="button"
-        disabled={!canEdit || !pub}
-        onClick={() => setRole(r)}
-        className="flex w-full items-center justify-between px-5 py-3 text-left text-[15px] active:bg-black/5 disabled:opacity-50"
-      >
-        {ROLE_LABEL[r]}
-        {r === role && <IconCheck size={20} />}
-      </button>
-    ))}
-  </div>
-</div>
+              {["reader", "writer"].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  disabled={!canEdit || !pub}
+                  onClick={() => setRole(r)}
+                  className="flex w-full items-center justify-between px-5 py-3 text-left text-[15px] active:bg-black/5 disabled:opacity-50"
+                >
+                  {ROLE_LABEL[r]}
+                  {r === role && <IconCheck size={20} />}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {copyLinkBar}
@@ -1277,7 +1286,7 @@ const discardDialog = (
     return (
       <div className="pb-4">
         <div className="truncate px-6 pb-2 pt-1 text-[15px] font-medium">
-          {person.displayName || person.emailAddress}
+          {nameOf(person)}
         </div>
         {Object.keys(DRIVE_ROLES).map((k) => (
           <SheetItem
@@ -1320,9 +1329,7 @@ const discardDialog = (
     if (sheetView?.type !== "invite") return null;
     return (
       <div className="pb-4">
-        <div className="px-6 pb-2 pt-1 text-[15px] font-medium">
-          Permission
-        </div>
+        <div className="px-6 pb-2 pt-1 text-[15px] font-medium">Permission</div>
         {Object.keys(DRIVE_ROLES).map((k) => (
           <SheetItem
             key={k}
@@ -1362,112 +1369,114 @@ const discardDialog = (
     return (
       <>
         {discardDialog}
-        {shell(layer(true,
-          <>
-            <TopBar
-              left={
-                <RoundBtn label="Close" onClick={requestClose}>
-                  <IconClose size={22} />
-                </RoundBtn>
-              }
-              title={sendLinkTitle}
-              right={
-                <RoundBtn
-                  label="Send"
-                  disabled={isShareLoading || !selectedUsers.length}
-                  onClick={handleSendLink}
+        {shell(
+          layer(
+            true,
+            <>
+              <TopBar
+                left={
+                  <RoundBtn label="Close" onClick={requestClose}>
+                    <IconClose size={22} />
+                  </RoundBtn>
+                }
+                title={sendLinkTitle}
+                right={
+                  <RoundBtn
+                    label="Send"
+                    disabled={isShareLoading || !selectedUsers.length}
+                    onClick={handleSendLink}
+                  >
+                    <PaperAirplaneIcon className="h-6 w-6 text-[#1a73e8]" />
+                  </RoundBtn>
+                }
+              />
+
+              <div className="flex-1 overflow-y-auto px-5 pb-6">
+                <p className="mb-3 text-[13px] text-(--text-secondary)">
+                  {isMulti
+                    ? "You'll send an email with the links from below"
+                    : "You'll send an email with the link from below"}
+                </p>
+
+                <div
+                  ref={inviteSearchRef}
+                  className="rounded-lg border-2 border-[#1a73e8] px-3 py-2"
                 >
-                  <PaperAirplaneIcon className="h-6 w-6 text-[#1a73e8]" />
-                </RoundBtn>
-              }
-            />
-
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              <p className="mb-3 text-[13px] text-(--text-secondary)">
-                {isMulti
-                  ? "You'll send an email with the links from below"
-                  : "You'll send an email with the link from below"}
-              </p>
-
-              <div
-                ref={inviteSearchRef}
-                className="rounded-lg border-2 border-[#1a73e8] px-3 py-2"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedUsers.map((u) => (
-                    <Chip
-                      key={u._id ?? u.id}
-                      user={u}
-                      onRemove={() => handleRemoveSelected(u.id)}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedUsers.map((u) => (
+                      <Chip
+                        key={u._id ?? u.id}
+                        user={u}
+                        onRemove={() => handleRemoveSelected(u.id)}
+                      />
+                    ))}
+                    <input
+                      type="text"
+                      className="min-w-30 flex-1 bg-transparent py-1 text-[15px] outline-none"
+                      placeholder="Add people to send the link to"
+                      value={inviteInput}
+                      onChange={(e) => {
+                        setInviteInput(e.target.value);
+                        setShowInviteSuggestions(true);
+                      }}
+                      onFocus={() => setShowInviteSuggestions(true)}
                     />
-                  ))}
-                  <input
-                    type="text"
-                    className="min-w-30 flex-1 bg-transparent py-1 text-[15px] outline-none"
-                    placeholder="Add people to send the link to"
-                    value={inviteInput}
-                    onChange={(e) => {
-                      setInviteInput(e.target.value);
-                      setShowInviteSuggestions(true);
-                    }}
-                    onFocus={() => setShowInviteSuggestions(true)}
-                  />
+                  </div>
                 </div>
-              </div>
 
-              {showInviteSuggestions && !selectedUsers.length && (
-                <div className="mt-2">
-                  {ownersPool.map((u) => (
-                    <PersonRow
-                      key={u.id || u.permissionId || u.emailAddress}
-                      avatar={u.avatar || u.photoLink}
-                      name={u.name || u.displayName}
-                      title={u.name || u.displayName}
-                      subtitle={u.email || u.emailAddress}
-                      onClick={(e) => handleSelectUser(e, u)}
-                    />
-                  ))}
-                </div>
-              )}
+                {showInviteSuggestions && !selectedUsers.length && (
+                  <div className="mt-2">
+                    {ownersPool.map((u) => (
+                      <PersonRow
+                        key={u.id || u.permissionId || u.emailAddress}
+                        avatar={u.avatar || u.photoLink}
+                        name={nameOf(u)}
+                        subtitle={u.email || u.emailAddress}
+                        onClick={(e) => handleSelectUser(e, u)}
+                      />
+                    ))}
+                  </div>
+                )}
 
-              {messageField}
+                {messageField}
 
-              {!isMulti && (
-                <>
-                  <SectionLabel>General access</SectionLabel>
-                  <div className="flex items-center gap-3 py-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e6f4ea]">
-                      {linkAccess === "anyone" ? (
-                        <GlobeAmericasIcon className="h-5 w-5 text-[#1e8e3e]" />
-                      ) : (
-                        <LockClosedIcon className="h-5 w-5 text-[#1e8e3e]" />
+                {!isMulti && (
+                  <>
+                    <SectionLabel>General access</SectionLabel>
+                    <div className="flex items-center gap-3 py-1">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e6f4ea]">
+                        {linkAccess === "anyone" ? (
+                          <GlobeAmericasIcon className="h-5 w-5 text-[#1e8e3e]" />
+                        ) : (
+                          <LockClosedIcon className="h-5 w-5 text-[#1e8e3e]" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[15px]">
+                          {linkAccess === "anyone"
+                            ? "Anyone with the link"
+                            : "Restricted"}
+                        </div>
+                        <div className="text-[13px] text-(--text-secondary)">
+                          {linkAccess === "anyone"
+                            ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
+                            : "Only people with access can open with this link"}
+                        </div>
+                      </div>
+                      {linkAccess === "anyone" && (
+                        <span className="text-[13px] text-(--text-secondary)">
+                          {ROLE_LABEL[linkRole]}
+                        </span>
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[15px]">
-                        {linkAccess === "anyone"
-                          ? "Anyone with the link"
-                          : "Restricted"}
-                      </div>
-                      <div className="text-[13px] text-(--text-secondary)">
-                        {linkAccess === "anyone"
-                          ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
-                          : "Only people with access can open with this link"}
-                      </div>
-                    </div>
-                    {linkAccess === "anyone" && (
-                      <span className="text-[13px] text-(--text-secondary)">
-                        {ROLE_LABEL[linkRole]}
-                      </span>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
 
-            {copyLinkBar}
-          </>,
-        ))}
+              {copyLinkBar}
+            </>,
+          ),
+        )}
       </>
     );
   }
@@ -1476,111 +1485,113 @@ const discardDialog = (
 
   function renderInvitePanel() {
     return layer(
-          showInvitePanel,
-          <>
-            <TopBar
-              left={
-                <RoundBtn label="Back" onClick={handleCancel}>
-                  <ArrowLeftIcon className="h-6 w-6" />
-                </RoundBtn>
-              }
-              title={shareTitle}
-              right={
-                <RoundBtn
-                  label={notifyPeople ? "Send" : "Share"}
-                  disabled={isShareLoading}
-                  onClick={handleSend}
-                >
-                  <PaperAirplaneIcon className="h-6 w-6 text-[#1a73e8]" />
-                </RoundBtn>
-              }
-            />
+      showInvitePanel,
+      <>
+        <TopBar
+          left={
+            <RoundBtn label="Back" onClick={handleCancel}>
+              <ArrowLeftIcon className="h-6 w-6" />
+            </RoundBtn>
+          }
+          title={shareTitle}
+          right={
+            <RoundBtn
+              label={notifyPeople ? "Send" : "Share"}
+              disabled={isShareLoading}
+              onClick={handleSend}
+            >
+              <PaperAirplaneIcon className="h-6 w-6 text-[#1a73e8]" />
+            </RoundBtn>
+          }
+        />
 
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              {/* tap people below to add them */}
-              <div ref={inviteSearchRef} className="rounded-lg border border-black/20 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedUsers.map((u) => (
-                    <Chip
-                      key={u._id ?? u.id}
-                      user={u}
-                      onRemove={() => handleRemoveSelected(u.id)}
-                    />
-                  ))}
-                  <input
-                    type="text"
-                    className="min-w-30 flex-1 bg-transparent py-1 text-[15px] outline-none"
-                    placeholder="Add more people..."
-                    value={inviteInput}
-                    onChange={(e) => {
-                      setInviteInput(e.target.value);
-                      setShowInviteSuggestions(true);
-                    }}
-                    onFocus={() => setShowInviteSuggestions(true)}
-                  />
-                </div>
-              </div>
-
-              {showInviteSuggestions && (
-                <div className="-mx-5 mt-1">
-                  <div className="flex justify-end px-5 pb-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowInviteSuggestions(false);
-                        document.activeElement?.blur?.();
-                      }}
-                      className="py-1 text-[14px] font-medium text-[#1a73e8]"
-                    >
-                      Done
-                    </button>
-                  </div>
-                  {inviteSuggestions
-                    .filter((u) => isSelectable(u, false))
-                    .map((u) => (
-                      <PersonRow
-                        key={u.id}
-                        avatar={u.avatar}
-                        name={u.name}
-                        title={u.name}
-                        subtitle={u.email}
-                        onClick={() => handleAddUser(u)}
-                      />
-                    ))}
-                </div>
-              )}
-
-              {!showInviteSuggestions && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setSheet({ type: "invite" })}
-                    className="mt-3 flex w-full items-center justify-between rounded-lg px-1 py-3 text-left active:bg-black/5"
-                  >
-                    <span className="text-[15px]">Permission</span>
-                    <span className="flex items-center gap-1 text-[15px] text-[#1a73e8]">
-                      {roleKeyLabel(inviteRole)}
-                      <IconChevronDown size={14} />
-                    </span>
-                  </button>
-
-                  <label className="flex cursor-pointer items-center justify-between px-1 py-3">
-                    <span className="text-[15px]">Notify people</span>
-                    <input
-                      type="checkbox"
-                      checked={notifyPeople}
-                      onChange={(e) => setNotifyPeople(e.target.checked)}
-                      className="h-5 w-5 rounded border-gray-300 text-blue-600"
-                    />
-                  </label>
-
-                  {notifyPeople && messageField}
-                </>
-              )}
+        <div className="flex-1 overflow-y-auto px-5 pb-6">
+          {/* tap people below to add them */}
+          <div
+            ref={inviteSearchRef}
+            className="rounded-lg border border-black/20 px-3 py-2"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedUsers.map((u) => (
+                <Chip
+                  key={u._id ?? u.id}
+                  user={u}
+                  onRemove={() => handleRemoveSelected(u.id)}
+                />
+              ))}
+              <input
+                type="text"
+                className="min-w-30 flex-1 bg-transparent py-1 text-[15px] outline-none"
+                placeholder="Add more people..."
+                value={inviteInput}
+                onChange={(e) => {
+                  setInviteInput(e.target.value);
+                  setShowInviteSuggestions(true);
+                }}
+                onFocus={() => setShowInviteSuggestions(true)}
+              />
             </div>
+          </div>
 
-            {copyLinkBar}
-          </>,
+          {showInviteSuggestions && (
+            <div className="-mx-5 mt-1">
+              <div className="flex justify-end px-5 pb-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInviteSuggestions(false);
+                    document.activeElement?.blur?.();
+                  }}
+                  className="py-1 text-[14px] font-medium text-[#1a73e8]"
+                >
+                  Done
+                </button>
+              </div>
+              {inviteSuggestions
+                .filter((u) => isSelectable(u, false))
+                .map((u) => (
+                  <PersonRow
+                    key={u.id}
+                    avatar={u.avatar}
+                    name={nameOf(u)}
+                    subtitle={u.email}
+                    onClick={() => handleAddUser(u)}
+                  />
+                ))}
+            </div>
+          )}
+
+          {!showInviteSuggestions && (
+            <>
+              <button
+                type="button"
+                onClick={() => setSheet({ type: "invite" })}
+                className="mt-3 flex w-full items-center justify-between rounded-lg px-1 py-3 text-left active:bg-black/5"
+              >
+                <span className="text-[15px]">Permission</span>
+                <span className="flex items-center gap-1 text-[15px] text-[#1a73e8]">
+                  {roleKeyLabel(inviteRole)}
+                  <IconChevronDown size={14} />
+                </span>
+              </button>
+
+              <label className="flex cursor-pointer items-center justify-between px-1 py-3">
+                <span className="text-[15px]">Notify people</span>
+                <input
+                  type="checkbox"
+                  checked={notifyPeople}
+                  onChange={(e) => setNotifyPeople(e.target.checked)}
+                  className="h-5 w-5 rounded border-gray-300 text-blue-600"
+                />
+              </label>
+
+              {notifyPeople && messageField}
+            </>
+          )}
+        </div>
+
+        {copyLinkBar}
+      </>,
     );
   }
 
@@ -1597,228 +1608,244 @@ const discardDialog = (
       {discardDialog}
       {shell(
         <>
-          {layer(true, <>
-          <TopBar
-            left={
-              <RoundBtn
-                label="Close"
-                onClick={() =>
-                  isChanged ? setIsConfirmation(true) : closeShare()
+          {layer(
+            true,
+            <>
+              <TopBar
+                left={
+                  <RoundBtn
+                    label="Close"
+                    onClick={() =>
+                      isChanged ? setIsConfirmation(true) : closeShare()
+                    }
+                  >
+                    <IconClose size={22} />
+                  </RoundBtn>
                 }
-              >
-                <IconClose size={22} />
-              </RoundBtn>
-            }
-            title={shareTitle}
-            right={
-              <button
-                type="button"
-                disabled={isShareLoading}
-                onClick={() =>
-                  isMulti ? handleSaveMultiPermissions() : handleSaveSingle()
-                }
-                className="rounded-full px-3 py-1.5 text-[15px] font-medium text-[#1a73e8] active:bg-black/5 disabled:opacity-50"
-              >
-                {saveLabel}
-              </button>
-            }
-          />
-
-          <div className="flex-1 overflow-y-auto pb-6">
-            {/* search */}
-            <div ref={searchRef} className="flex items-center gap-2 px-4">
-              <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-0.5 py-2.5">
-                <IconPersonAdd
-                  size={18}
-                  style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-                />
-                <input
-                  type="text"
-                  className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
-                  placeholder="Add people and groups"
-                  value={emailInput}
-                  onChange={(e) => {
-                    setEmailInput(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                />
-                {emailInput && (
+                title={shareTitle}
+                right={
                   <button
                     type="button"
-                    aria-label="Clear"
-                    onClick={() => setEmailInput("")}
+                    disabled={isShareLoading}
+                    onClick={() =>
+                      isMulti
+                        ? handleSaveMultiPermissions()
+                        : handleSaveSingle()
+                    }
+                    className="rounded-full px-3 py-1.5 text-[15px] font-medium text-[#1a73e8] active:bg-black/5 disabled:opacity-50"
                   >
-                    <IconClose size={16} />
+                    {saveLabel}
                   </button>
-                )}
-              </div>
-              {showSuggestions && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuggestions(false);
-                    setEmailInput("");
-                    document.activeElement?.blur?.();
-                  }}
-                  className="px-2 py-2 text-[15px] font-medium text-[#1a73e8]"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
+                }
+              />
 
-            {showSuggestions ? (
-              <div className="mt-2">
-                {suggestions
-                  .filter((s) => isSelectable(s, true))
-                  .map((u) => (
-                    <PersonRow
-                      key={u.id}
-                      avatar={u.avatar}
-                      name={u.name}
-                      title={u.name}
-                      subtitle={u.email}
-                      onClick={(e) => handleSelectUser(e, u)}
+              <div className="flex-1 overflow-y-auto pb-6">
+                {/* search */}
+                <div ref={searchRef} className="flex items-center gap-2 px-4">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-0.5 py-2.5">
+                    <IconPersonAdd
+                      size={18}
+                      style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
                     />
-                  ))}
-              </div>
-            ) : (
-              <>
-                <SectionLabel>People with access</SectionLabel>
-
-                {sortedPeople.map((person) => {
-                  const roleLocked = person.role === "owner" || !canChangeRole;
-
-                  return (
-                    <PersonRow
-                      key={person?.email || person?.emailAddress}
-                      avatar={person?.photoLink || person?.avatar}
-                      name={person?.displayName || person?.name}
-                      title={
-                        <span
-                          className={
-                            person?.role === "remove" ? "line-through" : ""
-                          }
-                        >
-                          {person?.displayName}
-                          {person?.emailAddress === user.email ? " (you)" : ""}
-                        </span>
-                      }
-                      subtitle={
-                        person?.pendingOwner
-                          ? `${person?.emailAddress} · Pending owner`
-                          : person?.emailAddress
-                      }
-                      onClick={
-                        roleLocked
-                          ? undefined
-                          : () => setSheet({ type: "person", person })
-                      }
-                      trailing={
-                        <span
-                          className={`flex items-center gap-1 text-[14px] ${
-                            roleLocked
-                              ? "text-(--text-secondary)"
-                              : "text-(--text-primary)"
-                          }`}
-                        >
-                          {ROLE_LABEL[person?.role] ?? person?.role}
-                          {!roleLocked && <IconChevronDown size={12} />}
-                        </span>
-                      }
+                    <input
+                      type="text"
+                      className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+                      placeholder="Add people and groups"
+                      value={emailInput}
+                      onChange={(e) => {
+                        setEmailInput(e.target.value);
+                        setShowSuggestions(true);
+                      }}
+                      onFocus={() => setShowSuggestions(true)}
                     />
-                  );
-                })}
-
-                {!canChangeRole && (
-                  <p className="px-5 pt-1 text-[12px] text-(--text-secondary)">
-                    Can't reduce permission because it's set on a parent folder
-                  </p>
-                )}
-
-                <SectionLabel>General access</SectionLabel>
-
-                {!isMulti ? (
-                  <button
-                    type="button"
-                    onClick={() => setAccessView({ id: null })}
-                    className="flex w-full items-center gap-3 px-5 py-2.5 text-left active:bg-black/5"
-                  >
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                        linkAccess === "anyone" ? "bg-[#e6f4ea]" : "bg-black/5"
-                      }`}
-                    >
-                      {linkAccess === "anyone" ? (
-                        <GlobeAmericasIcon className="h-5 w-5 text-green-900" />
-                      ) : (
-                        <LockClosedIcon className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[15px]">
-                        {linkAccess === "anyone"
-                          ? "Anyone with the link"
-                          : "Restricted"}
-                        {linkAccess === "anyone" && (
-                          <span className="text-(--text-secondary)">
-                            {" · "}
-                            {ROLE_LABEL[linkRole]}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[13px] text-(--text-secondary)">
-                        {linkAccess === "anyone"
-                          ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
-                          : "Only people with access can open with this link"}
-                      </div>
-                    </div>
-                    <ChevronRightIcon className="h-4 w-4 text-(--text-secondary)" />
-                  </button>
-                ) : (
-                  shareItems.map((it) => {
-                    const { pub, role } = getLinkState(it);
-                    const canShareThis = it?.capabilities?.canShare === true;
-
-                    return (
+                    {emailInput && (
                       <button
-                        key={getItemId(it)}
                         type="button"
-                        disabled={!canShareThis}
-                        onClick={() => setAccessView({ id: getItemId(it) })}
-                        className="flex w-full items-center gap-3 px-5 py-2.5 text-left active:bg-black/5 disabled:opacity-50"
+                        aria-label="Clear"
+                        onClick={() => setEmailInput("")}
+                      >
+                        <IconClose size={16} />
+                      </button>
+                    )}
+                  </div>
+                  {showSuggestions && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSuggestions(false);
+                        setEmailInput("");
+                        document.activeElement?.blur?.();
+                      }}
+                      className="px-2 py-2 text-[15px] font-medium text-[#1a73e8]"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+
+                {showSuggestions ? (
+                  <div className="mt-2">
+                    {suggestions
+                      .filter((s) => isSelectable(s, true))
+                      .map((u) => (
+                        <PersonRow
+                          key={u.id}
+                          avatar={u.avatar}
+                          name={nameOf(u)}
+                          subtitle={u.email}
+                          onClick={(e) => handleSelectUser(e, u)}
+                        />
+                      ))}
+                  </div>
+                ) : (
+                  <>
+                    <SectionLabel>People with access</SectionLabel>
+
+                    {sortedPeople.map((person) => {
+                      console.log("PERSON:", person);
+                      const roleLocked =
+                        person.role === "owner" || !canChangeRole;
+                      const email = person?.emailAddress ?? person?.email;
+
+                      return (
+                        <PersonRow
+                          key={person?.id ?? emailOf(person)}
+                          avatar={person?.photoLink || person?.avatar}
+                          name={nameOf(person)}
+                          title={
+                            <span
+                              className={
+                                person?.role === "remove" ? "line-through" : ""
+                              }
+                            >
+                              {nameOf(person)}
+                              {emailOf(person) === user.email?.toLowerCase()
+                                ? " (you)"
+                                : ""}
+                            </span>
+                          }
+                          subtitle={
+                            person?.pendingOwner
+                              ? `${email} · Pending owner`
+                              : email
+                          }
+                          onClick={
+                            roleLocked
+                              ? undefined
+                              : () => setSheet({ type: "person", person })
+                          }
+                          trailing={
+                            <span
+                              className={`flex items-center gap-1 text-[14px] ${
+                                roleLocked
+                                  ? "text-(--text-secondary)"
+                                  : "text-(--text-primary)"
+                              }`}
+                            >
+                              {ROLE_LABEL[person?.role] ?? person?.role}
+                              {!roleLocked && <IconChevronDown size={12} />}
+                            </span>
+                          }
+                        />
+                      );
+                    })}
+
+                    {!canChangeRole && (
+                      <p className="px-5 pt-1 text-[12px] text-(--text-secondary)">
+                        Can't reduce permission because it's set on a parent
+                        folder
+                      </p>
+                    )}
+
+                    <SectionLabel>General access</SectionLabel>
+
+                    {!isMulti ? (
+                      <button
+                        type="button"
+                        onClick={() => setAccessView({ id: null })}
+                        className="flex w-full items-center gap-3 px-5 py-2.5 text-left active:bg-black/5"
                       >
                         <div
                           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                            pub ? "bg-[#e6f4ea]" : "bg-black/5"
+                            linkAccess === "anyone"
+                              ? "bg-[#e6f4ea]"
+                              : "bg-black/5"
                           }`}
                         >
-                          {pub ? (
+                          {linkAccess === "anyone" ? (
                             <GlobeAmericasIcon className="h-5 w-5 text-green-900" />
                           ) : (
                             <LockClosedIcon className="h-5 w-5" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[15px]">{it.name}</div>
-                          <div className="truncate text-[13px] text-(--text-secondary)">
-                            {pub
-                              ? `Anyone with the link · ${ROLE_LABEL[role]}`
+                          <div className="text-[15px]">
+                            {linkAccess === "anyone"
+                              ? "Anyone with the link"
                               : "Restricted"}
+                            {linkAccess === "anyone" && (
+                              <span className="text-(--text-secondary)">
+                                {" · "}
+                                {ROLE_LABEL[linkRole]}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[13px] text-(--text-secondary)">
+                            {linkAccess === "anyone"
+                              ? `Anyone on the internet with the link ${ROLE_DESC[linkRole]}`
+                              : "Only people with access can open with this link"}
                           </div>
                         </div>
                         <ChevronRightIcon className="h-4 w-4 text-(--text-secondary)" />
                       </button>
-                    );
-                  })
-                )}
-              </>
-            )}
-          </div>
+                    ) : (
+                      shareItems.map((it) => {
+                        const { pub, role } = getLinkState(it);
+                        const canShareThis =
+                          it?.capabilities?.canShare === true;
 
-          {!showSuggestions && copyLinkBar}
-          </>, showInvitePanel || Boolean(accessView))}
+                        return (
+                          <button
+                            key={getItemId(it)}
+                            type="button"
+                            disabled={!canShareThis}
+                            onClick={() => setAccessView({ id: getItemId(it) })}
+                            className="flex w-full items-center gap-3 px-5 py-2.5 text-left active:bg-black/5 disabled:opacity-50"
+                          >
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                                pub ? "bg-[#e6f4ea]" : "bg-black/5"
+                              }`}
+                            >
+                              {pub ? (
+                                <GlobeAmericasIcon className="h-5 w-5 text-green-900" />
+                              ) : (
+                                <LockClosedIcon className="h-5 w-5" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[15px]">
+                                {it.name}
+                              </div>
+                              <div className="truncate text-[13px] text-(--text-secondary)">
+                                {pub
+                                  ? `Anyone with the link · ${ROLE_LABEL[role]}`
+                                  : "Restricted"}
+                              </div>
+                            </div>
+                            <ChevronRightIcon className="h-4 w-4 text-(--text-secondary)" />
+                          </button>
+                        );
+                      })
+                    )}
+                  </>
+                )}
+              </div>
+
+              {!showSuggestions && copyLinkBar}
+            </>,
+            showInvitePanel || Boolean(accessView),
+          )}
           {renderInvitePanel()}
           {renderAccessPage()}
         </>,

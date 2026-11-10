@@ -44,7 +44,7 @@ import { UseAvatar } from "../../Hooks/useAvatar";
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function FileViewerMobile({
-  item,
+  item: itemProp,
   handleSelect,
   onClose,
   onShare,
@@ -83,6 +83,10 @@ export default function FileViewerMobile({
 
   // details sheet
   const [detailsItem, setDetailsItem] = useState(null);
+  // item
+  const item = Array.isArray(itemProp)
+    ? itemProp?.map((it) => it)[0]
+    : itemProp;
 
   const detailsSheet = (
     <DetailsPageMobile

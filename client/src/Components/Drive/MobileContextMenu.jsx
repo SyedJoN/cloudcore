@@ -389,7 +389,7 @@ export default function MobileContextMenu({
                       // single: the id, multiple: array of ids
                       onClick={run(() =>
                         onMove(
-                          isMulti ? targets.map((it) => it._id) : item._id,
+                          isMulti ? targets.map((it) => it) : item,
                         ),
                       )}
                     />
