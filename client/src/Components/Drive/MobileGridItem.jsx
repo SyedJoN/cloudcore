@@ -14,14 +14,18 @@ export default function MobileGridItem({
   avatar,
   owner,
   selected,
-  setSelectedItems,
-  selectionMode,
-  setSelectionMode,
+  setSelectedItems = () => {},
+  selectionMode = false,
+  setSelectionMode = () => {},
   onSelect,
   onRowClick,
   onDoubleClick,
   onContextMenu,
-}) {
+  // NEW
+  pickerMode = false, // used inside the move modal: no menu / selection / long-press
+  disabled = false,   // greyed-out and static
+  onOpen,             // called when an enabled card is tapped in picker mode
+}) {      
   const { user } = useAuth();
   const { isGoogleDrive } = useGDrive();
   const [hasImgError, setHasImgError] = useState(false);
@@ -55,13 +59,12 @@ export default function MobileGridItem({
 
   useEffect(() => () => clearTimeout(pressTimer.current), []);
 
-  const handlePressStart = (e) => {
-    // kebab / checkbox button pe card press effect na aaye
-    if (e.target.closest(".mgi-trailing")) return;
-    clearTimeout(pressTimer.current);
-    setPressed(true);
-  };
-
+ const handlePressStart = (e) => {
+  if (disabled) return; // no press effect on greyed-out cards
+  if (e.target.closest(".mgi-trailing")) return;
+  clearTimeout(pressTimer.current);
+  setPressed(true);
+};
   const handlePressEnd = () => {
     clearTimeout(pressTimer.current);
     // quick tap me bhi press 120ms tak dikhe
@@ -92,21 +95,26 @@ export default function MobileGridItem({
     }
   };
 
-  const handleClick = () => {
-    if (selectionMode) {
-      handleToggle(itemId);
-      return;
-    }
-    onDoubleClick?.(type, itemId, item.name); 
-  };
+ const handleClick = () => {
+  if (disabled) return;
+  if (pickerMode) {
+    onOpen?.(item);
+    return;
+  }
+  if (selectionMode) {
+    handleToggle(itemId);
+    return;
+  }
+  onDoubleClick?.(type, itemId, item.name);
+};
 
-  const handleContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (selectionMode) return;
-    setSelectedItems(new Set([itemId]));
-    setSelectionMode(true);
-  };
+const handleContextMenu = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (pickerMode || selectionMode) return;
+  setSelectedItems(new Set([itemId]));
+  setSelectionMode(true);
+};
 
   const handleKebab = (e) => {
     e.stopPropagation();
@@ -138,7 +146,7 @@ export default function MobileGridItem({
 
   return (
     <div
-      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""}`}
+    className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""}`}
       data-id={itemId}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -157,7 +165,8 @@ export default function MobileGridItem({
           )}
         </span>
         <span className="mgi-name">{item.name}</span>
-        <button
+        {!pickerMode && (
+<button
           type="button"
           className="mgi-trailing"
           aria-label={selectionMode ? "Select item" : "More actions"}
@@ -182,6 +191,8 @@ export default function MobileGridItem({
             <IconDots className="h-5 w-5" />
           )}
         </button>
+        )}
+        
       </div>
 
       {/* Preview: big folder icon, or the file thumbnail */}

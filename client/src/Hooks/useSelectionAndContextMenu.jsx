@@ -25,7 +25,6 @@ export function useSelectionAndContextMenu({
     (e, id) => {
       e.stopPropagation();
       e.preventDefault();
-
       // Toggle off if clicking the same item again
       if (open && contextItem?.id === id) {
         setOpen(false);

@@ -118,6 +118,15 @@
   transition: opacity 220ms ease-out;
 }
 
+.mgi-card.mgi-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+  cursor: default;
+  transform: none;
+}
+.mgi-card.mgi-disabled .mgi-preview {
+  filter: grayscale(1);
+}
 @keyframes mgi-select-pop {
   0%   { transform: scale(0.95); }
   60%  { transform: scale(1.015); }

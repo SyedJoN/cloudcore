@@ -14,6 +14,7 @@ import { StarIcon, UsersIcon } from "@heroicons/react/16/solid";
 import SortButton from "../ListRow/SortButton";
 import { applyRecentFilters, DEFAULT_RECENT_FILTERS } from "../Drive/Recent/ApplyRecentFilters";
 import SortButtonMobile from "../ListRow/SortButtonMobile";
+import MobileGridItem from "../Drive/MobileGridItem";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -68,6 +69,7 @@ export default function MobileMoveModal({
   user,
   onClose,
 }) {
+
   const { toast } = useToast();
   const searchRef = useRef(null);
   const tabsRef = useRef(null);
@@ -118,12 +120,12 @@ export default function MobileMoveModal({
   const destId = norm(currentCrumb.id) ?? rootId;
   const currentDirId = destId;
 
-  const sourceOf = (s) => {
-    const own = norm(s.parentDirId ?? s.parentId ?? s.parent ?? s.directoryId);
-    if (isRecentRoute || isStarredRoute) return own ?? rootId;
-    return norm(viewedDirId) ?? own ?? rootId;
-  };
-
+const sourceOf = (s) => {
+  const own = norm(
+    s.parentDirId ?? s.parentId ?? s.parent ?? s.directoryId ?? s.dirId,
+  );
+  return own ?? norm(viewedDirId) ?? rootId;
+};
   const isSameLocation =
     selectedItems.length > 0 &&
     selectedItems.every((s) => sourceOf(s) === destId);
@@ -277,13 +279,12 @@ export default function MobileMoveModal({
     setActiveTab(id);
   }
 
-  function navigateInto(folder) {
-    setDirection("forward");
-    setSearchQuery("");
-    setIsSearching(false);
-    setBreadcrumbs((prev) => [...prev, { id: folder._id, name: folder.name }]);
-  }
-
+function navigateInto(folder) {
+  setDirection("forward");
+  setSearchQuery("");
+  setIsSearching(false);
+  setBreadcrumbs((prev) => [...prev, { id: folder._id ?? folder.id, name: folder.name }]);
+}
   function goBack() {
     if (isSearching) {
       setIsSearching(false);
@@ -367,103 +368,35 @@ export default function MobileMoveModal({
       setIsMoving(false);
     }
   }
-// ⚠️ Replace the URL with the one your GridItem uses for thumbnails
-function getThumbnailUrl(file) {
-  if (file.thumbnailUrl) return file.thumbnailUrl;
-  if (file.thumbnail) return file.thumbnail;
-
-  const isImage = /^(png|jpe?g|gif|webp|bmp|svg)$/i.test(
-    (file.extension || file.name?.split(".").pop() || "").replace(".", ""),
-  );
-  const isVideo = /^(mp4|mov|mkv|webm|avi)$/i.test(
-    (file.extension || file.name?.split(".").pop() || "").replace(".", ""),
-  );
-  const isPdf = /^pdf$/i.test(
-    (file.extension || file.name?.split(".").pop() || "").replace(".", ""),
-  );
-
-  if (isImage || isVideo || isPdf) {
-    return `${BASE_URL}/file/${file._id}?action=thumbnail`; // <-- placeholder
-  }
-  return null;
-}
-
-function Thumb({ file }) {
-  const [failed, setFailed] = useState(false);
-  const url = getThumbnailUrl(file);
-
-  if (!url || failed) {
-    return (
-      <span className="mv-card-badge">
-        <FileBadge type={getFileIcon(file.name)} />
-      </span>
-    );
-  }
-
-  return (
-    <img
-      className="mv-card-thumb"
-      src={url}
-      alt=""
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
-  );
-}
+console.log({ destId, sources: selectedItems.map(sourceOf), selectedItems });
   // Renders one folder/file in list or grid
 function renderEntry(entry) {
-  const isFolder = entry.isDirectory;
-  const open = isFolder ? () => navigateInto(entry) : undefined;
+  const id = entry._id ?? entry.id;
 
   if (viewMode === "grid") {
-    // Folder: compact chip
-    if (isFolder) {
-      return (
-        <button
-          key={entry._id}
-          type="button"
-          className="mv-chip"
-          onClick={open}
-        >
-          <span className="mv-chip-icon">
-            <IconFolder size={22} color="#c4c7c5" />
-          </span>
-          <span className="mv-chip-name">{entry.name}</span>
-        </button>
-      );
-    }
-
-    // File: card with title row + preview (dimmed, not tappable)
     return (
-      <div key={entry._id} className="mv-card disabled" aria-disabled>
-        <div className="mv-card-head">
-          <span className="mv-card-icon">
-            <FileBadge type={getFileIcon(entry.name)} />
-          </span>
-          <span className="mv-card-name">{entry.name}</span>
-        </div>
-       <div className="mv-card-preview">
-  <Thumb file={entry} />
-</div>
-      </div>
+      <MobileGridItem
+        key={id}
+        item={entry}
+        pickerMode
+        disabled={!entry.isDirectory}
+        onOpen={entry.isDirectory ? navigateInto : undefined}
+      />
     );
   }
 
-  return isFolder ? (
-    <button key={entry._id} type="button" className="mv-row" onClick={open}>
-      <span className="mv-row-icon">
-        <IconFolder size={32} color="#c4c7c5" />
-      </span>
+  // list view stays as before
+  return entry.isDirectory ? (
+    <button key={id} type="button" className="mv-row" onClick={() => navigateInto(entry)}>
+      <span className="mv-row-icon"><IconFolder size={32} color="#c4c7c5" /></span>
       <span className="mv-row-text">
         <span className="mv-row-name">{entry.name}</span>
         <RowMeta entry={entry} />
       </span>
     </button>
   ) : (
-    <div key={entry._id} className="mv-row disabled" aria-disabled>
-      <span className="mv-row-icon mv-file-tile">
-        <FileBadge type={getFileIcon(entry.name)} />
-      </span>
+    <div key={id} className="mv-row disabled" aria-disabled>
+      <span className="mv-row-icon mv-file-tile"><FileBadge type={getFileIcon(entry.name)} /></span>
       <span className="mv-row-text">
         <span className="mv-row-name">{entry.name}</span>
         <RowMeta entry={entry} />

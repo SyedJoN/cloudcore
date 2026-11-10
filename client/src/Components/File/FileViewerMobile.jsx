@@ -45,6 +45,7 @@ const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
 export default function FileViewerMobile({
   item,
+  handleSelect,
   onClose,
   onShare,
   onNavigate,
@@ -591,7 +592,10 @@ export default function FileViewerMobile({
                     disabled={
                       isSharedRoute || isDeleted || !canMove || isGDrive
                     }
-                    onClick={run(() => onMove?.(item._id))}
+                 onClick={run(() => {
+  handleSelect(item.id ?? item._id);
+  onMove?.(item);
+})}
                   />
                   <SheetItem
                     icon={
