@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   IconClose,
   IconPersonAdd,
@@ -6,10 +7,12 @@ import {
   IconCheck,
   IconChevronDown,
   IconGlobe,
+  IconFolder,
 } from "../Icons/Icons.jsx";
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
 import {
   DRIVE_ROLES,
+  getFileType,
   ROLE_DESC,
   ROLE_LABEL,
 } from "../../../Utils/displayUtils.js";
@@ -30,11 +33,23 @@ import { updateItemState } from "../../../Utils/updateItemState.js";
 import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";
+import FileBadge from "../File/FileBadge.jsx";
 
 export const ROLE_PRIORITY = {
   reader: 1,
   writer: 2,
   owner: 3,
+};
+
+// Approx height of the 2-option dropdown, used to decide whether to open upwards
+const ITEM_DROPDOWN_HEIGHT = 96;
+
+// Literal class names so Tailwind can detect them
+const ORIGIN_CLASS = {
+  "top-left": "origin-top-left",
+  "top-right": "origin-top-right",
+  "bottom-left": "origin-bottom-left",
+  "bottom-right": "origin-bottom-right",
 };
 
 /* ───────────── helpers ───────────── */
@@ -140,6 +155,8 @@ export default function ShareModal({
   const [showAccessDropdown, setShowAccessDropdown] = useState(false);
   // multi mode: which per-item dropdown is open -> `${itemId}:access` | `${itemId}:role`
   const [itemAccessDropdown, setItemAccessDropdown] = useState(null);
+  // multi mode: fixed screen position + origin of the portaled dropdown
+  const [itemDropdownPos, setItemDropdownPos] = useState(null);
 
   const [isConfirmation, setIsConfirmation] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
@@ -151,6 +168,7 @@ export default function ShareModal({
   const inviteSuggestionsRef = useRef(null);
   const accessDropdownRef = useRef(null);
   const multiAccessRef = useRef(null);
+  const itemDropdownRef = useRef(null); // the portaled dropdown itself
   const prevRoleRef = useRef(null);
   const shareModalOverlayRef = useRef(null);
   const [notifyPeople, setNotifyPeople] = useState(true);
@@ -159,6 +177,8 @@ export default function ShareModal({
   const [heightReady, setHeightReady] = useState(false);
 
   const type = getItemType(item);
+  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+
   const isOwner = item?.owners?.[0]?.me === true;
 
   // For multiple items, every one must allow the action
@@ -243,7 +263,30 @@ export default function ShareModal({
   useClickOutside(suggestionsRef, () => setShowSuggestions(false));
   useClickOutside(inviteSuggestionsRef, () => setShowInviteSuggestions(false));
   useClickOutside(accessDropdownRef, () => setShowAccessDropdown(false));
-  useClickOutside(multiAccessRef, () => setItemAccessDropdown(null));
+
+  // Multi-mode dropdown: the dropdown now lives in a portal (outside
+  // multiAccessRef), so "outside" must exclude BOTH the list and the dropdown.
+  useEffect(() => {
+    if (!itemAccessDropdown) return;
+
+    const onDown = (e) => {
+      if (multiAccessRef.current?.contains(e.target)) return;
+      if (itemDropdownRef.current?.contains(e.target)) return;
+      setItemAccessDropdown(null);
+    };
+    // Fixed-position dropdown would float in the air if anything moves
+    const close = () => setItemAccessDropdown(null);
+
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", close, true); // capture: catches inner scroll containers
+    window.addEventListener("resize", close);
+
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [itemAccessDropdown]);
 
   const suggestions = emailInput.trim()
     ? allUsers.filter(
@@ -380,523 +423,464 @@ export default function ShareModal({
       }),
     }));
 
-  
+  async function handleSend(e) {
+    e.preventDefault();
 
-async function handleSend(e) {
-  e.preventDefault();
-
-  if (
-    isShareLoading ||
-    !selectedUsers.length ||
-    !shareItems.length
-  ) {
-    return;
-  }
-
-  setIsShareLoading(true);
-
-  try {
-    const uniqueItems = [
-      ...new Map(
-        shareItems.map((item) => {
-          const id = String(getItemId(item));
-          const type = getItemType(item);
-
-          return [
-            `${type}:${id}`,
-            {
-              id,
-              type,
-              name: item.name || "Shared item",
-              url:
-                item.webViewLink ||
-                item.url ||
-                null,
-              isFolder:
-                type === "folder" ||
-                item.mimeType ===
-                  "application/vnd.google-apps.folder",
-            },
-          ];
-        })
-      ).values(),
-    ];
-
-    const sendRequest = (confirmCascade = false) =>
-      grantAccessById(
-        null,
-        null,
-        selectedUsers,
-        message,
-        confirmCascade,
-        notifyPeople,
-        uniqueItems
-      );
-
-    let data = await sendRequest(false);
-
-    if (data?.needsConfirmation) {
-      const conflicts = data.conflict || [];
-
-      const details = conflicts
-        .map(
-          (c) =>
-            `${c.ancestorName}: ${c.previousRole} → ${c.requestedRole}`
-        )
-        .join("\n");
-
-      const confirmed = window.confirm(
-        `Some users already have inherited permissions.\n\n${details}\n\nContinue?`
-      );
-
-      if (!confirmed) return;
-
-      data = await sendRequest(true);
+    if (isShareLoading || !selectedUsers.length || !shareItems.length) {
+      return;
     }
 
-    if (!Array.isArray(data?.results)) {
-      throw new Error(
-        data?.message || "Invalid sharing response"
-      );
-    }
-
-    const succeeded = [];
-    const failed = [];
-
-    for (const result of data.results) {
-      const permissions = result.permissions || [];
-
-      const permissionFailures = permissions.filter(
-        (p) => p.success === false
-      );
-
-      const permissionSuccesses = permissions.filter(
-        (p) => p.success === true
-      );
-
-      const itemSucceeded =
-        result.status >= 200 &&
-        result.status < 300 &&
-        !result.needsConfirmation &&
-        permissionFailures.length === 0;
-
-      if (itemSucceeded) {
-        succeeded.push({
-          ...result,
-          permissions: permissionSuccesses,
-        });
-      } else {
-        failed.push(result);
-      }
-    }
-
-    const updatedIds = new Set();
-
-    for (const result of succeeded) {
-      const key = `${result.type}:${result.id}`;
-
-      if (updatedIds.has(key)) continue;
-
-      updatedIds.add(key);
-
-      const item = shareItems.find(
-        (it) =>
-          String(getItemId(it)) === String(result.id) &&
-          getItemType(it) === result.type
-      );
-
-      if (item) {
-        applyShareToState(item, result);
-      }
-    }
-
-    const failedCount = uniqueItems.length - updatedIds.size;
-
-    const permissionFailureCount = failed.reduce(
-      (total, result) =>
-        total +
-        (result.permissions || []).filter(
-          (p) => p.success === false
-        ).length,
-      0
-    );
-
-    if (!updatedIds.size) {
-      throw new Error(
-        failed[0]?.permissions?.find(
-          (p) => p.success === false
-        )?.message ||
-          failed[0]?.message ||
-          "Failed to share selected items"
-      );
-    }
-
-    if (failedCount || permissionFailureCount) {
-      toast({
-        message: `Access updated for ${updatedIds.size} of ${uniqueItems.length} items. ${failedCount} item(s) failed.`,
-        type: "error",
-      });
-    } else if (data.emailFailedFor?.length) {
-      toast({
-        message:
-          "Access updated, but some notification emails failed.",
-        type: "error",
-      });
-    } else {
-      toast({
-        message: `Successfully shared ${updatedIds.size} items`,
-        type: "success",
-      });
-    }
-
-    setSelectedUsers([]);
-    setShowInvitePanel(false);
-    setMessage("");
-    setInviteInput("");
-    setShareItem(null);
-  } catch (error) {
-
-    console.error(
-      "handleSend error:",
-      error.response?.data || error
-    );
-
-    toast({
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Something went wrong while sharing",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-}
-
-
-
-async function handleSaveMultiPermissions() {
-  if (isShareLoading || !isChanged) {
-    setShareItem(null);
-    return;
-  }
-
-  try {
     setIsShareLoading(true);
 
-    const previous = prevPermissions ?? [];
-    const current = peopleWithAccess ?? [];
+    try {
+      const uniqueItems = [
+        ...new Map(
+          shareItems.map((item) => {
+            const id = String(getItemId(item));
+            const type = getItemType(item);
 
-    // Find users whose roles have changed
-    const changedUsers = current.filter((person) => {
-      if (person.role === "remove" || person.role === "owner") {
-        return false;
+            return [
+              `${type}:${id}`,
+              {
+                id,
+                type,
+                name: item.name || "Shared item",
+                url: item.webViewLink || item.url || null,
+                isFolder:
+                  type === "folder" ||
+                  item.mimeType === "application/vnd.google-apps.folder",
+              },
+            ];
+          }),
+        ).values(),
+      ];
+
+      const sendRequest = (confirmCascade = false) =>
+        grantAccessById(
+          null,
+          null,
+          selectedUsers,
+          message,
+          confirmCascade,
+          notifyPeople,
+          uniqueItems,
+        );
+
+      let data = await sendRequest(false);
+
+      if (data?.needsConfirmation) {
+        const conflicts = data.conflict || [];
+
+        const details = conflicts
+          .map(
+            (c) => `${c.ancestorName}: ${c.previousRole} → ${c.requestedRole}`,
+          )
+          .join("\n");
+
+        const confirmed = window.confirm(
+          `Some users already have inherited permissions.\n\n${details}\n\nContinue?`,
+        );
+
+        if (!confirmed) return;
+
+        data = await sendRequest(true);
       }
 
-      const oldPerson = previous.find(
-        (p) =>
-          String(p.id ?? p._id) ===
-          String(person.id ?? person._id)
+      if (!Array.isArray(data?.results)) {
+        throw new Error(data?.message || "Invalid sharing response");
+      }
+
+      const succeeded = [];
+      const failed = [];
+
+      for (const result of data.results) {
+        const permissions = result.permissions || [];
+
+        const permissionFailures = permissions.filter(
+          (p) => p.success === false,
+        );
+
+        const permissionSuccesses = permissions.filter(
+          (p) => p.success === true,
+        );
+
+        const itemSucceeded =
+          result.status >= 200 &&
+          result.status < 300 &&
+          !result.needsConfirmation &&
+          permissionFailures.length === 0;
+
+        if (itemSucceeded) {
+          succeeded.push({
+            ...result,
+            permissions: permissionSuccesses,
+          });
+        } else {
+          failed.push(result);
+        }
+      }
+
+      const updatedIds = new Set();
+
+      for (const result of succeeded) {
+        const key = `${result.type}:${result.id}`;
+
+        if (updatedIds.has(key)) continue;
+
+        updatedIds.add(key);
+
+        const item = shareItems.find(
+          (it) =>
+            String(getItemId(it)) === String(result.id) &&
+            getItemType(it) === result.type,
+        );
+
+        if (item) {
+          applyShareToState(item, result);
+        }
+      }
+
+      const failedCount = uniqueItems.length - updatedIds.size;
+
+      const permissionFailureCount = failed.reduce(
+        (total, result) =>
+          total +
+          (result.permissions || []).filter((p) => p.success === false).length,
+        0,
       );
 
-      return oldPerson && oldPerson.role !== person.role;
-    });
+      if (!updatedIds.size) {
+        throw new Error(
+          failed[0]?.permissions?.find((p) => p.success === false)?.message ||
+            failed[0]?.message ||
+            "Failed to share selected items",
+        );
+      }
 
-    // Find users whose access should be removed
-    const removedUsers = current.filter(
-      (person) => person.role === "remove"
-    );
+      if (failedCount || permissionFailureCount) {
+        toast({
+          message: `Access updated for ${updatedIds.size} of ${uniqueItems.length} items. ${failedCount} item(s) failed.`,
+          type: "error",
+        });
+      } else if (data.emailFailedFor?.length) {
+        toast({
+          message: "Access updated, but some notification emails failed.",
+          type: "error",
+        });
+      } else {
+        toast({
+          message: `Successfully shared ${updatedIds.size} items`,
+          type: "success",
+        });
+      }
 
-    if (!changedUsers.length && !removedUsers.length) {
+      setSelectedUsers([]);
+      setShowInvitePanel(false);
+      setMessage("");
+      setInviteInput("");
+      setShareItem(null);
+    } catch (error) {
+      console.error("handleSend error:", error.response?.data || error);
+
       toast({
-        message: "No permission changes found",
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "Something went wrong while sharing",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  }
+
+  async function handleSaveMultiPermissions() {
+    if (isShareLoading || !isChanged) {
+      setShareItem(null);
+      return;
+    }
+
+    try {
+      setIsShareLoading(true);
+
+      const previous = prevPermissions ?? [];
+      const current = peopleWithAccess ?? [];
+
+      // Find users whose roles have changed
+      const changedUsers = current.filter((person) => {
+        if (person.role === "remove" || person.role === "owner") {
+          return false;
+        }
+
+        const oldPerson = previous.find(
+          (p) => String(p.id ?? p._id) === String(person.id ?? person._id),
+        );
+
+        return oldPerson && oldPerson.role !== person.role;
+      });
+
+      // Find users whose access should be removed
+      const removedUsers = current.filter((person) => person.role === "remove");
+
+      if (!changedUsers.length && !removedUsers.length) {
+        toast({
+          message: "No permission changes found",
+          type: "error",
+        });
+        return;
+      }
+
+      const successfulUpdates = new Map();
+      const failed = [];
+
+      // Process every selected file/folder
+      for (const selectedItem of shareItems) {
+        const itemId = getItemId(selectedItem);
+        const itemType = getItemType(selectedItem);
+
+        const itemKey = `${itemType}:${itemId}`;
+
+        successfulUpdates.set(itemKey, {
+          itemId,
+          itemType,
+          granted: [],
+          removed: [],
+        });
+
+        // STEP 1: Update existing user roles
+        if (changedUsers.length) {
+          try {
+            const result = await grantAccessById(
+              itemType,
+              itemId,
+              changedUsers,
+              message,
+              false,
+              notifyPeople,
+            );
+
+            if (result?.needsConfirmation) {
+              failed.push({
+                item: selectedItem.name,
+                message: "Role update requires confirmation",
+              });
+            } else {
+              successfulUpdates.get(itemKey).granted.push(...changedUsers);
+            }
+          } catch (error) {
+            failed.push({
+              item: selectedItem.name,
+              message: error.response?.data?.message || error.message,
+            });
+          }
+        }
+
+        // STEP 2: Remove users
+        for (const person of removedUsers) {
+          try {
+            const result = await revokeFileAccess(
+              itemType,
+              itemId,
+              person.id,
+              "remove",
+              false,
+            );
+
+            if (result?.needsConfirmation) {
+              failed.push({
+                item: selectedItem.name,
+                user: person.emailAddress,
+                message: "Revoke requires confirmation",
+              });
+              continue;
+            }
+
+            successfulUpdates.get(itemKey).removed.push(person);
+          } catch (error) {
+            failed.push({
+              item: selectedItem.name,
+              user: person.emailAddress,
+              message: error.response?.data?.message || error.message,
+            });
+          }
+        }
+      }
+
+      // STEP 3: Update local files and folders
+      const updateList = (list) =>
+        list.map((resource) => {
+          const resourceId = getItemId(resource);
+          const resourceType = getItemType(resource);
+
+          const itemKey = `${resourceType}:${resourceId}`;
+          const update = successfulUpdates.get(itemKey);
+
+          if (!update) return resource;
+
+          const removedIds = new Set(
+            update.removed.map((p) => String(p.id ?? p._id)),
+          );
+
+          const permissions = (resource.permissions ?? [])
+            .filter((p) => !removedIds.has(String(p.id ?? p._id)))
+            .map((p) => {
+              const changedUser = update.granted.find(
+                (u) => String(u.id ?? u._id) === String(p.id ?? p._id),
+              );
+
+              if (!changedUser) return p;
+
+              return {
+                ...p,
+                role: changedUser.role,
+              };
+            });
+
+          return {
+            ...resource,
+            permissions,
+          };
+        });
+
+      setFilesList(updateList);
+      setDirectoriesList(updateList);
+
+      // STEP 4: Update modal permission state only
+      // when every operation succeeds.
+      if (!failed.length) {
+        const updatedPermissions = current.filter((p) => p.role !== "remove");
+
+        setPeopleWithAccess(updatedPermissions);
+        setPrevPermissions(updatedPermissions);
+
+        setShareItem(null);
+
+        toast({
+          message: `Permissions updated successfully for ${shareItems.length} items`,
+          type: "success",
+        });
+      } else {
+        toast({
+          message: `${failed.length} permission operation(s) failed. Check console.`,
+          type: "error",
+        });
+
+        console.error("Permission update failures:", failed);
+      }
+    } catch (error) {
+      console.error("handleSaveMultiPermissions:", error);
+
+      toast({
+        message:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to update permissions",
+        type: "error",
+      });
+    } finally {
+      setIsShareLoading(false);
+    }
+  }
+
+  async function handleSendLink(e) {
+    e.preventDefault();
+
+    if (isShareLoading) return;
+
+    if (!selectedUsers.length) {
+      toast({
+        message: "Please select a person",
         type: "error",
       });
       return;
     }
 
-    const successfulUpdates = new Map();
-    const failed = [];
-
-    // Process every selected file/folder
-    for (const selectedItem of shareItems) {
-      const itemId = getItemId(selectedItem);
-      const itemType = getItemType(selectedItem);
-
-      const itemKey = `${itemType}:${itemId}`;
-
-      successfulUpdates.set(itemKey, {
-        itemId,
-        itemType,
-        granted: [],
-        removed: [],
+    if (!shareItems.length) {
+      toast({
+        message: "No items selected",
+        type: "error",
       });
-
-      // STEP 1: Update existing user roles
-      if (changedUsers.length) {
-        try {
-          const result = await grantAccessById(
-            itemType,
-            itemId,
-            changedUsers,
-            message,
-            false,
-            notifyPeople
-          );
-
-          if (result?.needsConfirmation) {
-            failed.push({
-              item: selectedItem.name,
-              message: "Role update requires confirmation",
-            });
-          } else {
-            successfulUpdates.get(itemKey).granted.push(
-              ...changedUsers
-            );
-          }
-        } catch (error) {
-          failed.push({
-            item: selectedItem.name,
-            message:
-              error.response?.data?.message ||
-              error.message,
-          });
-        }
-      }
-
-      // STEP 2: Remove users
-      for (const person of removedUsers) {
-        try {
-          const result = await revokeFileAccess(
-            itemType,
-            itemId,
-            person.id,
-            "remove",
-            false
-          );
-
-          if (result?.needsConfirmation) {
-            failed.push({
-              item: selectedItem.name,
-              user: person.emailAddress,
-              message: "Revoke requires confirmation",
-            });
-            continue;
-          }
-
-          successfulUpdates.get(itemKey).removed.push(
-            person
-          );
-        } catch (error) {
-          failed.push({
-            item: selectedItem.name,
-            user: person.emailAddress,
-            message:
-              error.response?.data?.message ||
-              error.message,
-          });
-        }
-      }
+      return;
     }
 
-    // STEP 3: Update local files and folders
-    const updateList = (list) =>
-      list.map((resource) => {
-        const resourceId = getItemId(resource);
-        const resourceType = getItemType(resource);
+    try {
+      setIsShareLoading(true);
 
-        const itemKey = `${resourceType}:${resourceId}`;
-        const update = successfulUpdates.get(itemKey);
+      // Normalize and deduplicate selected files/folders
+      const uniqueItems = [
+        ...new Map(
+          shareItems.map((it) => {
+            const id = String(it._id ?? it.id);
+            const type = getResourceType(it);
 
-        if (!update) return resource;
+            return [
+              `${type}:${id}`,
+              {
+                id,
+                type,
+                name: it.name,
+                ...(it.webViewLink && {
+                  url: it.webViewLink,
+                  isPublic: hasAnyone(it),
+                  publicRole: getAnyonePermission(it)?.role ?? "reader",
+                }),
+              },
+            ];
+          }),
+        ).values(),
+      ];
 
-        const grantedIds = new Set(
-          update.granted.map((p) =>
-            String(p.id ?? p._id)
-          )
-        );
-
-        const removedIds = new Set(
-          update.removed.map((p) =>
-            String(p.id ?? p._id)
-          )
-        );
-
-        const permissions = (resource.permissions ?? [])
-          .filter(
-            (p) =>
-              !removedIds.has(String(p.id ?? p._id))
-          )
-          .map((p) => {
-            const changedUser = update.granted.find(
-              (u) =>
-                String(u.id ?? u._id) ===
-                String(p.id ?? p._id)
-            );
-
-            if (!changedUser) return p;
-
-            return {
-              ...p,
-              role: changedUser.role,
-            };
-          });
-
-        return {
-          ...resource,
-          permissions,
-        };
+      const data = await sendLink({
+        message,
+        notifyPeople,
+        toEmails: [
+          ...new Set(
+            selectedUsers
+              .map((u) => (u.email ?? u.emailAddress)?.trim().toLowerCase())
+              .filter(Boolean),
+          ),
+        ],
+        items: uniqueItems,
       });
 
-    setFilesList(updateList);
-    setDirectoriesList(updateList);
+      const failedItems = data.failed ?? [];
+      const failedRecipients = data.failedRecipients ?? [];
 
-    // STEP 4: Update modal permission state only
-    // when every operation succeeds.
-    if (!failed.length) {
-      const updatedPermissions = current.filter(
-        (p) => p.role !== "remove"
-      );
+      if (failedItems.length || failedRecipients.length) {
+        toast({
+          message:
+            data.message ||
+            `Some links could not be sent. ${failedItems.length} item(s) and ${failedRecipients.length} recipient(s) failed.`,
+          type: "error",
+        });
+      } else {
+        toast({
+          message:
+            data.message ||
+            `Links successfully sent for ${uniqueItems.length} items`,
+          type: "success",
+        });
+      }
 
-      setPeopleWithAccess(updatedPermissions);
-      setPrevPermissions(updatedPermissions);
-
+      setSelectedUsers([]);
       setShareItem(null);
+      setMessage("");
+      setInviteInput("");
+      setShowInvitePanel(false);
+    } catch (error) {
+      console.error("handleSendLink error:", error.response?.data || error);
 
-      toast({
-        message: `Permissions updated successfully for ${shareItems.length} items`,
-        type: "success",
-      });
-    } else {
-      toast({
-        message: `${failed.length} permission operation(s) failed. Check console.`,
-        type: "error",
-      });
-
-      console.error("Permission update failures:", failed);
-    }
-
-  } catch (error) {
-    console.error("handleSaveMultiPermissions:", error);
-
-    toast({
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to update permissions",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
-  }
-}
-
-
- 
-async function handleSendLink(e) {
-  e.preventDefault();
-
-  if (isShareLoading) return;
-
-  if (!selectedUsers.length) {
-    toast({
-      message: "Please select a person",
-      type: "error",
-    });
-    return;
-  }
-
-  if (!shareItems.length) {
-    toast({
-      message: "No items selected",
-      type: "error",
-    });
-    return;
-  }
-
-  try {
-    setIsShareLoading(true);
-
-    // Normalize and deduplicate selected files/folders
-    const uniqueItems = [
-      ...new Map(
-        shareItems.map((it) => {
-          const id = String(it._id ?? it.id);
-          const type = getResourceType(it);
-
-          return [
-            `${type}:${id}`,
-            {
-              id,
-              type,
-              name: it.name,
-              ...(it.webViewLink && {
-                url: it.webViewLink,
-                isPublic: hasAnyone(it),
-                publicRole:
-                  getAnyonePermission(it)?.role ?? "reader",
-              }),
-            },
-          ];
-        })
-      ).values(),
-    ];
-
-    const data = await sendLink({
-      message,
-      notifyPeople,
-      toEmails: [
-        ...new Set(
-          selectedUsers
-            .map((u) => (u.email ?? u.emailAddress)?.trim().toLowerCase())
-            .filter(Boolean)
-        ),
-      ],
-      items: uniqueItems,
-    });
-
-    const failedItems = data.failed ?? [];
-    const failedRecipients = data.failedRecipients ?? [];
-
-    if (failedItems.length || failedRecipients.length) {
       toast({
         message:
-          data.message ||
-          `Some links could not be sent. ${failedItems.length} item(s) and ${failedRecipients.length} recipient(s) failed.`,
+          error.response?.data?.message ||
+          error.message ||
+          "Something went wrong while sending links",
         type: "error",
       });
-    } else {
-      toast({
-        message:
-          data.message ||
-          `Links successfully sent for ${uniqueItems.length} items`,
-        type: "success",
-      });
+    } finally {
+      setIsShareLoading(false);
     }
-
-    setSelectedUsers([]);
-    setShareItem(null);
-    setMessage("");
-    setInviteInput("");
-    setShowInvitePanel(false);
-
-  } catch (error) {
-    console.error(
-      "handleSendLink error:",
-      error.response?.data || error
-    );
-
-    toast({
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Something went wrong while sending links",
-      type: "error",
-    });
-  } finally {
-    setIsShareLoading(false);
   }
-}
 
   function handleCancel() {
     setShowInvitePanel(false);
@@ -1139,6 +1123,56 @@ async function handleSendLink(e) {
   function applyLinkChangeToItem(it, role, access) {
     onClose(it, role, access);
   }
+
+  // Multi mode: open (or toggle) a per-item dropdown. The dropdown is rendered
+  // in a portal with position: fixed, so we compute its position from the
+  // trigger button's bounding rect. align: "left" | "right" (which trigger edge).
+  function openItemDropdown(e, key, align) {
+    e.stopPropagation();
+
+    if (itemAccessDropdown === key) {
+      setItemAccessDropdown(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const openUp =
+      window.innerHeight - rect.bottom < ITEM_DROPDOWN_HEIGHT &&
+      rect.top > ITEM_DROPDOWN_HEIGHT;
+
+    setItemDropdownPos({
+      originClass:
+        ORIGIN_CLASS[`${openUp ? "bottom" : "top"}-${align}`],
+      style: {
+        position: "fixed",
+        top: openUp ? "auto" : rect.bottom + 4,
+        bottom: openUp ? window.innerHeight - rect.top + 4 : "auto",
+        left: align === "left" ? rect.left : "auto",
+        right: align === "right" ? window.innerWidth - rect.right : "auto",
+        zIndex: 11000, // above the modal
+      },
+    });
+    setItemAccessDropdown(key);
+  }
+
+  // Resolve which item + kind the open multi-mode dropdown belongs to
+  const activeItemDropdown = (() => {
+    if (!isMulti || !itemAccessDropdown || !itemDropdownPos) return null;
+
+    const sep = itemAccessDropdown.lastIndexOf(":");
+    const id = itemAccessDropdown.slice(0, sep);
+    const kind = itemAccessDropdown.slice(sep + 1); // "access" | "role"
+    const it = shareItems.find((s) => getItemId(s) === id);
+    if (!it) return null;
+
+    const publicPermission = getAnyonePermission(it);
+    return {
+      it,
+      kind,
+      pub: Boolean(publicPermission),
+      role: publicPermission?.role || "reader",
+    };
+  })();
 
   if (!item) return null;
 
@@ -1737,8 +1771,7 @@ async function handleSendLink(e) {
                             personRefs.current[idx] = { current: null };
 
                           const roleLocked =
-                            person.role === "owner" ||
-                            !canChangeRole
+                            person.role === "owner" || !canChangeRole;
 
                           return (
                             <div
@@ -1809,28 +1842,26 @@ async function handleSendLink(e) {
                                     </button>
                                   </MouseTooltip>
 
-                            
-                                    <RoleDropdown
-                                      open={openDropdown === idx}
-                                      isChanged={isChanged}
-                                      isOwnerPending={person?.pendingOwner}
-                                      onTransfer={() =>
-                                        sendOwnershipTransferMail(person)
-                                      }
-                                      onCancel={() =>
-                                        cancelOwnershipTransferMail(person)
-                                      }
-                                      anchorRef={personRefs.current[idx]}
-                                      current={ROLE_LABEL[person?.role]}
-                                      onChange={(r) =>
-                                        updatePersonRole(person, r)
-                                      }
-                                      onClose={() => setOpenDropdown(null)}
-                                      showRemove={true}
-                                      isOwner={isOwner}
-                                      person={person}
-                                    />
-                                  
+                                  <RoleDropdown
+                                    open={openDropdown === idx}
+                                    isChanged={isChanged}
+                                    isOwnerPending={person?.pendingOwner}
+                                    onTransfer={() =>
+                                      sendOwnershipTransferMail(person)
+                                    }
+                                    onCancel={() =>
+                                      cancelOwnershipTransferMail(person)
+                                    }
+                                    anchorRef={personRefs.current[idx]}
+                                    current={ROLE_LABEL[person?.role]}
+                                    onChange={(r) =>
+                                      updatePersonRole(person, r)
+                                    }
+                                    onClose={() => setOpenDropdown(null)}
+                                    showRemove={true}
+                                    isOwner={isOwner}
+                                    person={person}
+                                  />
                                 </div>
                               </div>
                             </div>
@@ -1964,7 +1995,9 @@ async function handleSendLink(e) {
                           display: "flex",
                           flexDirection: "column",
                           gap: 16,
-                          paddingBottom: 56,
+                          // (old paddingBottom: 56 hack removed — the dropdowns
+                          // no longer render inside this scroll container)
+                          paddingBottom: 8,
                         }}
                       >
                         {shareItems.map((it) => {
@@ -1976,6 +2009,10 @@ async function handleSendLink(e) {
                             it?.capabilities?.canShare === true;
                           const accessKey = `${id}:access`;
                           const roleKey = `${id}:role`;
+                          // per-item icon (previously used the first item's)
+                          const itemIconType = it.isDirectory
+                            ? null
+                            : getFileType(it?.name || "");
 
                           return (
                             <div key={id}>
@@ -1991,15 +2028,28 @@ async function handleSendLink(e) {
                                   fontSize: 14,
                                 }}
                               >
-                                <span
-                                  style={{
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {it.name}
-                                </span>
+                                <div className="flex min-w-0 flex-1 items-center gap-2 truncate font-medium text-(--text-primary)">
+                                  <div className="flex shrink-0 items-center">
+                                    {it.isDirectory ? (
+                                      <IconFolder
+                                        size={18}
+                                        style={{
+                                          color: "#5f6368",
+                                          flexShrink: 0,
+                                        }}
+                                      />
+                                    ) : (
+                                      <FileBadge
+                                        size={18}
+                                        type={itemIconType}
+                                      />
+                                    )}
+                                  </div>
+
+                                  <span className="min-w-0 truncate px-2 text-[14px]">
+                                    {it.name}
+                                  </span>
+                                </div>
                               </div>
 
                               <div
@@ -2022,12 +2072,8 @@ async function handleSendLink(e) {
                                       type="button"
                                       className="gd-share-access-btn"
                                       disabled={!canShareThis}
-                                      onClick={() =>
-                                        setItemAccessDropdown(
-                                          itemAccessDropdown === accessKey
-                                            ? null
-                                            : accessKey,
-                                        )
+                                      onClick={(e) =>
+                                        openItemDropdown(e, accessKey, "left")
                                       }
                                     >
                                       <span>
@@ -2037,37 +2083,6 @@ async function handleSendLink(e) {
                                       </span>
                                       <IconChevronDown size={14} />
                                     </button>
-
-                                    {itemAccessDropdown === accessKey && (
-                                      <div className="gd-share-access-dropdown origin-top-left animate-[sortDropdown_80ms_ease-out]">
-                                        {["restricted", "anyone"].map((opt) => (
-                                          <button
-                                            key={opt}
-                                            type="button"
-                                            className="gd-share-access-option"
-                                            onClick={() => {
-                                              setItemAccessDropdown(null);
-                                              if ((opt === "anyone") === pub)
-                                                return;
-                                              applyLinkChangeToItem(
-                                                it,
-                                                role,
-                                                opt,
-                                              );
-                                            }}
-                                          >
-                                            <span className="gd-share-access-check">
-                                              {(opt === "anyone") === pub && (
-                                                <IconCheck size={16} />
-                                              )}
-                                            </span>
-                                            {opt === "anyone"
-                                              ? "Anyone with the link"
-                                              : "Restricted"}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
                                   </div>
 
                                   <div className="gd-share-link-sub">
@@ -2087,45 +2102,13 @@ async function handleSendLink(e) {
                                         type="button"
                                         className="gd-share-role-btn"
                                         disabled={!canShareThis}
-                                        onClick={() =>
-                                          setItemAccessDropdown(
-                                            itemAccessDropdown === roleKey
-                                              ? null
-                                              : roleKey,
-                                          )
+                                        onClick={(e) =>
+                                          openItemDropdown(e, roleKey, "right")
                                         }
                                       >
                                         {ROLE_LABEL[role]}{" "}
                                         <IconChevronDown size={14} />
                                       </button>
-
-                                      {itemAccessDropdown === roleKey && (
-                                        <div className="gd-share-access-dropdown origin-top-right animate-[sortDropdown_80ms_ease-out]">
-                                          {["reader", "writer"].map((r) => (
-                                            <button
-                                              key={r}
-                                              type="button"
-                                              className="gd-share-access-option"
-                                              onClick={() => {
-                                                setItemAccessDropdown(null);
-                                                if (r === role) return;
-                                                applyLinkChangeToItem(
-                                                  it,
-                                                  r,
-                                                  "anyone",
-                                                );
-                                              }}
-                                            >
-                                              <span className="gd-share-access-check">
-                                                {r === role && (
-                                                  <IconCheck size={16} />
-                                                )}
-                                              </span>
-                                              {ROLE_LABEL[r]}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
                                     </div>
                                   </div>
                                 )}
@@ -2134,6 +2117,74 @@ async function handleSendLink(e) {
                           );
                         })}
                       </div>
+
+                      {/* Portaled dropdown: renders in document.body with
+                          position: fixed so the scroll container can't clip it */}
+                      {activeItemDropdown &&
+                        createPortal(
+                          <div
+                            ref={itemDropdownRef}
+                            className={`gd-share-access-dropdown ${itemDropdownPos.originClass} animate-[sortDropdown_80ms_ease-out]`}
+                            style={itemDropdownPos.style}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {activeItemDropdown.kind === "access"
+                              ? ["restricted", "anyone"].map((opt) => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    className="gd-share-access-option"
+                                    onClick={() => {
+                                      setItemAccessDropdown(null);
+                                      if (
+                                        (opt === "anyone") ===
+                                        activeItemDropdown.pub
+                                      )
+                                        return;
+                                      applyLinkChangeToItem(
+                                        activeItemDropdown.it,
+                                        activeItemDropdown.role,
+                                        opt,
+                                      );
+                                    }}
+                                  >
+                                    <span className="gd-share-access-check">
+                                      {(opt === "anyone") ===
+                                        activeItemDropdown.pub && (
+                                        <IconCheck size={16} />
+                                      )}
+                                    </span>
+                                    {opt === "anyone"
+                                      ? "Anyone with the link"
+                                      : "Restricted"}
+                                  </button>
+                                ))
+                              : ["reader", "writer"].map((r) => (
+                                  <button
+                                    key={r}
+                                    type="button"
+                                    className="gd-share-access-option"
+                                    onClick={() => {
+                                      setItemAccessDropdown(null);
+                                      if (r === activeItemDropdown.role) return;
+                                      applyLinkChangeToItem(
+                                        activeItemDropdown.it,
+                                        r,
+                                        "anyone",
+                                      );
+                                    }}
+                                  >
+                                    <span className="gd-share-access-check">
+                                      {r === activeItemDropdown.role && (
+                                        <IconCheck size={16} />
+                                      )}
+                                    </span>
+                                    {ROLE_LABEL[r]}
+                                  </button>
+                                ))}
+                          </div>,
+                          document.body,
+                        )}
                     </>
                   )}
 
@@ -2159,20 +2210,20 @@ async function handleSendLink(e) {
                     <div className="gd-pending-span">
                       {isChanged && <span>Pending changes</span>}
                     </div>
-                      <button
-                        className={`gd-btn  ${isShareLoading ? "btn-loading" : "gd-btn-primary"}`}
-                        onClick={() =>
-                          isMulti
-                            ? handleSaveMultiPermissions()
-                            : onUpdateRoleAfterSave(item, type, message)
-                        }
-                      >
-                        {isShareLoading
-                          ? "Saving..."
-                          : isChanged
-                            ? "Save"
-                            : "Done"}
-                      </button>
+                    <button
+                      className={`gd-btn  ${isShareLoading ? "btn-loading" : "gd-btn-primary"}`}
+                      onClick={() =>
+                        isMulti
+                          ? handleSaveMultiPermissions()
+                          : onUpdateRoleAfterSave(item, type, message)
+                      }
+                    >
+                      {isShareLoading
+                        ? "Saving..."
+                        : isChanged
+                          ? "Save"
+                          : "Done"}
+                    </button>
                   </div>
                 </>
               )}

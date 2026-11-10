@@ -56,6 +56,7 @@ import DriveTopBarMobile from "../Components/Drive/DriveTopbarMobile";
 import MobileMoveModal from "../Components/Modals/MobileMoveModal";
 import ShareModalMobile from "../Components/Modals/ShareModalMobile";
 import useDriveActions from "../Hooks/useDriveActions";
+import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
 
 export default function DirectoryView({ route }) {
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
@@ -63,7 +64,7 @@ export default function DirectoryView({ route }) {
   const isDesktop = device === "windows";
   const isMobile = device === "mobile";
   const { user, refreshUser } = useAuth();
-  const { checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
+  const { checkingGoogleDrive, checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
     useGDrive();
   const { toast } = useToast();
   const { dirId } = useParams();
@@ -119,6 +120,15 @@ export default function DirectoryView({ route }) {
     });
   };
 
+ useEffect(() => {
+
+  if (checkingGoogleDrive) return;
+
+  if (route === "google-drive" && isGoogleDrive === false) {
+    redirectToGoogleDriveAuth();
+  }
+}, [route, isGoogleDrive, checkingGoogleDrive]);
+
   useEffect(() => {
     if (location.pathname.startsWith("/directory") && isMobile) {
       setAnimate(true);
@@ -159,62 +169,6 @@ export default function DirectoryView({ route }) {
                 : "root");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
-  const downloadControllers = useRef({});
-
-  // const handleUndo = async (undoAction) => {
-  //   try {
-  //     if (!undoAction) return;
-  //     const items = undoAction?.items;
-
-  //     if (undoAction.type === "trash") {
-  //       await handleRestoreItem(items, true);
-
-  //       const folders = items.filter((item) => item.isDirectory);
-  //       const files = items.filter((item) => !item.isDirectory);
-  //       if (!isTrashRoute) {
-  //         setDirectoriesList((prev) => [...prev, ...folders]);
-
-  //         setFilesList((prev) => [...prev, ...files]);
-  //       }
-  //     }
-  //     if (undoAction.type === "restore") {
-  //       await handleMoveToTrash(items, true);
-  //       const folders = items.filter((item) => item.isDirectory);
-  //       const files = items.filter((item) => !item.isDirectory);
-
-  //       if (previousDirContext === "trash") {
-  //         setDirectoriesList((prev) => [...prev, ...folders]);
-  //         setFilesList((prev) => [...prev, ...files]);
-  //       } else {
-  //         const ids = Array.isArray(items)
-  //           ? new Set(items.map((item) => String(item._id ?? item.id)))
-  //           : new Set(items._id ?? items.id);
-
-  //         setDirectoriesList((prev) =>
-  //           prev.filter((item) => !ids.has(String(item._id))),
-  //         );
-
-  //         setFilesList((prev) =>
-  //           prev.filter((item) => !ids.has(String(item._id))),
-  //         );
-  //       }
-  //     }
-  //     if (undoAction.type === "star") {
-  //       await handleToggleStar(items, true);
-
-  //       if (previousDirContext === "starred") {
-  //         const folders = items.filter((item) => item.isDirectory);
-  //         const files = items.filter((item) => !item.isDirectory);
-
-  //         setDirectoriesList((prev) => [...prev, ...folders]);
-  //         setFilesList((prev) => [...prev, ...files]);
-  //       }
-  //     }
-  //     toast({ message: "Action undone", type: "success" });
-  //   } catch (error) {
-  //     console.log("error", error);
-  //   }
-  // };
 
   function showError(message, autoClear = false) {
     setError(message);
@@ -285,7 +239,6 @@ export default function DirectoryView({ route }) {
     searchQuery,
   });
 
-  const [path, setPath] = useState([]);
   CascadeConfirmationModal;
   const refreshCurrentDirectory = (type = "") =>
     getDirectoryItems(
@@ -410,6 +363,8 @@ export default function DirectoryView({ route }) {
     setPrevPermissions,
     peopleWithAccess,
     setPeopleWithAccess,
+    path,
+    setPath,
     linkRole,
     setLinkRole,
     linkAccess,
@@ -418,10 +373,12 @@ export default function DirectoryView({ route }) {
     cascadeModal,
     confirmModal,
   } = useDriveActions({
+    dirId,
     user,
     setDirectoriesList,
     setFilesList,
     combinedItems,
+    lastDirectory,
     setLastDirectory,
     isGoogleDriveRoute,
     selectedItems,
@@ -437,6 +394,7 @@ export default function DirectoryView({ route }) {
     previousDirContext,
     clearSelection,
     toast,
+    setError,
     showError,
   });
 
@@ -580,7 +538,6 @@ export default function DirectoryView({ route }) {
     }
     loadAllUsers();
   }, []);
-
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
@@ -845,7 +802,7 @@ export default function DirectoryView({ route }) {
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
-            onContextMenu={(e) => handleCreateNewMenu(e)}
+            onContextMenu={(e) => (isMobile ? null : handleCreateNewMenu(e))}
             onMouseLeave={handleMainMouseUp}
           >
             {isDesktop && (

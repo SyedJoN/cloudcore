@@ -592,10 +592,10 @@ export default function FileViewerMobile({
                     disabled={
                       isSharedRoute || isDeleted || !canMove || isGDrive
                     }
-                 onClick={run(() => {
-  handleSelect(item.id ?? item._id);
-  onMove?.(item);
-})}
+                    onClick={run(() => {
+                      handleSelect(item.id ?? item._id);
+                      onMove?.(item);
+                    })}
                   />
                   <SheetItem
                     icon={

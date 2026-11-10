@@ -11,7 +11,7 @@ import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import { GDrivePicker, NAV_ITEMS } from "./DriveSidebar";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 
-const TAB_KEYS = ["home", "starred", "shared", "root"];
+const TAB_KEYS = ["home", "starred", "google-drive", "shared", "root"];
 const TAB_LABELS = { root: "Files" };
 
 /* ---------- Main mobile component ---------- */
@@ -71,6 +71,7 @@ export default function DriveBottomBar({
       >
         {tabs.map(({ key, label, path, Icon, IconSolid, isActive }) => {
           const active = isActive({ dirContext, dirId });
+          console.log('active', active)
           const DisplayIcon = active ? IconSolid : Icon;
           return (
             <button
