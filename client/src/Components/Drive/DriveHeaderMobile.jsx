@@ -60,7 +60,6 @@ function MobileDrawer({ open, onClose, dirId, dirContext }) {
         <nav className="gd-nav-section">
             
           {NAV_ITEMS.map(({ key, label, path, Icon, IconSolid, isActive }) => {
-            if (!isGoogleDrive && key === "google-drive") return null;
             const active = isActive({ dirContext, dirId });
             const DisplayIcon = active ? IconSolid : Icon;
             return (
