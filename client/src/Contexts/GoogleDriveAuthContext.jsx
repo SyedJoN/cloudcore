@@ -21,8 +21,6 @@ export function GDriveAuthProvider({ children }) {
     try {
       const res = await googleDriveCheck();
 
-      console.log("DRIVE CHECK RESPONSE:", res.data);
-
       const authenticated = res.data?.isAuthenticated === true;
 
       setIsGoogleDrive(authenticated);

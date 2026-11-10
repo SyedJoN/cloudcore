@@ -1,8 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronLeftIcon,
-  EllipsisVerticalIcon,
-} from "@heroicons/react/24/solid";
+
+import { useEffect, useState } from "react";
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
@@ -11,36 +8,40 @@ import { getColor } from "../../../Utils/getProfileColor";
 import { formatDate } from "../../../Utils/formatDate";
 import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
-import { MdOutlineSelectAll, MdClose } from "react-icons/md";
-import { useDevice } from "../../Contexts/DeviceContext";
+import { useDriveDrag } from "../../Hooks/useDriveDrag";
+
+const DRAG_MIME = "application/x-drive-items";
 
 export default function GridItem({
+  combinedItems,
   item,
-  dirId,
   avatar,
   owner,
   selected,
   selectedItems,
-  setSelectedItems,
-  combinedItems,
-  handleSelectAll,
   onSelect,
   onRowClick,
   onDoubleClick,
   onContextMenu,
+  onMove,
 }) {
   const { user } = useAuth();
   const [hasImgError, setHasImgError] = useState(false);
-  const { isGoogleDrive } = useGDrive();
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDropTarget, setIsDropTarget] = useState(false);
 
+  const { isGoogleDrive } = useGDrive();
   const location = useLocation();
+
   const isDriveRoute = location.pathname.endsWith("/drive");
   const isRecentRoute = location.pathname.endsWith("/recent");
   const isSharedRoute = location.pathname.endsWith("/shared");
   const isTrashRoute = location.pathname.endsWith("/trash");
   const isGoogleDriveRoute = location.pathname.endsWith("/google-drive");
+
   const showActiviyBar =
     isDriveRoute || isRecentRoute || isSharedRoute || isTrashRoute;
+
   const type = item.isDirectory
     ? isGoogleDrive && isGoogleDriveRoute
       ? "google-directory"
@@ -49,8 +50,81 @@ export default function GridItem({
       ? "google-file"
       : "file";
 
+  const itemId = item._id ?? item.id;
   const iconType = item.isDirectory ? null : getFileType(item?.name || "");
-  const itemId = (item._id ?? item.id) || item?.map((i) => i._id ?? i.id);
+
+  useEffect(() => {
+    const check = () => {
+      setIsDragging(
+        document.body.classList.contains("gd-drag-active")
+      );
+    };
+
+    const observer = new MutationObserver(check);
+
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const { dragProps } = useDriveDrag({
+    item,
+    itemId,
+    selectedItems,
+    onSelect,
+    enabled: !isTrashRoute && !isGoogleDriveRoute,
+  });
+
+  const isDraggedItem = [...(selectedItems || [])].some(
+    id => String(id) === String(itemId)
+  );
+
+  const isDisabled = isDragging && isDraggedItem;
+
+  const handleDragOver = (e) => {
+    if (!item.isDirectory) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    e.dataTransfer.dropEffect = "move";
+    setIsDropTarget(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (!item.isDirectory) return;
+
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDropTarget(false);
+    }
+  };
+
+const handleDrop = (e) => {
+  if (!item.isDirectory) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+  setIsDropTarget(false);
+
+  try {
+    const ids = JSON.parse(
+      e.dataTransfer.getData(DRAG_MIME) || "[]"
+    );
+
+    if (!ids.length) return;
+
+    onMove?.(
+      ids,
+      item._id ?? item.id,
+      item.name
+    );
+  } catch (error) {
+    console.error("Drop error:", error);
+  }
+};
 
   const avatarEl =
     avatar && !hasImgError ? (
@@ -84,25 +158,49 @@ export default function GridItem({
   const modified = item.modifiedTime
     ? new Date(item.modifiedTime).getTime()
     : 0;
+
   const viewed = item.viewedByMeTime
     ? new Date(item.viewedByMeTime).getTime()
     : 0;
+
   const isOpened = viewed > modified;
 
   return (
     <div
-      className={`gd-grid-item ${selected ? "selected" : ""} ${showActiviyBar ? "h-[260.5px]" : ""}`}
+      {...dragProps}
+      className={`
+        gd-grid-item
+        ${selected ? "selected" : ""}
+        ${showActiviyBar ? "h-[260.5px]" : ""}
+        ${isDisabled ? "gd-drag-disabled" : ""}
+        ${isDragging && isDraggedItem ? "gd-drag-source" : ""}
+        ${isDropTarget ? "gd-drop-target" : ""}
+      `}
       data-id={itemId}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
       onClick={() => {
+        if (document.body.classList.contains("gd-drag-active")) return;
         onRowClick?.(itemId);
       }}
-      onDoubleClick={() => onDoubleClick?.(type, itemId, item.name)}
+      onDoubleClick={() => {
+        if (document.body.classList.contains("gd-drag-active")) return;
+        onDoubleClick?.(type, itemId, item.name);
+      }}
       onContextMenu={(e) => {
+        if (document.body.classList.contains("gd-drag-active")) {
+          e.preventDefault();
+          return;
+        }
+
         e.preventDefault();
+
         if (!selectedItems.has(itemId)) {
           onSelect?.(itemId);
         }
-        onContextMenu(e, itemId);
+
+        onContextMenu?.(e, itemId);
       }}
     >
       <div
@@ -119,14 +217,18 @@ export default function GridItem({
         ) : (
           <FileBadge type={iconType} />
         )}
+
         <span className="gd-grid-item-name">{item.name}</span>
 
-        {/* kebab / checkbox */}
         <button
           type="button"
-          aria-label={"More actions"}
+          aria-label="More actions"
+          disabled={isDisabled}
           onClick={(e) => {
             e.stopPropagation();
+
+            if (document.body.classList.contains("gd-drag-active")) return;
+
             onSelect?.(itemId);
             onContextMenu?.(e, itemId);
           }}
@@ -137,7 +239,9 @@ export default function GridItem({
       </div>
 
       <div
-        className={`gd-grid-item-preview ${showActiviyBar ? "h-50.25" : "h-41.75"}`}
+        className={`gd-grid-item-preview ${
+          showActiviyBar ? "h-50.25" : "h-41.75"
+        }`}
       >
         {item.isDirectory ? (
           <IconFolder size={48} />
@@ -155,6 +259,7 @@ export default function GridItem({
         }}
       >
         {avatarEl}
+
         <span className="gd-grid-item-last-action">
           <span>You {isOpened ? "opened" : "modified"}</span>
           <span>•</span>

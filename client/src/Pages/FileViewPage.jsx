@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import FileViewer from "../Components/File/FileViewer";
 import FileViewerMobile from "../Components/File/FileViewerMobile";
 import {
@@ -10,59 +10,69 @@ import {
 } from "../../apis/fileApi";
 import ShareModal from "../Components/Modals/ShareModal";
 import { axiosWithCreds } from "../../apis/axiosInstances";
-import { useAuth, useToast } from "../Contexts";
+import { useAuth, useGDrive, useToast } from "../Contexts";
 import { searchUsers } from "../../apis/userApi";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES } from "../../Utils/displayUtils";
 import { toggleItemStar } from "../../apis/resourceApi";
 import ShareModalMobile from "../Components/Modals/ShareModalMobile";
+import useDriveActions from "../Hooks/useDriveActions";
+import { useDirectoryData } from "../Hooks/useDirectoryData";
+import ConfirmationModal from "../Components/Modals/ConfirmationModal";
+import CascadeConfirmationModal from "../Components/Modals/CascadeConfirmationModal";
+import { useDevice } from "../Contexts/DeviceContext";
+import { useSelectionAndContextMenu } from "../Hooks/useSelectionAndContextMenu";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
-// agar tumhare paas pehle se useIsMobile hook hai to ye hata ke wohi import karo
-function useIsMobile(query = "(max-width: 768px)") {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.matchMedia(query).matches,
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const onChange = (e) => setIsMobile(e.matches);
-    setIsMobile(mq.matches);
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [query]);
-
-  return isMobile;
-}
-
 export default function FileViewPage({ route = null }) {
   const { user, refreshUser } = useAuth();
-  const { toast } = useToast();
-  const { fileId } = useParams();
-  const isMobile = useIsMobile();
 
+  const { isGoogleDrive, setIsGoogleDrive } = useGDrive();
+  const location = useLocation();
+  const { toast } = useToast();
+  const { dirId, fileId } = useParams();
+  const { device } = useDevice();
+  const isMobile = device === "mobile";
+  const isHomeRoute = location.pathname === "/home";
+  const isSharedRoute = location.pathname === "/shared";
+  const isTrashRoute = location.pathname === "/trash";
+  const isGoogleDriveRoute =
+    location.pathname === "/google-drive" && isGoogleDrive;
+  const isRecentRoute = location.pathname === "/recent";
+  const isStarredRoute = location.pathname === "/starred";
+
+  const dirContext =
+    location.state?.dirContext ||
+    (isTrashRoute
+      ? "trash"
+      : isSharedRoute
+        ? "shared"
+        : isRecentRoute
+          ? "recent"
+          : isGoogleDriveRoute
+            ? "google-drive"
+            : isHomeRoute
+              ? "home"
+              : isStarredRoute
+                ? "starred"
+                : "root");
   const [item, setItem] = useState(null);
   const [error, setError] = useState(null);
-  const [shareItem, setShareItem] = useState(null);
-  const [isShareLoading, setIsShareLoading] = useState(false);
-  const [showRename, setShowRename] = useState(false);
   const [renameId, setRenameId] = useState(null);
-  const [renameValue, setRenameValue] = useState("");
   const [renameType, setRenameType] = useState("");
   const [allUsers, setAllUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
-  const [peopleWithAccess, setPeopleWithAccess] = useState([]);
-  const [prevPermissions, setPrevPermissions] = useState([]);
-  const [linkAccess, setLinkAccess] = useState("");
-  const [linkRole, setLinkRole] = useState("");
   const [isStarred, setIsStarred] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [restartAnimation, setRestartAnimation] = useState(false);
 
   const usersLoadedRef = useRef(null);
+  const previousDirContext = useRef(null);
+  const errorTimeoutRef = useRef(null);
   const navigate = useNavigate();
-  const extRef = useRef(null);
+  const mainRef = useRef(null);
 
   useEffect(() => {
     setIsStarred((prev) => {
@@ -74,178 +84,267 @@ export default function FileViewPage({ route = null }) {
     });
   }, [item]);
 
-  function openRename(item) {
-    setRenameType(item.isDirectory ? "directory" : "file");
-    setRenameId(item._id);
-    extRef.current = item.extension;
-    setRenameValue(item.name);
-    setShowRename(true);
-  }
-
-  async function handleRenameSubmit(e) {
-    e.preventDefault();
-    setError("");
-    try {
-      const url =
-        renameType === "file" ? `/file/${renameId}` : `/directory/${renameId}`;
-
-      const body =
-        renameType === "file"
-          ? { fileName: renameValue }
-          : { newDirName: renameValue };
-
-      await axiosWithCreds.patch(url, body);
-      const cleanName = renameValue.replace(/\.[^/.]+$/, "");
-      const newName = `${cleanName}${extRef.current}`;
-      setShowRename(false);
-      setItem((prev) => prev.map((prev) => ({ ...prev, name: newName })));
-    } catch (err) {
-      setError(err.message);
+    function showError(message, autoClear = false) {
+    setError(message);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    if (autoClear) {
+      errorTimeoutRef.current = setTimeout(() => setError(""), 5000);
     }
   }
 
-  const handleToggleResourcePublic = async (item, role, access) => {
-    setIsShareLoading(true);
+  const {
+    setFilesList,
+    setDirectoriesList,
+    lastDirectory,
+    setLastDirectory,
+    combinedItems,
+  } = useDirectoryData({
+    dirId,
+    dirContext,
+    isSharedRoute,
+    isRecentRoute,
+    isTrashRoute,
+    setIsStarred,
+    isStarred,
+    isGoogleDriveRoute,
+    setIsGoogleDrive,
+    navigate,
+    searchQuery,
+  });
 
-    try {
-      const itemId = item._id ?? item.id;
-      const type = getResourceType(item);
+  const { selectedItems, setContextItem, handleSelect, clearSelection } =
+    useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory });
 
-      const restricted = access === "restricted";
-      const userRole = DRIVE_ROLES[role] ?? "reader";
+  const {
+    isShareLoading,
+    setIsShareLoading,
+    handleDownload,
+    handleMoveToTrash,
+    openRename,
+    handleCascadeConfirm,
+    handleCascadeCancel,
+    handleRenameSubmit,
+    handleToggleStar,
+    handleToggleResourcePublic,
+    handleSharedRoleUpdate,
+    handleConfirm,
+    handleCancel,
+    showRename,
+    setShowRename,
+    renameValue,
+    setRenameValue,
+    shareItem,
+    setShareItem,
+    prevPermissions,
+    setPrevPermissions,
+    peopleWithAccess,
+    setPeopleWithAccess,
+    linkRole,
+    setLinkRole,
+    linkAccess,
+    setLinkAccess,
+    cascadeModal,
+    confirmModal,
+  } = useDriveActions({
+    dirId,
+    user,
+    item,
+    setItem,
+    setDirectoriesList,
+    setFilesList,
+    combinedItems,
+    lastDirectory,
+    setLastDirectory,
+    isGoogleDriveRoute,
+    selectedItems,
+    isMobile,
+    setContextItem,
+    restartAnimation,
+    isStarred,
+    isStarredRoute,
+    isTrashRoute,
+    setIsStarred,
+    handleSelect,
+    refreshUser,
+    previousDirContext,
+    clearSelection,
+    toast,
+    setError,
+    showError,
+  });
 
-      let permission = null;
+  // function openRename(item) {
+  //   setRenameType(item.isDirectory ? "directory" : "file");
+  //   setRenameId(item._id);
+  //   extRef.current = item.extension;
+  //   setRenameValue(item.name);
+  //   setShowRename(true);
+  // }
 
-      await toggleFilePublic(itemId, userRole, access, type);
+  // async function handleRenameSubmit(e) {
+  //   e.preventDefault();
+  //   setError("");
+  //   try {
+  //     const url =
+  //       renameType === "file" ? `/file/${renameId}` : `/directory/${renameId}`;
 
-      const update = (list) =>
-        list.map((resource) => {
-          if (String(resource._id ?? resource.id) !== String(itemId)) {
-            return resource;
-          }
+  //     const body =
+  //       renameType === "file"
+  //         ? { fileName: renameValue }
+  //         : { newDirName: renameValue };
 
-          const permissions = resource.permissions ?? [];
+  //     await axiosWithCreds.patch(url, body);
+  //     const cleanName = renameValue.replace(/\.[^/.]+$/, "");
+  //     const newName = `${cleanName}${extRef.current}`;
+  //     setShowRename(false);
+  //     setItem((prev) => prev.map((prev) => ({ ...prev, name: newName })));
+  //   } catch (err) {
+  //     setError(err.message);
+  //   }
+  // }
 
-          const updatedPermissions = restricted
-            ? permissions.filter((p) => p?.type !== "anyone")
-            : [
-                ...permissions.filter((p) => p?.type !== "anyone"),
-                {
-                  ...(permission ?? {}),
-                  type: "anyone",
-                  role: userRole,
-                },
-              ];
+  // const handleToggleResourcePublic = async (item, role, access) => {
+  //   setIsShareLoading(true);
 
-          return {
-            ...resource,
-            isPublic: restricted ? false : true,
-            publicRole: restricted ? null : userRole,
-            permissions: updatedPermissions,
-          };
-        });
+  //   try {
+  //     const itemId = item._id ?? item.id;
+  //     const type = getResourceType(item);
 
-      setItem((prev) => update(prev));
-      setLinkAccess(restricted ? "restricted" : "anyone");
-      setLinkRole(restricted ? "reader" : userRole);
+  //     const restricted = access === "restricted";
+  //     const userRole = DRIVE_ROLES[role] ?? "reader";
 
-      toast({
-        message: "Public Access updated",
-        type: "success",
-      });
-    } catch (error) {
-      toast({
-        message: error?.message || "Something went wrong!",
-        type: "error",
-      });
-    } finally {
-      setIsShareLoading(false);
-    }
-  };
+  //     let permission = null;
 
-  const handleSharedRoleUpdate = async (item, type, message) => {
-    setIsShareLoading(true);
+  //     await toggleFilePublic(itemId, userRole, access, type);
 
-    try {
-      const allPermissions = item?.permissions ?? [];
-      const mergedPermissions = allPermissions.map((permission) => {
-        const changedPermission = peopleWithAccess.find(
-          (person) => String(person.id) === String(permission.id),
-        );
+  //     const update = (list) =>
+  //       list.map((resource) => {
+  //         if (String(resource._id ?? resource.id) !== String(itemId)) {
+  //           return resource;
+  //         }
 
-        if (!changedPermission) {
-          return permission;
-        }
+  //         const permissions = resource.permissions ?? [];
 
-        return {
-          ...permission,
-          role: changedPermission.role,
-        };
-      });
-      const newPermissions = mergedPermissions.filter(
-        (permission) =>
-          permission?.type !== "anyone" && permission?.role !== "owner",
-      );
+  //         const updatedPermissions = restricted
+  //           ? permissions.filter((p) => p?.type !== "anyone")
+  //           : [
+  //               ...permissions.filter((p) => p?.type !== "anyone"),
+  //               {
+  //                 ...(permission ?? {}),
+  //                 type: "anyone",
+  //                 role: userRole,
+  //               },
+  //             ];
 
-      const previousEditablePermissions = (item?.permissions ?? []).filter(
-        (permission) =>
-          permission?.type !== "anyone" && permission?.role !== "owner",
-      );
+  //         return {
+  //           ...resource,
+  //           isPublic: restricted ? false : true,
+  //           publicRole: restricted ? null : userRole,
+  //           permissions: updatedPermissions,
+  //         };
+  //       });
 
-      const result = await updateSharedAccess({
-        item,
-        type,
-        peopleWithAccess: newPermissions,
-        prevPermissions: previousEditablePermissions,
-        message,
-        grantAccessById,
-        revokeFileAccess,
-      });
+  //     setItem((prev) => update(prev));
+  //     setLinkAccess(restricted ? "restricted" : "anyone");
+  //     setLinkRole(restricted ? "reader" : userRole);
 
-      if (!result.changed) {
-        setShareItem(null);
-        return;
-      }
+  //     toast({
+  //       message: "Public Access updated",
+  //       type: "success",
+  //     });
+  //   } catch (error) {
+  //     toast({
+  //       message: error?.message || "Something went wrong!",
+  //       type: "error",
+  //     });
+  //   } finally {
+  //     setIsShareLoading(false);
+  //   }
+  // };
 
-      const updatedPeopleWithAccess = peopleWithAccess
-        .map((p) => {
-          const isRemoved = p.role === "remove";
-          if (isRemoved) {
-            return null;
-          }
-          return p;
-        })
-        .filter(Boolean);
+  // const handleSharedRoleUpdate = async (item, type, message) => {
+  //   setIsShareLoading(true);
 
-      const update = (list) =>
-        list.map((resource) => {
-          const resourceId = String(resource?._id ?? resource?.id);
-          if (resourceId !== String(result.itemId)) {
-            return resource;
-          }
-          return {
-            ...resource,
-            permissions: updatedPeopleWithAccess,
-          };
-        });
-      setItem((prev) => update(prev));
-      setPeopleWithAccess(updatedPeopleWithAccess);
-      setPrevPermissions(updatedPeopleWithAccess);
-      setShareItem(null);
+  //   try {
+  //     const allPermissions = item?.permissions ?? [];
+  //     const mergedPermissions = allPermissions.map((permission) => {
+  //       const changedPermission = peopleWithAccess.find(
+  //         (person) => String(person.id) === String(permission.id),
+  //       );
 
-      toast({
-        message: "Access updated",
-        type: "success",
-      });
-    } catch (error) {
-      toast({
-        message: error?.message || "Something went wrong!",
-        type: "error",
-      });
-    } finally {
-      setIsShareLoading(false);
-    }
-  };
+  //       if (!changedPermission) {
+  //         return permission;
+  //       }
+
+  //       return {
+  //         ...permission,
+  //         role: changedPermission.role,
+  //       };
+  //     });
+  //     const newPermissions = mergedPermissions.filter(
+  //       (permission) =>
+  //         permission?.type !== "anyone" && permission?.role !== "owner",
+  //     );
+
+  //     const previousEditablePermissions = (item?.permissions ?? []).filter(
+  //       (permission) =>
+  //         permission?.type !== "anyone" && permission?.role !== "owner",
+  //     );
+
+  //     const result = await updateSharedAccess({
+  //       item,
+  //       type,
+  //       peopleWithAccess: newPermissions,
+  //       prevPermissions: previousEditablePermissions,
+  //       message,
+  //       grantAccessById,
+  //       revokeFileAccess,
+  //     });
+
+  //     if (!result.changed) {
+  //       setShareItem(null);
+  //       return;
+  //     }
+
+  //     const updatedPeopleWithAccess = peopleWithAccess
+  //       .map((p) => {
+  //         const isRemoved = p.role === "remove";
+  //         if (isRemoved) {
+  //           return null;
+  //         }
+  //         return p;
+  //       })
+  //       .filter(Boolean);
+
+  //     const update = (list) =>
+  //       list.map((resource) => {
+  //         const resourceId = String(resource?._id ?? resource?.id);
+  //         if (resourceId !== String(result.itemId)) {
+  //           return resource;
+  //         }
+  //         return {
+  //           ...resource,
+  //           permissions: updatedPeopleWithAccess,
+  //         };
+  //       });
+  //     setItem((prev) => update(prev));
+  //     setPeopleWithAccess(updatedPeopleWithAccess);
+  //     setPrevPermissions(updatedPeopleWithAccess);
+  //     setShareItem(null);
+
+  //     toast({
+  //       message: "Access updated",
+  //       type: "success",
+  //     });
+  //   } catch (error) {
+  //     toast({
+  //       message: error?.message || "Something went wrong!",
+  //       type: "error",
+  //     });
+  //   } finally {
+  //     setIsShareLoading(false);
+  //   }
+  // };
 
   useEffect(() => {
     refreshUser();
@@ -322,46 +421,46 @@ export default function FileViewPage({ route = null }) {
     );
   }
 
-  async function handleToggleStar(item) {
-    try {
-      await Promise.all(
-        item.map((i) => {
-          const type = i.isDirectory ? "folder" : "file";
-          setIsStarred((prev) => ({
-            ...prev,
-            [i._id]: !prev[i._id],
-          }));
-          return toggleItemStar(i._id, type);
-        }),
-      );
-      setItem((prev) => prev.map((i) => ({ ...i, isStarred: !i.isStarred })));
+  // async function handleToggleStar(item) {
+  //   try {
+  //     await Promise.all(
+  //       item.map((i) => {
+  //         const type = i.isDirectory ? "folder" : "file";
+  //         setIsStarred((prev) => ({
+  //           ...prev,
+  //           [i._id]: !prev[i._id],
+  //         }));
+  //         return toggleItemStar(i._id, type);
+  //       }),
+  //     );
+  //     setItem((prev) => prev.map((i) => ({ ...i, isStarred: !i.isStarred })));
 
-      toast({
-        message: `${item[0].name} ${item[0].isStarred ? "removed from" : "added to"} starred`,
-        type: "success",
-      });
-    } catch (error) {
-      setError(error.message);
-    }
-  }
+  //     toast({
+  //       message: `${item[0].name} ${item[0].isStarred ? "removed from" : "added to"} starred`,
+  //       type: "success",
+  //     });
+  //   } catch (error) {
+  //     setError(error.message);
+  //   }
+  // }
 
-  async function handleMoveToTrash(item) {
-    try {
-      const url = item.isDirectory
-        ? `/directory/soft-delete/${item._id}`
-        : `/file/soft-delete/${item._id}`;
-      const channel = new BroadcastChannel("file-sync");
+  // async function handleMoveToTrash(item) {
+  //   try {
+  //     const url = item.isDirectory
+  //       ? `/directory/soft-delete/${item._id}`
+  //       : `/file/soft-delete/${item._id}`;
+  //     const channel = new BroadcastChannel("file-sync");
 
-      await axiosWithCreds.delete(url);
+  //     await axiosWithCreds.delete(url);
 
-      channel.postMessage({
-        type: "FILE_DELETED",
-        id: item._id,
-      });
-    } catch (err) {
-      setError(err.message || "Something went wrong");
-    }
-  }
+  //     channel.postMessage({
+  //       type: "FILE_DELETED",
+  //       id: item._id,
+  //     });
+  //   } catch (err) {
+  //     setError(err.message || "Something went wrong");
+  //   }
+  // }
 
   // tab band na ho sake (mobile browser me direct open) to drive pe wapas
   const closeViewer = () => {
@@ -374,11 +473,29 @@ export default function FileViewPage({ route = null }) {
       ? () => setShareItem(item[0])
       : (item) => setShareItem(item);
 
-  const handleDownload = () =>
-    window.open(`${BASE_URL}/file/${item[0]._id}?action=download`, "_blank");
+  // const handleDownload = () =>
+  //   window.open(`${BASE_URL}/file/${item[0]._id}?action=download`, "_blank");
 
   return (
     <>
+      {cascadeModal && (
+        <CascadeConfirmationModal
+          chain={cascadeModal.chain}
+          onCancel={handleCascadeCancel}
+          onConfirm={handleCascadeConfirm}
+          isFetching={isShareLoading}
+        />
+      )}
+      {confirmModal.open && (
+        <ConfirmationModal
+          open={confirmModal.open}
+          title={confirmModal.message}
+          action_1="Yes"
+          action_2="No"
+          onAction_1={handleConfirm}
+          onAction_2={handleCancel}
+        />
+      )}
       {isMobile ? (
         <FileViewerMobile
           key={item[0]._id}
@@ -391,7 +508,9 @@ export default function FileViewPage({ route = null }) {
           onTrash={() => handleMoveToTrash(item[0])}
           onStar={() => handleToggleStar(item)}
           onDownload={handleDownload}
-          onDeleteSuccess={() => {}}
+          onDeleteSuccess={() => {
+            console.log("on delete success");
+          }}
         />
       ) : (
         <FileViewer
@@ -410,50 +529,52 @@ export default function FileViewPage({ route = null }) {
         />
       )}
 
-      {shareItem && (
-        isMobile ? <ShareModalMobile
-         item={shareItem}
-          setItem={setItem}
-          onClose={handleToggleResourcePublic}
-          onUpdateRoleAfterSave={handleSharedRoleUpdate}
-          setShareItem={setShareItem}
-          isShareLoading={isShareLoading}
-          setIsShareLoading={setIsShareLoading}
-          selectedUsers={selectedUsers}
-          setSelectedUsers={setSelectedUsers}
-          peopleWithAccess={peopleWithAccess}
-          prevPermissions={prevPermissions}
-          setPrevPermissions={setPrevPermissions}
-          linkAccess={linkAccess}
-          setLinkAccess={setLinkAccess}
-          linkRole={linkRole}
-          setLinkRole={setLinkRole}
-          setPeopleWithAccess={setPeopleWithAccess}
-          allUsers={allUsers}
-          setAllUsers={setAllUsers}
-        /> :
-        <ShareModal
-          item={shareItem}
-          setItem={setItem}
-          onClose={handleToggleResourcePublic}
-          onUpdateRoleAfterSave={handleSharedRoleUpdate}
-          setShareItem={setShareItem}
-          isShareLoading={isShareLoading}
-          setIsShareLoading={setIsShareLoading}
-          selectedUsers={selectedUsers}
-          setSelectedUsers={setSelectedUsers}
-          peopleWithAccess={peopleWithAccess}
-          prevPermissions={prevPermissions}
-          setPrevPermissions={setPrevPermissions}
-          linkAccess={linkAccess}
-          setLinkAccess={setLinkAccess}
-          linkRole={linkRole}
-          setLinkRole={setLinkRole}
-          setPeopleWithAccess={setPeopleWithAccess}
-          allUsers={allUsers}
-          setAllUsers={setAllUsers}
-        />
-      )}
+      {shareItem &&
+        (isMobile ? (
+          <ShareModalMobile
+            item={shareItem}
+            setItem={setItem}
+            onClose={handleToggleResourcePublic}
+            onUpdateRoleAfterSave={handleSharedRoleUpdate}
+            setShareItem={setShareItem}
+            isShareLoading={isShareLoading}
+            setIsShareLoading={setIsShareLoading}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            peopleWithAccess={peopleWithAccess}
+            prevPermissions={prevPermissions}
+            setPrevPermissions={setPrevPermissions}
+            linkAccess={linkAccess}
+            setLinkAccess={setLinkAccess}
+            linkRole={linkRole}
+            setLinkRole={setLinkRole}
+            setPeopleWithAccess={setPeopleWithAccess}
+            allUsers={allUsers}
+            setAllUsers={setAllUsers}
+          />
+        ) : (
+          <ShareModal
+            item={shareItem}
+            setItem={setItem}
+            onClose={handleToggleResourcePublic}
+            onUpdateRoleAfterSave={handleSharedRoleUpdate}
+            setShareItem={setShareItem}
+            isShareLoading={isShareLoading}
+            setIsShareLoading={setIsShareLoading}
+            selectedUsers={selectedUsers}
+            setSelectedUsers={setSelectedUsers}
+            peopleWithAccess={peopleWithAccess}
+            prevPermissions={prevPermissions}
+            setPrevPermissions={setPrevPermissions}
+            linkAccess={linkAccess}
+            setLinkAccess={setLinkAccess}
+            linkRole={linkRole}
+            setLinkRole={setLinkRole}
+            setPeopleWithAccess={setPeopleWithAccess}
+            allUsers={allUsers}
+            setAllUsers={setAllUsers}
+          />
+        ))}
       {showRename && (
         <div className="gd-modal-overlay" onClick={() => setShowRename(false)}>
           <div className="gd-modal" onClick={(e) => e.stopPropagation()}>

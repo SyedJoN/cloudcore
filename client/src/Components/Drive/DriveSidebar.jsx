@@ -33,6 +33,7 @@ import { useAuth, useGDrive } from "../../Contexts";
 import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import GoogleDriveBrowser from "./GoogleDriveBrowser";
 import CircularLoader from "../Loaders/CircularLoader";
+import { useTrashDropZone } from "../../Hooks/useTrashDropZone";
 
 export const NAV_ITEMS = [
   {
@@ -228,7 +229,7 @@ export function GDrivePicker({
 
   return createPortal(
     <GoogleDriveBrowser
-    isGoogleDriveRoute={isGoogleDriveRoute}
+      isGoogleDriveRoute={isGoogleDriveRoute}
       enqueueItem={enqueueItem}
       setItemProgress={setItemProgress}
       completeItem={completeItem}
@@ -241,6 +242,32 @@ export function GDrivePicker({
       showError={showError}
     />,
     document.body,
+  );
+}
+
+const NOOP = () => {};
+
+/**
+ * One sidebar nav button. Extracted from the .map() so the drop-zone hook can
+ * be called per item (hooks can't be called inside a loop callback).
+ * Only the Trash button actually gets the drag & drop handlers.
+ */
+function NavButton({ navItem, active, onNavigate, onDropToTrash }) {
+  const { key, label, path, Icon, IconSolid } = navItem;
+  const isTrash = key === "trash";
+
+  const { isOver, dropProps } = useTrashDropZone(onDropToTrash ?? NOOP);
+
+  const DisplayIcon = active ? IconSolid : Icon;
+
+  return (
+    <button
+      className={`gd-nav-item ${active ? "active" : ""} ${isTrash ? "gd-sidebar-trash" : ""} ${isTrash && isOver ? "gd-drop-over" : ""}`}
+      onClick={() => onNavigate(path)}
+      {...(isTrash ? dropProps : {})}
+    >
+      <DisplayIcon className="w-5 h-5" size={20} /> {label}
+    </button>
   );
 }
 
@@ -260,6 +287,7 @@ export default function DriveSidebar({
   completeItem,
   handleCancelUpload,
   setDbFileId,
+  onDropToTrash, // (ids: string[]) => void  — items dropped on the Trash button
 }) {
   const { isGoogleDrive } = useGDrive();
   const { user } = useAuth();
@@ -321,18 +349,17 @@ export default function DriveSidebar({
 
       {/* Nav */}
       <nav className="gd-nav-section">
-        {NAV_ITEMS.map(({ key, label, path, Icon, IconSolid, isActive }) => {
-          const active = isActive({ dirContext, dirId });
-          const DisplayIcon = active ? IconSolid : Icon;
-          if (!isGoogleDrive && key === "google-drive") return;
+        {NAV_ITEMS.map((navItem) => {
+          if (!isGoogleDrive && navItem.key === "google-drive") return null;
+
           return (
-            <button
-              key={key}
-              className={`gd-nav-item ${active ? "active" : ""}`}
-              onClick={() => navigate(path)}
-            >
-              <DisplayIcon className="w-5 h-5" size={20} /> {label}
-            </button>
+            <NavButton
+              key={navItem.key}
+              navItem={navItem}
+              active={navItem.isActive({ dirContext, dirId })}
+              onNavigate={navigate}
+              onDropToTrash={onDropToTrash}
+            />
           );
         })}
       </nav>

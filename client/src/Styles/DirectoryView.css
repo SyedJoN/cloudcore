@@ -351,6 +351,35 @@
   gap: 4px;
   user-select: none;
 }
+/* Other grid items become inactive */
+body.gd-drag-active .gd-grid-item.gd-drag-disabled {
+  opacity: 0.35;
+  filter: grayscale(0.5);
+  pointer-events: none;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+.gd-grid-item.gd-drag-disabled {
+  opacity: 0.6!important;
+  pointer-events: none;
+}
+/* Currently dragged items remain visible */
+body.gd-drag-active .gd-grid-item.gd-drag-source {
+  opacity: 1;
+  filter: none;
+}
+.gd-drop-target {
+  outline: 2px solid #4285f4 !important;
+  background: rgba(66, 133, 244, 0.1) !important;
+}
+/* Optional background overlay */
+body.gd-drag-active::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.04);
+  pointer-events: none;
+  z-index: 100;
+}
 .gd-bottom-bar {
   position: fixed;
   bottom: 0;

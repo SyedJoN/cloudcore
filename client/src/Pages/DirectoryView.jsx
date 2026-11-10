@@ -27,6 +27,7 @@ import TopBanner from "../Components/Banners/TopBanner";
 import { useAuth, useGDrive, useBreadcrumb, useToast } from "../Contexts";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { fetchPortalUrl } from "../../apis/subscriptionApi";
+import { moveItem as moveItemFunction } from "../../apis/resourceApi";
 
 import { useDirectoryData } from "../Hooks/useDirectoryData";
 import { useUploadQueue } from "../Hooks/useUploadQueue";
@@ -64,8 +65,12 @@ export default function DirectoryView({ route }) {
   const isDesktop = device === "windows";
   const isMobile = device === "mobile";
   const { user, refreshUser } = useAuth();
-  const { checkingGoogleDrive, checkGoogleDriveAccess, isGoogleDrive, setIsGoogleDrive } =
-    useGDrive();
+  const {
+    checkingGoogleDrive,
+    checkGoogleDriveAccess,
+    isGoogleDrive,
+    setIsGoogleDrive,
+  } = useGDrive();
   const { toast } = useToast();
   const { dirId } = useParams();
   const location = useLocation();
@@ -120,14 +125,13 @@ export default function DirectoryView({ route }) {
     });
   };
 
- useEffect(() => {
+  useEffect(() => {
+    if (checkingGoogleDrive) return;
 
-  if (checkingGoogleDrive) return;
-
-  if (route === "google-drive" && isGoogleDrive === false) {
-    redirectToGoogleDriveAuth();
-  }
-}, [route, isGoogleDrive, checkingGoogleDrive]);
+    if (route === "google-drive" && isGoogleDrive === false) {
+      redirectToGoogleDriveAuth();
+    }
+  }, [route, isGoogleDrive, checkingGoogleDrive]);
 
   useEffect(() => {
     if (location.pathname.startsWith("/directory") && isMobile) {
@@ -322,6 +326,7 @@ export default function DirectoryView({ route }) {
   } = useSelectionAndContextMenu({ combinedItems, mainRef, lastDirectory });
 
   const {
+    handleUndoRef,
     isActionLoading,
     isShareLoading,
     setIsShareLoading,
@@ -330,6 +335,7 @@ export default function DirectoryView({ route }) {
     handleRowClick,
     handleRowDoubleClick,
     handleCopyItems,
+    handleMoveItems,
     handleDownloadFolder,
     handleDownload,
     handleCancelDownload,
@@ -344,6 +350,7 @@ export default function DirectoryView({ route }) {
     handleToggleStar,
     handleToggleResourcePublic,
     handleSharedRoleUpdate,
+    handleDropOnTrash,
     mobileHeaderDirName,
     showCreateDir,
     setShowCreateDir,
@@ -398,6 +405,24 @@ export default function DirectoryView({ route }) {
     showError,
   });
 
+  const handleMove = async (ids, destinationId, destinationName) => {
+  const validItems = combinedItems.filter((item) =>
+    ids.some(
+      (id) => String(id) === String(item._id ?? item.id)
+    )
+  );
+
+  if (!validItems.length) {
+    console.log("Items not found:", ids);
+    return;
+  }
+
+  await handleMoveItems(
+    validItems,
+    destinationId,
+    destinationName
+  );
+};
   useEffect(() => {
     if (selectedItems.size === 0) {
       setSelectionMode(false);
@@ -482,7 +507,19 @@ export default function DirectoryView({ route }) {
     const channel = new BroadcastChannel("file-sync");
     channel.onmessage = (event) => {
       if (event.data.type === "FILE_DELETED") {
+        const item = event.data.item;
         setFilesList((prev) => prev.filter((f) => f._id !== event.data.id));
+        toast({
+          message: "item moved to trash",
+          type: "success",
+          duration: 5000,
+          undoAction: {
+            type: "trash",
+            items: item,
+            onUndo: () =>
+              handleUndoRef.current?.({ type: "trash", items: item }),
+          },
+        });
       }
     };
     return () => channel.close();
@@ -784,6 +821,7 @@ export default function DirectoryView({ route }) {
             completeItem={completeItem}
             handleCancelUpload={handleCancelUpload}
             setDbFileId={setDbFileId}
+            onDropToTrash={handleDropOnTrash}
             refreshCurrentDirectory={refreshCurrentDirectory}
             showError={showError}
             dirId={dirId}
@@ -850,10 +888,8 @@ export default function DirectoryView({ route }) {
               (isMobile ? (
                 <MobileMoveModal
                   currentDirId={dirId}
-                  item={selectedItem}
-                  items={combinedItems.filter((i) =>
-                    selectedItems.has(i.id ?? i._id),
-                  )}
+                  item={Array.isArray(moveItem) ? moveItem[0] : moveItem}
+                  items={Array.isArray(moveItem) ? moveItem : [moveItem]}
                   route={route}
                   viewMode={viewMode}
                   onToggleView={() =>
@@ -868,10 +904,8 @@ export default function DirectoryView({ route }) {
               ) : (
                 <MoveModal
                   currentDirId={dirId}
-                  item={selectedItem}
-                  items={combinedItems.filter((i) =>
-                    selectedItems.has(i.id ?? i._id),
-                  )}
+                  item={Array.isArray(moveItem) ? moveItem[0] : moveItem}
+                  items={Array.isArray(moveItem) ? moveItem : [moveItem]}
                   route={route}
                   viewMode={viewMode}
                   onToggleView={() =>
@@ -884,7 +918,6 @@ export default function DirectoryView({ route }) {
                   onClose={() => setMoveItem(null)}
                 />
               ))}
-
             {isLoading ? (
               <div className={`gd-loading ${isMobile ? "mobile" : ""}`}>
                 <div className="gd-spinner" />
@@ -952,6 +985,7 @@ export default function DirectoryView({ route }) {
                     isHomeRoute={isHomeRoute}
                     items={combinedItems}
                     open={open}
+                    onMove={handleMove}
                     setOpen={setOpen}
                     selectionMode={selectionMode}
                     setSelectionMode={setSelectionMode}

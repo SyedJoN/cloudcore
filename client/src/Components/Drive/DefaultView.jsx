@@ -29,6 +29,7 @@ const DefaultView = ({
   dirId,
   selectedItems,
   setSelectedItems,
+  handleDropOnTrash,
   handleSelectAll,
   onSelect,
   onToggleView,
@@ -39,6 +40,7 @@ const DefaultView = ({
   onDownload,
   onRename,
   onShare,
+  onMove,
   onContextMenu,
   listHeaderRow,
   isStarred,
@@ -50,7 +52,6 @@ const DefaultView = ({
   setOpen,
   setContextItem,
 }) => {
-  
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
   const { device } = useDevice();
@@ -257,8 +258,12 @@ const DefaultView = ({
                     selectedItemsSize={selectedItems.size}
                     selectedItems={selectedItems}
                     handleSelectAll={handleSelectAll}
+                    handleDropOnTrash={handleDropOnTrash}
                     selectionMode={selectionMode}
                     setSelectionMode={setSelectionMode}
+ onMove={(ids, destinationId, destinationName) => {
+  onMove?.(ids, destinationId, destinationName);
+}}
                     onSelect={onSelect}
                     onDownload={onDownload}
                     onRename={onRename}
@@ -307,8 +312,12 @@ const DefaultView = ({
                   selectedItems={selectedItems}
                   selectedItemsSize={selectedItems.size}
                   handleSelectAll={handleSelectAll}
+                  handleDropOnTrash={handleDropOnTrash}
                   selectionMode={selectionMode}
                   setSelectionMode={setSelectionMode}
+          onMove={(ids, destinationId, destinationName) => {
+  onMove?.(ids, destinationId, destinationName);
+}}
                   onSelect={onSelect}
                   onDownload={onDownload}
                   onRename={onRename}

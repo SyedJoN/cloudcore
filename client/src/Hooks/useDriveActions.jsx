@@ -2,6 +2,8 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES, getFileType } from "../../Utils/displayUtils";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
+import { moveItem as moveItemFunction } from "../../apis/resourceApi";
+
 import {
   deleteFile,
   grantAccessById,
@@ -31,6 +33,8 @@ const EMPTY_CONFIRM = { open: false, message: "", resolve: null };
 export function useDriveActions({
   dirId,
   user,
+  item,
+  setItem,
   setDirectoriesList,
   setFilesList,
   isStarredRoute,
@@ -1093,6 +1097,14 @@ export function useDriveActions({
           setFilesList((prev) =>
             prev.filter((i) => !ids.has(String(i._id ?? i.id))),
           );
+          if (item) {
+            const channel = new BroadcastChannel("file-sync");
+            channel.postMessage({
+              type: "FILE_DELETED",
+              id: item.map((i) => i._id)[0],
+              item: item,
+            });
+          }
 
           if (isUndo) return;
           toast({
@@ -1393,7 +1405,11 @@ export function useDriveActions({
             prev._id === renameId ? { ...prev, name: renameValue } : prev,
           );
         }
-
+        if (item) {
+          setItem((prev) =>
+            prev.map((item) => ({ ...item, name: renameValue })),
+          );
+        }
         setDirectoriesList((prev) =>
           prev.map((item) =>
             (item.id ?? item._id) === renameId
@@ -1530,7 +1546,69 @@ export function useDriveActions({
       toast,
     ],
   );
+  const handleMoveItems = useCallback(
+    async (items, destinationId, destinationName, isUndo = false) => {
+      try {
+        if (!items?.length || !destinationId) return;
 
+        const message = await moveItemFunction({
+          items,
+          destinationId,
+          destinationName,
+        });
+
+        const movedIds = new Set(items.map((i) => String(i._id ?? i.id)));
+
+        // Current lists se moved items remove karo
+        setDirectoriesList((prev) =>
+          prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+        );
+
+        setFilesList((prev) =>
+          prev.filter((i) => !movedIds.has(String(i._id ?? i.id))),
+        );
+
+        if (isUndo) return;
+
+        toast({
+          message: message || "Items moved successfully",
+          type: "success",
+          duration: 5000,
+          undoAction: {
+            type: "move",
+            items,
+            previousDestinationId: dirId,
+            previousDestinationName: lastDirectory?.name || "My Drive",
+            onUndo: () =>
+              handleUndoRef.current?.({
+                type: "move",
+                items,
+                previousDestinationId: dirId,
+                previousDestinationName: lastDirectory?.name || "My Drive",
+              }),
+          },
+        });
+
+        clearSelection();
+      } catch (error) {
+        toast({
+          message:
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to move items",
+          type: "error",
+        });
+      }
+    },
+    [
+      dirId,
+      lastDirectory,
+      setDirectoriesList,
+      setFilesList,
+      toast,
+      clearSelection,
+    ],
+  );
   /* ───────────── Undo (defined after the handlers it calls) ───────────── */
 
   const handleUndo = useCallback(
@@ -1538,7 +1616,14 @@ export function useDriveActions({
       try {
         if (!undoAction) return;
         const items = undoAction?.items;
-
+        if (undoAction.type === "move") {
+          await handleMoveItems(
+            items,
+            undoAction.previousDestinationId,
+            undoAction.previousDestinationName,
+            true,
+          );
+        }
         if (undoAction.type === "trash") {
           await handleRestoreItem(items, true);
 
@@ -1608,11 +1693,24 @@ export function useDriveActions({
     handleToggleStarRef.current = handleToggleStar;
   }, [handleToggleStar]);
 
+  const handleDropOnTrash = useCallback(
+    async (ids) => {
+      const idSet = new Set(ids.map(String));
+      const items = combinedItems.filter((i) =>
+        idSet.has(String(i._id ?? i.id)),
+      );
+      if (!items.length) return;
+      await handleMoveToTrash(items); // toast + Undo pehle se hai
+    },
+    [combinedItems, handleMoveToTrash],
+  );
   return {
+    handleUndoRef,
     isActionLoading,
     isShareLoading,
     setIsShareLoading,
     handleCascadeConfirm,
+    handleDropOnTrash,
     handleCascadeCancel,
     handleRowClick,
     handleRowDoubleClick,
@@ -1627,6 +1725,7 @@ export function useDriveActions({
     handleDelete,
     handleRestoreItem,
     handleCreateDirectory,
+    handleMoveItems,
     openRename,
     handleRenameSubmit,
     handleToggleStar,
