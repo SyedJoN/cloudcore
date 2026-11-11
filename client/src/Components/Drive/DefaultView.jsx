@@ -141,20 +141,22 @@ const DefaultView = ({
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
   const isGoogleDriveRoute = route === "google-drive";
-  const handleMultiContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const selectedObjects = combinedItems.filter((item) =>
-      selectedItems.has(item.id ?? item._id),
-    );
-    if (!selectedObjects.length) return;
+const handleMultiContextMenu = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
 
-    onContextMenu?.(e, selectedObjects);
-  };
+  const selectedIds = new Set([...selectedItems].map(String));
+const getId = (i) => String(i?.id ?? i?._id);
+
+  const ids = combinedItems
+    .map(getId)             
+    .filter((id) => selectedIds.has(String(id)));
+
+  if (!ids.length) return;
+
+
+  onContextMenu?.(e, ids);
+};
   return (
     <div className="gd-drive">
       {device === "windows" && (

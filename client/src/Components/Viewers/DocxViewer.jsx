@@ -34,7 +34,7 @@ export default function DocxViewer({ url }) {
 
   return (
     <>
-      {loading && <p>Loading...</p>}
+      {loading && <p className="flex items-center justify-center h-full">Loading...</p>}
       <div ref={ref} className="fv-office-doc" />
     </>
   );

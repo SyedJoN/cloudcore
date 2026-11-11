@@ -165,6 +165,7 @@ export default function DriveToolbarMobile({
           aria-label="More options"
           aria-haspopup="dialog"
           onClick={(e) => {
+            e.stopPropagation();
             handleSelect?.(dirId);
             onContextMenu?.(e, dirId);
           }}

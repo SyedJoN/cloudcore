@@ -23,9 +23,9 @@ export default function MobileGridItem({
   onContextMenu,
   // NEW
   pickerMode = false, // used inside the move modal: no menu / selection / long-press
-  disabled = false,   // greyed-out and static
-  onOpen,             // called when an enabled card is tapped in picker mode
-}) {      
+  disabled = false, // greyed-out and static
+  onOpen, // called when an enabled card is tapped in picker mode
+}) {
   const { user } = useAuth();
   const { isGoogleDrive } = useGDrive();
   const [hasImgError, setHasImgError] = useState(false);
@@ -59,12 +59,12 @@ export default function MobileGridItem({
 
   useEffect(() => () => clearTimeout(pressTimer.current), []);
 
- const handlePressStart = (e) => {
-  if (disabled) return; // no press effect on greyed-out cards
-  if (e.target.closest(".mgi-trailing")) return;
-  clearTimeout(pressTimer.current);
-  setPressed(true);
-};
+  const handlePressStart = (e) => {
+    if (disabled) return; // no press effect on greyed-out cards
+    if (e.target.closest(".mgi-trailing")) return;
+    clearTimeout(pressTimer.current);
+    setPressed(true);
+  };
   const handlePressEnd = () => {
     clearTimeout(pressTimer.current);
     // quick tap me bhi press 120ms tak dikhe
@@ -95,26 +95,26 @@ export default function MobileGridItem({
     }
   };
 
- const handleClick = () => {
-  if (disabled) return;
-  if (pickerMode) {
-    onOpen?.(item);
-    return;
-  }
-  if (selectionMode) {
-    handleToggle(itemId);
-    return;
-  }
-  onDoubleClick?.(type, itemId, item.name);
-};
+  const handleClick = () => {
+    if (disabled) return;
+    if (pickerMode) {
+      onOpen?.(item);
+      return;
+    }
+    if (selectionMode) {
+      handleToggle(itemId);
+      return;
+    }
+    onDoubleClick?.(type, itemId, item.name);
+  };
 
-const handleContextMenu = (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  if (pickerMode || selectionMode) return;
-  setSelectedItems(new Set([itemId]));
-  setSelectionMode(true);
-};
+  const handleContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (pickerMode || selectionMode) return;
+    setSelectedItems(new Set([itemId]));
+    setSelectionMode(true);
+  };
 
   const handleKebab = (e) => {
     e.stopPropagation();
@@ -146,7 +146,7 @@ const handleContextMenu = (e) => {
 
   return (
     <div
-    className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""}`}
+      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""}`}
       data-id={itemId}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -166,33 +166,32 @@ const handleContextMenu = (e) => {
         </span>
         <span className="mgi-name">{item.name}</span>
         {!pickerMode && (
-<button
-          type="button"
-          className="mgi-trailing"
-          aria-label={selectionMode ? "Select item" : "More actions"}
-          onClick={handleKebab}
-        >
-          {selectionMode ? (
-            <span className={`mgi-check ${selected ? "on" : ""}`}>
-              {selected && (
-                <svg viewBox="0 0 24 24" width="12" height="12">
-                  <path
-                    d="m5 12 4 4L19 6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </span>
-          ) : (
-            <IconDots className="h-5 w-5" />
-          )}
-        </button>
+          <button
+            type="button"
+            className="mgi-trailing"
+            aria-label={selectionMode ? "Select item" : "More actions"}
+            onClick={handleKebab}
+          >
+            {selectionMode ? (
+              <span className={`mgi-check ${selected ? "on" : ""}`}>
+                {selected && (
+                  <svg viewBox="0 0 24 24" width="12" height="12">
+                    <path
+                      d="m5 12 4 4L19 6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </span>
+            ) : (
+              <IconDots className="h-5 w-5" />
+            )}
+          </button>
         )}
-        
       </div>
 
       {/* Preview: big folder icon, or the file thumbnail */}

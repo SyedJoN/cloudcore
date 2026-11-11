@@ -382,8 +382,8 @@ const resolveRole = async (
 
 const EXPORT_MAP = {
   "application/vnd.google-apps.document": {
-    mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ext: ".docx",
+    mime: "application/pdf",
+    ext: ".pdf",
   },
   "application/vnd.google-apps.spreadsheet": {
     mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -629,12 +629,17 @@ export const completeUpload = async (req, res, next) => {
   }
 };
 
+
 export const getFileById = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?._id;
+
     const file = await File.findById(id);
-    if (!file) return res.status(404).json({ message: "File not found" });
+
+    if (!file) {
+      return res.status(404).json({ message: "File not found" });
+    }
 
     if (!file.isPublic && req.user?.role !== "superuser") {
       const parentDir = await Directory.findById(file.parentDirId).lean();
@@ -651,44 +656,52 @@ export const getFileById = async (req, res, next) => {
         });
 
         if (!canRead.allowed) {
-          return res
-            .status(403)
-            .json({ message: "You don't have access to this file" });
+          return res.status(403).json({
+            message: "You don't have access to this file",
+          });
         }
       }
     }
 
     const s3Key = `${file._id}${file.extension}`;
-    if (req.query.action === "download") {
-      const url = getCreateCloudfrontSignedUrl({
-        path: s3Key,
-        download: true,
-        fileName: file.name,
-      });
-      return res.redirect(url);
-    }
+
     const url = getCreateCloudfrontSignedUrl({
       path: s3Key,
+      download: req.query.action === "download",
       fileName: file.name,
     });
 
-    const s3Response = await fetch(url);
-    if (!s3Response.ok) {
-      return res.status(s3Response.status).send("Failed to fetch file");
-    }
-    const contentType = s3Response.headers.get("content-type");
-    if (!contentType?.startsWith("text/")) {
-      return res.redirect(url);
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      return res.status(response.status).send("Failed to fetch file");
     }
 
-    res.setHeader("Content-Type", contentType || "text/plain");
-    await file.save();
+    res.setHeader(
+      "Content-Type",
+      response.headers.get("content-type") ||
+        "application/octet-stream"
+    );
 
-    return Readable.fromWeb(s3Response.body).pipe(res);
+    const contentLength = response.headers.get("content-length");
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+
+    if (req.query.action === "download") {
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${file.name.replace(/["\\]/g, "_")}"`
+      );
+    }
+
+    return Readable.fromWeb(response.body).pipe(res);
+
   } catch (error) {
     next(error);
   }
 };
+
 
 export const getFileMetaById = async (req, res, next) => {
   try {
