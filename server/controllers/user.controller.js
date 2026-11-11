@@ -26,6 +26,7 @@ export const getCurrentUser = async (req, res, next) => {
       plan: req.user.plan,
       uploadLimit: req.user.uploadLimit,
       totalStorage: req.user.totalStorage,
+      parentDirId: req.user.parentDirId,
       totalUsage: rootDir?.size ?? 0,
     });
   } catch (error) {

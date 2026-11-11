@@ -15,12 +15,15 @@
     "@react-oauth/google": "^0.13.4",
     "@tailwindcss/vite": "^4.3.2",
     "axios": "^1.16.1",
+    "docx-preview": "^0.4.1",
+    "dompurify": "^3.4.17",
     "lucide-react": "^1.24.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",
     "react-router-dom": "^7.1.1",
     "tailwindcss": "^4.3.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

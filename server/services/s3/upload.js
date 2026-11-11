@@ -10,7 +10,7 @@ export const getSignedUploadUrl = async (key, contentType) => {
   });
 
   const url = await getSignedUrl(s3, command, {
-    expiresIn: 3600,
+    expiresIn: 300,
     signableHeaders: new Set(['content-type']),
   });
 

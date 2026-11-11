@@ -380,32 +380,83 @@ const resolveRole = async (
   };
 };
 
-export const uploadDriveFileToS3 = async (req, res, next) => {
+const EXPORT_MAP = {
+  "application/vnd.google-apps.document": {
+    mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ext: ".docx",
+  },
+  "application/vnd.google-apps.spreadsheet": {
+    mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ext: ".xlsx",
+  },
+  "application/vnd.google-apps.presentation": {
+    mime: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ext: ".pptx",
+  },
+};
+
+export const uploadDriveFileToS3 = async (req, res) => {
   const { driveFileId } = req.body;
   const { drive_access_token } = req.signedCookies;
 
   if (!drive_access_token) {
-    return res.status(401).json({
-      message: "Missing token",
-    });
+    return res.status(401).json({ message: "Missing token" });
   }
 
-  const drive = getDriveClient(drive_access_token);
-  const fileResponse = await drive.files.get(
-    {
-      fileId: driveFileId,
-      alt: "media",
-    },
-    {
-      responseType: "arraybuffer",
-    },
-  );
+  try {
+    const drive = getDriveClient(drive_access_token);
 
-  const buffer = Buffer.from(fileResponse.data);
-  return res.status(201).json({
-    message: "File uploaded successfully",
-    buffer,
-  });
+    const meta = await drive.files.get({
+      fileId: driveFileId,
+      fields: "mimeType,name,capabilities/canDownload",
+      supportsAllDrives: true,
+    });
+    const { mimeType, name, capabilities } = meta.data;
+
+    if (capabilities?.canDownload === false) {
+      return res.status(403).json({ message: "The owner has disabled downloading for this file" });
+    }
+
+    let fileResponse;
+    let outMime = mimeType;
+    let outName = name;
+
+    if (mimeType.startsWith("application/vnd.google-apps.")) {
+      const target = EXPORT_MAP[mimeType];
+      if (!target) {
+        return res.status(415).json({ message: "This Google file type can't be imported" });
+      }
+      fileResponse = await drive.files.export(
+        { fileId: driveFileId, mimeType: target.mime },
+        { responseType: "arraybuffer" },
+      );
+      outMime = target.mime;
+      outName = name.endsWith(target.ext) ? name : name + target.ext;
+    } else {
+      fileResponse = await drive.files.get(
+        { fileId: driveFileId, alt: "media", supportsAllDrives: true },
+        { responseType: "arraybuffer" },
+      );
+    }
+
+    const buffer = Buffer.from(fileResponse.data);
+    return res.status(201).json({
+      message: "File fetched successfully",
+      buffer,
+      contentType: outMime,
+      name: outName,
+      size: buffer.length,
+    });
+  } catch (err) {
+    const status = err.code ?? err.response?.status ?? 500;
+    const reason = err.errors?.[0]?.reason ?? err.response?.data?.error?.errors?.[0]?.reason;
+    console.error("Drive fetch failed:", status, reason, err.message);
+
+    return res.status(status === 401 || status === 403 || status === 404 ? status : 500).json({
+      message: err.message,
+      reason,
+    });
+  }
 };
 export const generateSignedUploadUrl = async (req, res, next) => {
   const { name, size, contentType } = req.body;
@@ -528,6 +579,8 @@ export const completeUpload = async (req, res, next) => {
     try {
       const contentLength = await getFileSize(s3Key);
       if (uploadedFile.size !== contentLength) {
+        console.log("uploadFIle.size", uploadedFile.size)
+        console.log("uploacontentLengthdFIle.size", contentLength)
         await deleteFileFromS3(s3Key);
         await uploadedFile.deleteOne();
         return res.status(400).json({ message: "File size dosen't match" });
