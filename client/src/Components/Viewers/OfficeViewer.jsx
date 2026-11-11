@@ -1,64 +1,55 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { IconDownload } from "../Icons/Icons";
 
-export default function OfficeViewer({ BASE_URL, item, category }) {
-  const ref = useRef(null);
-  const [html, setHtml] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const url = `${BASE_URL}/file/${item._id}`;
+function OfficeViewer({ BASE_URL, item, category }) {
+  const fileUrl = `${BASE_URL}/file/${item._id}`;
+  // Try Microsoft Office Online viewer (requires publicly accessible URL — show fallback)
+  const [useMicrosoft] = useState(false); // set true if your server is public
 
-  useEffect(() => {
-    if (category === "office-ppt") return;
+  const appMap = {
+    "office-word": "Word",
+    "office-excel": "Excel",
+    "office-ppt": "PowerPoint",
+  };
+  const iconMap = {
+    "office-word": { color: "#185abd", label: "DOCX" },
+    "office-excel": { color: "#107c41", label: "XLSX" },
+    "office-ppt": { color: "#c43e1c", label: "PPTX" },
+  };
+  const info = iconMap[category] || { color: "#5f6368", label: "FILE" };
 
-    let cancelled = false;
-    setError("");
-    setHtml("");
-    setLoading(true);
-    if (ref.current) ref.current.innerHTML = "";
-
-    (async () => {
-      try {
-        const res = await fetch(url, { credentials: "include" });
-        if (!res.ok) throw new Error(`Failed: ${res.status}`);
-
-        if (category === "office-word") {
-          const { renderAsync } = await import("docx-preview");
-          const blob = await res.blob();
-          if (!cancelled && ref.current) await renderAsync(blob, ref.current);
-        } else if (category === "office-excel") {
-          const XLSX = await import("xlsx");
-          const DOMPurify = (await import("dompurify")).default;
-          const wb = XLSX.read(await res.arrayBuffer());
-          const raw = XLSX.utils.sheet_to_html(wb.Sheets[wb.SheetNames[0]]);
-          if (!cancelled) setHtml(DOMPurify.sanitize(raw));
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [url, category]);
-
-  if (category === "office-ppt")
-    return <p>PPTX ka preview abhi available nahi. Download karein.</p>;
-  if (error) return <p className="flex justify-center items-center h-full">Preview load nahi hua: {error}</p>;
+  if (useMicrosoft) {
+    const encoded = encodeURIComponent(fileUrl);
+    return (
+      <div className="fv-office-stage">
+        <iframe
+          className="fv-pdf-frame"
+          src={`https://view.officeapps.live.com/op/embed.aspx?src=${encoded}`}
+          title={appMap[category]}
+        />
+      </div>
+    );
+  }
 
   return (
-    <>
-      {loading && <p>Loading...</p>}
-      {category === "office-word" ? (
-        <div ref={ref} className="fv-office-doc" />
-      ) : (
-        <div
-          className="fv-office-sheet"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      )}
-    </>
+    <div className="fv-unknown-stage">
+      <div className="fv-unknown-icon" style={{ background: info.color }}>
+        {info.label}
+      </div>
+      <p className="fv-unknown-name">{item.name}</p>
+      <p className="fv-unknown-hint">
+        Office files can't be previewed directly.
+        <br />
+        Download the file to open it in {appMap[category]}.
+      </p>
+      <a
+        href={fileUrl}
+        download={item.name}
+        className="fv-unknown-download-btn"
+      >
+        <IconDownload size={16} /> Download to view
+      </a>
+    </div>
   );
 }
+export default OfficeViewer;

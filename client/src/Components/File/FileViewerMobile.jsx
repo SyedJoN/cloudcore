@@ -19,6 +19,7 @@ import {
   AudioViewer,
   VideoViewer,
   ImageViewer,
+  DocxViewer,
 } from "../Viewers";
 
 import getCategory from "../../../Utils/getFileCategory";
@@ -367,7 +368,8 @@ export default function FileViewerMobile({
         return <PDFViewer url={fileUrl} />;
       case "text":
         return <TextViewer url={fileUrl} name={item?.name} />;
-      case "office-word":
+          case "office-word":
+                return <DocxViewer key={item?._id} url={fileUrl} />;
       case "office-excel":
       case "office-ppt":
         return <OfficeViewer item={item} category={category} />;

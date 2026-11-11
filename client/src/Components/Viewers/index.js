@@ -5,3 +5,4 @@ export { default as PDFViewer } from "./PDFViewer";
 export { default as AudioViewer } from "./AudioViewer";
 export { default as VideoViewer } from "./VideoViewer";
 export { default as ImageViewer } from "./ImageViewer";
+export { default as DocxViewer } from "./DocxViewer";

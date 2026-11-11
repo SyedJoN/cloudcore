@@ -13,6 +13,7 @@ import UserAccountBar from "../UserAccountBar";
 import { useLocation } from "react-router-dom";
 import {
   OfficeViewer,
+  DocxViewer,
   UnknownViewer,
   TextViewer,
   PDFViewer,
@@ -183,18 +184,24 @@ export default function FileViewer({
         return <PDFViewer url={fileUrl} />;
       case "text":
         return <TextViewer url={fileUrl} name={item?.name} />;
+
+      // sirf docx ke liye alag viewer
       case "office-word":
+        return <DocxViewer key={item?._id} url={fileUrl} />;
+
+      // excel / ppt: purana viewer, koi change nahi
       case "office-excel":
       case "office-ppt":
         return (
           <OfficeViewer BASE_URL={BASE_URL} item={item} category={category} />
         );
+
       default:
         return <UnknownViewer item={item} />;
     }
   };
 
-  // ITEM CHECK (hooks ke baad)
+  // ITEM CHECK (saare hooks ke baad)
   if (!item) return null;
 
   const ext = getExt(item.name || "").toUpperCase();
@@ -239,14 +246,7 @@ export default function FileViewer({
                 disabled={!hasPrev}
                 title="Previous (←)"
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -261,14 +261,7 @@ export default function FileViewer({
                 disabled={!hasNext}
                 title="Next (→)"
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="9 18 15 12 9 6" />
                 </svg>
               </button>
@@ -361,7 +354,7 @@ export default function FileViewer({
               </button>
             )}
 
-            {/* Delete forever (trash mein ya Google Drive file) */}
+            {/* Delete forever (trash ya Google Drive file) */}
             {canDelete && (isDeleted || isGDrive) && (
               <button
                 className="fv-action-btn gd-icon-btn fv-action-danger"
