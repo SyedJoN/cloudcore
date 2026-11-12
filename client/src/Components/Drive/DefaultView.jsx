@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   applyRecentFilters,
   DEFAULT_RECENT_FILTERS,
 } from "./Recent/ApplyRecentFilters";
-import { GoogleDriveCard, GridItem, ListRow } from ".";
+import { GridItem, ListRow } from ".";
 import {
   ChevronLeftIcon,
   EllipsisVerticalIcon,
 } from "@heroicons/react/24/solid";
 import RecentFilters from "./Recent/RecentFilters";
-import { useNavigate } from "react-router-dom";
 import SortButton from "../ListRow/SortButton";
 import { useAuth } from "../../Contexts";
 import { useDevice } from "../../Contexts/DeviceContext";
@@ -22,10 +21,10 @@ const DefaultView = ({
   items,
   sortConfig,
   setSortConfig,
+  setSortedFilesForViewer,
   combinedItems,
   viewMode,
   isGoogleDrive,
-  isHomeRoute,
   dirId,
   selectedItems,
   setSelectedItems,
@@ -48,13 +47,13 @@ const DefaultView = ({
   route,
   onStar,
   clearSelection,
-  open,
-  setOpen,
-  setContextItem,
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
   const { device } = useDevice();
+
+  const isDesktop = device === "windows";
+  const isMobile = device === "mobile";
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -126,40 +125,42 @@ const DefaultView = ({
     return data;
   }, [filteredItems, sortConfig]);
 
-  const ItemComponent =
-    device === "windows"
-      ? viewMode === "grid"
-        ? GridItem
-        : ListRow
-      : viewMode === "grid"
-        ? MobileGridItem
-        : MobileListRow;
+  useEffect(() => {
+    setSortedFilesForViewer(sortedItems.filter((i) => !i.isDirectory));
+  }, [sortedItems]);
+
+  const ItemComponent = isDesktop
+    ? viewMode === "grid"
+      ? GridItem
+      : ListRow
+    : viewMode === "grid"
+      ? MobileGridItem
+      : MobileListRow;
 
   const FoldersOnTop =
-    device === "windows" && viewMode === "grid" && sortConfig.folders === "top";
+    isDesktop && viewMode === "grid" && sortConfig.folders === "top";
 
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
   const isGoogleDriveRoute = route === "google-drive";
-const handleMultiContextMenu = (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+  const handleMultiContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  const selectedIds = new Set([...selectedItems].map(String));
-const getId = (i) => String(i?.id ?? i?._id);
+    const selectedIds = new Set([...selectedItems].map(String));
+    const getId = (i) => String(i?.id ?? i?._id);
 
-  const ids = combinedItems
-    .map(getId)             
-    .filter((id) => selectedIds.has(String(id)));
+    const ids = combinedItems
+      .map(getId)
+      .filter((id) => selectedIds.has(String(id)));
 
-  if (!ids.length) return;
+    if (!ids.length) return;
 
-
-  onContextMenu?.(e, ids);
-};
+    onContextMenu?.(e, ids);
+  };
   return (
     <div className="gd-drive">
-      {device === "windows" && (
+      {isDesktop && (
         <RecentFilters
           items={items}
           filters={filters}
@@ -167,11 +168,11 @@ const getId = (i) => String(i?.id ?? i?._id);
           user={user}
         />
       )}
-      {device === "windows"
+      {isDesktop
         ? viewMode === "grid"
         : true && (
             <div className="sort-btn pb-2 -mx-1.5 py-2">
-              {device === "mobile" ? (
+              {isMobile ? (
                 <SortButtonMobile
                   viewMode={viewMode}
                   onToggleView={onToggleView}
@@ -189,7 +190,7 @@ const getId = (i) => String(i?.id ?? i?._id);
             </div>
           )}
 
-      {device === "windows" ? viewMode === "list" && listHeaderRow : null}
+      {isDesktop ? viewMode === "list" && listHeaderRow : null}
 
       {sortedItems.length === 0 ? (
         <div className="gd-empty">
@@ -237,9 +238,7 @@ const getId = (i) => String(i?.id ?? i?._id);
           )}
 
           {FoldersOnTop && containsDirectory && (
-            <div
-              className={`gd-grid ${device === "mobile" ? "" : "gd-grid-on-top"}`}
-            >
+            <div className={`gd-grid ${isMobile ? "" : "gd-grid-on-top"}`}>
               {sortedItems
                 .filter((s) => s.isDirectory)
                 .map((item) => (
@@ -263,9 +262,9 @@ const getId = (i) => String(i?.id ?? i?._id);
                     handleDropOnTrash={handleDropOnTrash}
                     selectionMode={selectionMode}
                     setSelectionMode={setSelectionMode}
- onMove={(ids, destinationId, destinationName) => {
-  onMove?.(ids, destinationId, destinationName);
-}}
+                    onMove={(ids, destinationId, destinationName) => {
+                      onMove?.(ids, destinationId, destinationName);
+                    }}
                     onSelect={onSelect}
                     onDownload={onDownload}
                     onRename={onRename}
@@ -286,10 +285,10 @@ const getId = (i) => String(i?.id ?? i?._id);
           <div
             className={
               viewMode === "grid"
-                ? device === "mobile"
+                ? isMobile
                   ? "mgi-grid"
                   : "gd-grid"
-                : device === "mobile"
+                : isMobile
                   ? "gd-list mobile"
                   : "gd-list"
             }
@@ -317,9 +316,9 @@ const getId = (i) => String(i?.id ?? i?._id);
                   handleDropOnTrash={handleDropOnTrash}
                   selectionMode={selectionMode}
                   setSelectionMode={setSelectionMode}
-          onMove={(ids, destinationId, destinationName) => {
-  onMove?.(ids, destinationId, destinationName);
-}}
+                  onMove={(ids, destinationId, destinationName) => {
+                    onMove?.(ids, destinationId, destinationName);
+                  }}
                   onSelect={onSelect}
                   onDownload={onDownload}
                   onRename={onRename}

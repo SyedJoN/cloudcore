@@ -53,33 +53,7 @@ function ImageViewer({ url, name }) {
         }}
         draggable={false}
       />
-      {device === "windows" && 
-      <div className="fv-zoom-controls">
-        <button
-          className="fv-zoom-btn"
-          onClick={() => setZoom((z) => Math.min(5, z + 0.25))}
-        >
-          +
-        </button>
-        <span className="fv-zoom-label">{Math.round(zoom * 100)}%</span>
-        <button
-          className="fv-zoom-btn"
-          onClick={() => setZoom((z) => Math.max(0.1, z - 0.25))}
-        >
-          −
-        </button>
-        <button
-          className="fv-zoom-btn"
-          onClick={() => {
-            setZoom(1);
-            setOffset({ x: 0, y: 0 });
-          }}
-          title="Reset"
-        >
-          ⊙
-        </button>
-      </div>
-}
+     
     </div>
   );
 }

@@ -610,7 +610,6 @@ export default function ContextMenu({
   setShowCreateMenu,
   ...rest
 }) {
-  console.log({item, items})
   const [mounted, setMounted] = useState(false);
 
   const [render, setRender] = useState({

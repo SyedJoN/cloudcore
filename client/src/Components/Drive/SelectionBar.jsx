@@ -37,7 +37,6 @@ export default function SelectionBar({
 
   const isMulti = targets.length > 1;
   const item = targets[0];
-  console.log('targets', targets)
 
   // Actions are enabled only if EVERY selected item allows them.
   const every = (fn) => targets.every(fn);

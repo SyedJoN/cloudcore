@@ -103,9 +103,6 @@ export default function DirectoryView({ route }) {
 
   const [viewMode, setViewMode] = useState("grid");
 
-  // const [shareItem, setShareItem] = useState(null);
-
-  // const [isShareLoading, setIsShareLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDetails, setShowDetails] = useState(false);
   const [isStarred, setIsStarred] = useState(false);
@@ -114,6 +111,7 @@ export default function DirectoryView({ route }) {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [sortedFilesForViewer, setSortedFilesForViewer] = useState([]);
   const [inDirectory, setInDirectory] = useState(false);
   const [animate, setAnimate] = useState(false);
 
@@ -1000,6 +998,7 @@ export default function DirectoryView({ route }) {
                     setSelectionMode={setSelectionMode}
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
+                    setSortedFilesForViewer={setSortedFilesForViewer}
                     viewMode={viewMode}
                     dirId={dirId}
                     selectedItems={selectedItems}
@@ -1585,7 +1584,7 @@ export default function DirectoryView({ route }) {
           isStarred={isStarred}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
-          files={filteredFiles}
+          files={sortedFilesForViewer}
           onNavigate={(item) => setViewItem([item])}
           onDownload={async (payload) => {
             const items = Array.isArray(payload)
