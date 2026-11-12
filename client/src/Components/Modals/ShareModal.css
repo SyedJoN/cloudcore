@@ -49,6 +49,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px 0;
+  padding-bottom: 8px;
 }
 .gd-share-header h2 {
   font-size: 18px;

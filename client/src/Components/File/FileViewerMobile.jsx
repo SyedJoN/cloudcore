@@ -7,6 +7,7 @@ import {
   IconLink,
   IconRestore,
   IconNewTab,
+  PrintIcon,
 } from "../Icons/Icons";
 import "./FileViewer.css"; // viewers (fv-pdf-stage etc.) still rely on these styles
 import UserAccountBar from "../UserAccountBar";
@@ -55,6 +56,7 @@ export default function FileViewerMobile({
   onTrash,
   onRename,
   onStar,
+  onPrint,
   onDownload,
   onRestore,
   onDeleteForever,
@@ -272,6 +274,10 @@ export default function FileViewerMobile({
     );
   };
 
+  // image panes get centered, every other viewer fills the pane
+  const paneClass = (cat, isGDriveFile) =>
+    cat === "image" && !isGDriveFile ? "flex items-center justify-center" : "";
+
   /* ---------- effects ---------- */
 
   // safety net in case transitionend never fires
@@ -380,9 +386,21 @@ export default function FileViewerMobile({
 
   /* ---------- render ---------- */
 
+  const prevCat = prevFile ? getCategory(prevFile.name || "") : "";
+  const nextCat = nextFile ? getCategory(nextFile.name || "") : "";
+  const prevIsGDrive = route && Boolean(prevFile?.webViewLink);
+  const nextIsGDrive = route && Boolean(nextFile?.webViewLink);
+
   return (
     <>
-      <div className="fixed inset-0 z-500 flex flex-col bg-(--surface-white)">
+      {/* 100dvh = real visible height on mobile (address bar aware) */}
+      <div
+        className="fixed inset-x-0 top-0 z-500 flex flex-col bg-(--surface-white)"
+        style={{
+          height: "100dvh",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
         {/* ── Top bar ── */}
         <div
           className="flex shrink-0 items-center gap-1 px-3 pb-1"
@@ -453,7 +471,7 @@ export default function FileViewerMobile({
           >
             {/* previous */}
             <div
-              className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+              className={`pointer-events-none relative h-full overflow-hidden bg-(--surface-white) ${paneClass(prevCat, prevIsGDrive)}`}
               style={{ flex: "0 0 33.3333%" }}
               aria-hidden="true"
             >
@@ -462,7 +480,7 @@ export default function FileViewerMobile({
 
             {/* current */}
             <div
-              className="relative h-full overflow-hidden bg-(--surface-white)"
+              className={`relative h-full overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
               style={{ flex: "0 0 33.3333%" }}
             >
               {renderViewer()}
@@ -470,7 +488,7 @@ export default function FileViewerMobile({
 
             {/* next */}
             <div
-              className="pointer-events-none relative h-full overflow-hidden bg-(--surface-white)"
+              className={`pointer-events-none relative h-full overflow-hidden bg-(--surface-white) ${paneClass(nextCat, nextIsGDrive)}`}
               style={{ flex: "0 0 33.3333%" }}
               aria-hidden="true"
             >
@@ -570,7 +588,12 @@ export default function FileViewerMobile({
                     }}
                   />
                   <Divider />
-
+                  <SheetItem
+                    icon={<PrintIcon size={22} />}
+                    label="Print"
+                    disabled={isDeleted || !canDownload}
+                    onClick={run(() => onPrint?.(item))}
+                  />
                   <SheetItem
                     icon={<IconDownload size={22} />}
                     label="Download"

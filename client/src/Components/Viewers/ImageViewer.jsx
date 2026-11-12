@@ -35,7 +35,7 @@ function ImageViewer({ url, name }) {
   return (
     <div
       ref={stageRef}
-      className="fv-image-stage"
+      className="fv-image-stage flex justify-center items-center"
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}

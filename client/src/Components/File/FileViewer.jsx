@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import printJS from "print-js";
 
 import {
   IconClose,
@@ -10,6 +9,7 @@ import {
   IconRename,
   IconLink,
   IconRestore,
+  PrintIcon,
 } from "../Icons/Icons";
 import "./FileViewer.css";
 import UserAccountBar from "../UserAccountBar";
@@ -101,6 +101,7 @@ export default function FileViewer({
   onRename,
   onStar,
   onDownload,
+  onPrint,
   onRestore,
   onDeleteForever,
   onDeleteSuccess,
@@ -205,55 +206,6 @@ export default function FileViewer({
     }
   };
 
-  //Print
-
-const handlePrint = async () => {
-  if (isGDrive) return window.open(item?.webViewLink, "_blank");
-
-  document.getElementById("printJS")?.remove();
-
-  // Word printing whats render on the screen
-if (category === "office-word") {
-  return printJS({
-    printable: "gdv-stage",
-    type: "html",
-    scanStyles: false, // screen ki padding/width copy na ho
-    documentTitle: item?.name,
-    style: `
-      @page { margin: 0; }
-      html, body { margin: 0; padding: 0; background: #fff; }
-      #gdv-stage { padding: 0 !important; display: block !important; }
-      .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
-      .docx-wrapper > section.docx {
-        margin: 0 auto !important;
-        box-shadow: none !important;
-        page-break-after: always;
-      }
-    `,
-  });
-}
-
-  if (category === "pdf") {
-    try {
-      const res = await fetch(fileUrl, { credentials: "include" });
-      if (!res.ok) throw new Error();
-      const blobUrl = URL.createObjectURL(await res.blob());
-      return printJS({ printable: blobUrl, type: "pdf" });
-    } catch {
-      return toast({ message: "Failed to print", type: "error" });
-    }
-  }
-
-  // Image
-  printJS({
-    printable: `${fileUrl}?t=${Date.now()}`,
-    type: "image",
-    header: item?.name,
-    headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
-    imageStyle: "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
-    style: "@page { margin: 0; }",
-  });
-};
 
   // VIEWER
   const renderViewer = () => {
@@ -310,7 +262,7 @@ if (category === "office-word") {
   return createPortal(
     <div className="gdv-overlay" onClick={(e) => e.stopPropagation()}>
       <div
-      id="gdv-stage"
+        id="gdv-stage"
         className={`gdv-stage ${isMedia && !isGDrive ? "gdv-stage-media" : "gdv-stage-fill"}`}
         onClick={handleStageClick}
       >
@@ -347,28 +299,15 @@ if (category === "office-word") {
           {device === "windows" && (
             <div className="gdv-actions">
               {!isDeleted && canDownload && (
-  <button
-    type="button"
-    className="gdv-icon-btn"
-    title="Print"
-    onClick={handlePrint}
-  >
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="6 9 6 2 18 2 18 9" />
-      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <rect x="6" y="14" width="12" height="8" />
-    </svg>
-  </button>
-)}
+                <button
+                  type="button"
+                  className="gdv-icon-btn"
+                  title="Print"
+                  onClick={onPrint}
+                >
+             <PrintIcon/>
+                </button>
+              )}
               {!isDeleted && canDownload && (
                 <button
                   type="button"

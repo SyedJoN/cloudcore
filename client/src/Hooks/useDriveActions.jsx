@@ -3,6 +3,7 @@ import { getResourceType } from "../../Utils/getResourceType";
 import { DRIVE_ROLES, getFileType } from "../../Utils/displayUtils";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import { moveItem as moveItemFunction } from "../../apis/resourceApi";
+import printJS from "print-js";
 
 import {
   deleteFile,
@@ -17,6 +18,7 @@ import {
 import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useNavigate } from "react-router-dom";
+import getCategory from "../../Utils/getFileCategory";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -318,6 +320,57 @@ export function useDriveActions({
     [isGoogleDriveRoute, showError],
   );
 
+  /* ───────────── Print ───────────── */
+
+  const handlePrint = useCallback(async (item) => {
+    if (isGoogleDriveRoute) return window.open(item?.webViewLink, "_blank");
+    const category = getCategory(item?.name || "");
+    const fileUrl = isGoogleDriveRoute
+      ? item?.webContentLink || item?.webViewLink
+      : `${BASE_URL}/file/${item?._id}`;
+
+    document.getElementById("printJS")?.remove();
+
+    // Word printing whats render on the screen
+    if (category === "office-word") {
+      return printJS({
+        printable: "gdv-stage",
+        type: "html",
+        scanStyles: false, // screen's padding/width ignored
+        style: `
+        @page { margin: 0; }
+        html, body { margin: 0; padding: 0; background: #fff; }
+        #gdv-stage { padding: 0 !important; display: block !important; }
+        .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
+        .docx-wrapper > section.docx {
+          margin: 0 auto !important;
+          box-shadow: none !important;
+          page-break-after: always;
+        }
+      `,
+      });
+    }
+
+    if (category === "pdf") {
+      try {
+        const res = await fetch(fileUrl, { credentials: "include" });
+        if (!res.ok) throw new Error();
+        const blobUrl = URL.createObjectURL(await res.blob());
+        return printJS({ printable: blobUrl, type: "pdf" });
+      } catch {
+        return toast({ message: "Failed to print", type: "error" });
+      }
+    }
+
+    // Image
+    printJS({
+      printable: `${fileUrl}?t=${Date.now()}`,
+      type: "image",
+      headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
+      imageStyle: "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
+      style: "@page { margin: 0; }",
+    });
+  }, [isGoogleDriveRoute]);
   /* ───────────── Sharing ───────────── */
 
   const handleToggleResourcePublic = useCallback(
@@ -644,20 +697,19 @@ export function useDriveActions({
             ),
           );
 
-        const setList =
-  removeType === "folder"
-    ? (value) => {
-        setDirectoriesList(value);
-        setViewItem(value);
-        setItem(value);
+          const setList =
+            removeType === "folder"
+              ? (value) => {
+                  setDirectoriesList(value);
+                  setViewItem(value);
+                  setItem(value);
+                }
+              : (value) => {
+                  setFilesList(value);
+                  setViewItem(value);
 
-      }
-    : (value) => {
-        setFilesList(value);
-        setViewItem(value);
-
-        setItem(value);
-      };
+                  setItem(value);
+                };
           const sameItem = (resource) =>
             String(resource?._id ?? resource?.id) === String(itemId);
 
@@ -699,7 +751,7 @@ export function useDriveActions({
                   ? { ...prev, permissions: updatedPeopleWithAccess }
                   : prev,
             );
-               setItem((prev) =>
+            setItem((prev) =>
               Array.isArray(prev)
                 ? prev
                 : prev
@@ -718,7 +770,7 @@ export function useDriveActions({
           setError("Too many requests. Try again later.");
           return;
         }
-        console.log('er', error)
+        console.log("er", error);
         toast({
           message: error?.message || "Something went wrong!",
           type: "error",
@@ -1813,6 +1865,7 @@ export function useDriveActions({
     handleRowDoubleClick,
     handleCopyItems,
     handleUndo,
+    handlePrint,
     handleDownloadFolder,
     handleDownload,
     handleCancel,

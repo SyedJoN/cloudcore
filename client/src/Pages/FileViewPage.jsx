@@ -118,6 +118,7 @@ export default function FileViewPage({ route = null }) {
   const {
     isShareLoading,
     setIsShareLoading,
+    handlePrint,
     handleDownload,
     handleMoveToTrash,
     openRename,
@@ -386,7 +387,7 @@ export default function FileViewPage({ route = null }) {
     try {
       const data = await getFileByMetaId(fileId);
       setItem([data]);
-      setViewItem([data])
+      setViewItem([data]);
     } catch (error) {
       setError(error.message || "Failed to load file");
       console.log(error);
@@ -502,9 +503,10 @@ export default function FileViewPage({ route = null }) {
       )}
       {isMobile ? (
         <FileViewerMobile
-           key={item.map((it) => it?._id)}
+          key={item.map((it) => it?._id)}
           item={item}
           meta={true}
+          onPrint={handlePrint}
           isStarred={isStarred}
           onClose={closeViewer}
           onRename={openRename}
@@ -527,6 +529,7 @@ export default function FileViewPage({ route = null }) {
           isGDrive={false}
           onRename={openRename}
           onShare={handleShare}
+          onPrint={handlePrint}
           onTrash={() => handleMoveToTrash(item[0])}
           onStar={() => handleToggleStar(item)}
           onDownload={handleDownload}
@@ -536,7 +539,7 @@ export default function FileViewPage({ route = null }) {
       {shareItem &&
         (isMobile ? (
           <ShareModalMobile
-             item={shareItem}
+            item={shareItem}
             setItem={setItem}
             setDirectoriesList={setDirectoriesList}
             setFilesList={setFilesList}

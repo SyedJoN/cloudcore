@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-
+import CircularLoader from "../Loaders/CircularLoader.jsx";
 export default function DocxViewer({ url }) {
   const ref = useRef(null);
   const [error, setError] = useState("");
@@ -34,8 +34,12 @@ export default function DocxViewer({ url }) {
 
   return (
     <>
-      {loading && <p className="flex items-center justify-center h-full">Loading...</p>}
-      <div ref={ref} className="fv-office-doc" />
+      {loading && (
+        <div className="flex justify-center items-center w-full p-2">
+          <CircularLoader />
+        </div>
+      )}
+      <div ref={ref} className={`${loading ? "hidden" : ""} fv-office-doc`} />
     </>
   );
 }

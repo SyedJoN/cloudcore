@@ -35,7 +35,19 @@
   inset: auto !important;
   transform: none !important;
 }
+.fv-image-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
+.fv-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
 .gdv-stage-media img,
 .gdv-stage-media video {
   display: block;

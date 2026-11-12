@@ -334,6 +334,7 @@ export default function DirectoryView({ route }) {
     handleRowDoubleClick,
     handleCopyItems,
     handleMoveItems,
+    handlePrint,
     handleDownloadFolder,
     handleDownload,
     handleCancelDownload,
@@ -1246,6 +1247,7 @@ export default function DirectoryView({ route }) {
             onClose={() => {
               setOpen(false);
             }}
+            onPrint={handlePrint}
             onDownload={async (payload) => {
               const items = Array.isArray(payload)
                 ? payload
@@ -1503,9 +1505,10 @@ export default function DirectoryView({ route }) {
           item={viewItem}
           isStarred={isStarred}
           onClose={() => setViewItem([])}
+          onPrint={handlePrint}
           handleSelect={handleSelect}
           isSharedRoute={isSharedRoute}
-          files={filteredFiles}
+          files={sortedFilesForViewer}
           onNavigate={(item) => setViewItem([item])}
           onContextMenu={handleContextMenu}
           onDownload={async (item) => {
@@ -1581,6 +1584,7 @@ export default function DirectoryView({ route }) {
         <FileViewer
           key={viewItem?._id}
           item={viewItem}
+          onPrint={handlePrint}
           isStarred={isStarred}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
