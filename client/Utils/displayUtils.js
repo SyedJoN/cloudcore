@@ -1,28 +1,27 @@
 export function getFileType(filename) {
   const ext = filename.split(".").pop().toLowerCase();
-  if (["pdf"].includes(ext)) return "pdf";
+
+  if (ext === "pdf") return "pdf";
+
+  if (["doc", "docx"].includes(ext)) return "word";
+
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext))
     return "image";
-  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "video";
-  if (["zip", "rar", "tar", "gz", "7z"].includes(ext)) return "archive";
+
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext))
+    return "video";
+
+  if (["zip", "rar", "tar", "gz", "7z"].includes(ext))
+    return "archive";
+
   if (
     [
-      "js",
-      "jsx",
-      "ts",
-      "tsx",
-      "html",
-      "css",
-      "py",
-      "java",
-      "go",
-      "rs",
-      "cpp",
-      "c",
-      "cs",
+      "js", "jsx", "ts", "tsx", "html", "css",
+      "py", "java", "go", "rs", "cpp", "c", "cs",
     ].includes(ext)
   )
     return "code";
+
   return "alt";
 }
 export function getFileIcon(name = "") {

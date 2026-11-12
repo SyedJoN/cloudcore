@@ -10,15 +10,28 @@ export function useDropZone(onDropIds, { enabled = true } = {}) {
     setIsOver(false);
   }, []);
 
-  const onDragEnter = useCallback(
-    (e) => {
-      if (!enabled || !hasDriveDrag(e)) return;
-      e.preventDefault();
-      depth.current += 1;
-      setIsOver(true);
-    },
-    [enabled],
-  );
+
+
+const onDragEnter = useCallback(
+  (e) => {
+
+    if (!enabled || !hasDriveDrag(e)) return;
+    e.preventDefault();
+    depth.current += 1;
+    setIsOver(true);
+  },
+  [enabled],
+);
+
+const onDragLeave = useCallback(
+  (e) => {
+   
+    if (!enabled || !hasDriveDrag(e)) return;
+    depth.current = Math.max(0, depth.current - 1);
+    if (depth.current === 0) setIsOver(false);
+  },
+  [enabled],
+);
 
   const onDragOver = useCallback(
     (e) => {
@@ -29,14 +42,7 @@ export function useDropZone(onDropIds, { enabled = true } = {}) {
     [enabled],
   );
 
-  const onDragLeave = useCallback(
-    (e) => {
-      if (!enabled || !hasDriveDrag(e)) return;
-      depth.current = Math.max(0, depth.current - 1);
-      if (depth.current === 0) setIsOver(false);
-    },
-    [enabled],
-  );
+
 
   const onDrop = useCallback(
     (e) => {
@@ -55,4 +61,6 @@ export function useDropZone(onDropIds, { enabled = true } = {}) {
     dropProps: enabled ? { onDragEnter, onDragOver, onDragLeave, onDrop } : {},
   };
 }
+
+
 export const useTrashDropZone = (onDropIds) => useDropZone(onDropIds);

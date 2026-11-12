@@ -1,7 +1,5 @@
 import { IconFolder } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
-import { getFileType } from "../../../Utils/displayUtils";
-import { formatDate } from "../../../Utils/formatDate";
 import { formatSize } from "../../../Utils/formatHelpers";
 import { useAuth, useGDrive } from "../../Contexts";
 import { useState } from "react";
@@ -13,6 +11,7 @@ import RecentRoute from "../ListRow/RecentRoute";
 import { FolderIcon, InboxIcon, UsersIcon } from "@heroicons/react/24/solid";
 import TrashRoute from "../ListRow/TrashRoute";
 import StarredRoute from "../ListRow/StarredRoute";
+import { getFileKind } from "../../../Utils/fileKind";
 
 const currentYear = new Date().getFullYear();
 
@@ -126,7 +125,7 @@ export default function ListRow({
       ? "google-file"
       : "file";
 
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
 
   const itemId = item.id ?? item._id;
 

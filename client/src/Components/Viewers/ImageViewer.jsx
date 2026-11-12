@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useDevice } from "../../Contexts/DeviceContext";
 
 function ImageViewer({ url, name }) {
-  const [zoom, setZoom] = useState(1);
-  const {device} = useDevice();
+  const [zoom, setZoom] = useState(1)
   const [drag, setDrag] = useState(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const stageRef = useRef(null);

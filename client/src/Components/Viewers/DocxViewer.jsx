@@ -35,7 +35,7 @@ export default function DocxViewer({ url }) {
   return (
     <>
       {loading && (
-        <div className="flex justify-center items-center w-full p-2">
+        <div className="flex justify-center items-center w-full h-full p-2">
           <CircularLoader />
         </div>
       )}

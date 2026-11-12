@@ -26,13 +26,13 @@ import {
   ImageViewer,
 } from "../Viewers";
 
-import getCategory from "../../../Utils/getFileCategory";
 import { useAuth, useToast } from "../../Contexts";
 import getExt from "../../../Utils/getExtension";
 
 import { StarIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
 import { useDevice } from "../../Contexts/DeviceContext";
+import { getItemCategory } from "../../../Utils/fileKind";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -117,7 +117,7 @@ export default function FileViewer({
 
   const isGoogle = Boolean(item?.webViewLink);
   const isDeleted = item?.isDeleted;
-  const category = getCategory(item?.name || "");
+  const category = getItemCategory(item);
   const isGDrive = route && isGoogle;
 
   const fileUrl = isGDrive
@@ -263,7 +263,7 @@ export default function FileViewer({
     <div className="gdv-overlay" onClick={(e) => e.stopPropagation()}>
       <div
         id="gdv-stage"
-        className={`gdv-stage ${isMedia && !isGDrive ? "gdv-stage-media" : "gdv-stage-fill"}`}
+        className={`gdv-stage ${isMedia && !isGDrive ? "gdv-stage-media" : "gdv-stage-fill flex items-center"}`}
         onClick={handleStageClick}
       >
         {renderViewer()}
@@ -303,7 +303,7 @@ export default function FileViewer({
                   type="button"
                   className="gdv-icon-btn"
                   title="Print"
-                  onClick={onPrint}
+                  onClick={()=>onPrint(item)}
                 >
              <PrintIcon/>
                 </button>

@@ -24,12 +24,13 @@ import { FolderInput } from "lucide-react";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 import DetailsPageMobile from "./DetailsPageMobile";
 import { Divider } from "../Divider";
-import { getCountLabel, getFileType } from "../../../Utils/displayUtils";
+import { getCountLabel } from "../../../Utils/displayUtils";
 import FileBadge from "../File/FileBadge";
+import { getFileKind } from "../../../Utils/fileKind";
 
 /* File name at the top; becomes a back row inside the "Open with" view */
 
-export function SheetHeader({ title, onBack, item, iconType }) {
+export function SheetHeader({ title, onBack, item, iconType, isMulti }) {
   return (
     <div className="flex items-center gap-3 px-6 pb-3 pt-1">
       {onBack && (
@@ -43,7 +44,7 @@ export function SheetHeader({ title, onBack, item, iconType }) {
       )}
 
       <div className="flex min-w-0 flex-1 items-center gap-2 truncate text-[18px] font-medium text-(--text-primary)">
-        {item && (
+        {item && !isMulti && (
           <div className="flex shrink-0 items-center">
             {item.isDirectory ? (
               <IconFolder
@@ -56,7 +57,7 @@ export function SheetHeader({ title, onBack, item, iconType }) {
           </div>
         )}
 
-        <span className="min-w-0 truncate px-2 text-base">{title}</span>
+        <span className={`min-w-0 truncate pr-2 ${!isMulti ? "pl-2" : "pl-0"}`}>{title}</span>
       </div>
     </div>
   );
@@ -90,7 +91,7 @@ export default function MobileContextMenu({
 
   const isMulti = targets.length > 1;
   const item = targets[0];
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
 
   // "main" = full menu, "openWith" = Preview / Open in new tab (single only)
   const [view, setView] = useState("main");
@@ -279,7 +280,7 @@ export default function MobileContextMenu({
               className="mobile-context-menu w-full shrink-0"
               aria-hidden={view === "openWith"}
             >
-              <SheetHeader title={headerTitle} item={item} iconType={iconType} />
+              <SheetHeader title={headerTitle} item={item} iconType={iconType} isMulti={isMulti} />
 
               <div className="max-h-[70vh] overflow-y-auto py-2">
                 {showDeleteActions ? (

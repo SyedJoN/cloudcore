@@ -14,7 +14,7 @@
   --surface-container-dark: #e9eef6;
   --surface-container-mobile-dark: #f6fafe;
   --surface-container-dark-hover: #f6fafe;
-  --surface-container-mobile-dark-hover: #e9eef6;;
+  --surface-container-mobile-dark-hover: #e9eef6;
   --btn-bg-medium: rgba(32, 33, 36, 0.08);
   --border-inverse: #000000;
   --border: #e0e0e0;
@@ -30,8 +30,10 @@
   --accent-blue-hover: #add1e9;
   --accent-blue-light: #c2e7ff;
   --accent-blue-light-hover: #cee6f6;
-  --toast-bg-mobile: #131314;
-  --toast-text-mobile: #fff;
+  --accent-blue-dark-outine: #1765cc;
+  --accent-blue-badge: #f1f1f1;
+  --monochrome-bg-mobile: #131314;
+  --monochrome-text-mobile: #fff;
   --btn-hover-primary: rgba(32, 33, 36, 0.08);
   --sidebar-width: 256px;
   --header-height: 64px;
@@ -64,6 +66,8 @@
   --accent-blue: #a8c7fa;
   --accent-blue-light: #023f65;
   --accent-blue-hover-dark: #004a77;
+  --accent-blue-dark-outine: #c2e7ff;
+  --accent-blue-badge: #1765cc;
   --text-primary: #e3e3e3;
   --text-secondary: #c4c7c5;
   --text-btn: #062e6f;
@@ -78,8 +82,8 @@
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
   --btn-bg-medium: #37393b;
-  --toast-bg-mobile: #fff;
-  --toast-text-mobile: #131314;
+  --monochrome-bg-mobile: #fff;
+  --monochrome-text-mobile: #131314;
 }
 body {
   font-family: var(--font-main);

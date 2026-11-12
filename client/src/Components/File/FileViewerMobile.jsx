@@ -23,7 +23,6 @@ import {
   DocxViewer,
 } from "../Viewers";
 
-import getCategory from "../../../Utils/getFileCategory";
 import { useAuth, useToast } from "../../Contexts";
 
 import {
@@ -39,9 +38,9 @@ import { BottomSheet, SheetItem } from "../Drive/BottomSheet";
 import DetailsPageMobile from "../Drive/DetailsPageMobile";
 import { Divider } from "../Divider";
 import { SheetHeader } from "../Drive/MobileContextMenu";
-import { getFileType } from "../../../Utils/displayUtils";
 import UserAccountDrawerMobile from "../UserAccountDrawerBar";
 import { UseAvatar } from "../../Hooks/useAvatar";
+import { getFileKind, getItemCategory } from "../../../Utils/fileKind";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -102,15 +101,17 @@ export default function FileViewerMobile({
 
   /* ---------- item info ---------- */
 
-  const iconType = item?.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item?.isDirectory ? null : getFileKind(item);
 
   const isGoogle = Boolean(item?.webViewLink);
   const isDeleted = Boolean(item?.isDeleted);
   const isGDrive = route && isGoogle;
-  const category = getCategory(item?.name || "");
+  const category = getItemCategory(item);
   const fileUrl = isGDrive
     ? item?.webContentLink || item?.webViewLink
     : `${BASE_URL}/file/${item?._id}`;
+
+    console.log('cat', category)
 
   /* ---------- capabilities (same rules as MobileContextMenu) ---------- */
 
@@ -256,7 +257,7 @@ export default function FileViewerMobile({
   const renderNeighbor = (file) => {
     if (!file) return null;
 
-    const cat = getCategory(file.name || "");
+    const cat = getItemCategory(file);
     const isGDriveFile = route && Boolean(file.webViewLink);
 
     if (cat === "image" && !isGDriveFile) {
@@ -386,8 +387,8 @@ export default function FileViewerMobile({
 
   /* ---------- render ---------- */
 
-  const prevCat = prevFile ? getCategory(prevFile.name || "") : "";
-  const nextCat = nextFile ? getCategory(nextFile.name || "") : "";
+  const prevCat = prevFile ? getItemCategory(prevFile) : "";
+  const nextCat = nextFile ? getItemCategory(nextFile) : "";
   const prevIsGDrive = route && Boolean(prevFile?.webViewLink);
   const nextIsGDrive = route && Boolean(nextFile?.webViewLink);
 
@@ -480,7 +481,7 @@ export default function FileViewerMobile({
 
             {/* current */}
             <div
-              className={`relative h-full overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
+              className={`relative ${["pdf", "office-word", "office-excel", "office-ppt"].includes(category) ? "" : "flex justify-center items-center"} h-full overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
               style={{ flex: "0 0 33.3333%" }}
             >
               {renderViewer()}

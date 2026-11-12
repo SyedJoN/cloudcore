@@ -14,7 +14,7 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
   const [isUploading, setIsUploading] = useState(false);
   const [dbFileId, setDbFileId] = useState("");
   const fileInputRef = useRef(null);
-  const {user, refreshUser} = useAuth();
+  const { user, refreshUser } = useAuth();
 
   const isUploadingRef = useRef(false);
 
@@ -87,7 +87,9 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
       const needed = Number(current.size) - totalStorageLeft;
 
       if (Number(current.size) > totalStorageLeft) {
-        showError(`Storage is full. You need ${formatSize(needed)} more storage client`);
+        showError(
+          `Storage is full. You need ${formatSize(needed)} more storage client`,
+        );
         await refreshUser();
         await handleCancelUpload(current._id);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -96,10 +98,10 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
       }
 
       try {
-        const { uploadUrl, fileId } = await getSignedUploadUrl({
+        const { uploadUrl, fileId, contentType } = await getSignedUploadUrl({
           name: current.file.name,
           size: current.file.size,
-          contentType: current.file.type,
+          contentType: current.file.type || "application/octet-stream",
           parentDirId: dirId,
         });
         setDbFileId(fileId);
@@ -144,7 +146,8 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
         });
 
         setUploadXhrMap((prev) => ({ ...prev, [current._id]: xhr }));
-        xhr.setRequestHeader("Content-Type", current.file.type);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.send(current.file);
         xhr.send(current.file);
       } catch (error) {
         showError(error.message || "Failed fetching uploadUrl");
@@ -160,14 +163,18 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
       const selected = Array.from(e.target.files);
 
       if (user.uploadLimit !== null && user.uploadLimit == 0) {
-        showError("Uploads are paused. Please complete your payment to continue");
+        showError(
+          "Uploads are paused. Please complete your payment to continue",
+        );
         e.target.value = "";
         return;
       }
 
       if (!selected.length) return;
 
-      const validFiles = selected.filter((file) => file.size <= user.uploadLimit);
+      const validFiles = selected.filter(
+        (file) => file.size <= user.uploadLimit,
+      );
       e.target.value = "";
 
       if (!validFiles.length) {

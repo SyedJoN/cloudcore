@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
-import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
 import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
 import "./MobileGridItem.css";
+import { getFileKind } from "../../../Utils/fileKind";
 
 export default function MobileGridItem({
   item,
@@ -47,7 +46,7 @@ export default function MobileGridItem({
       ? "google-file"
       : "file";
 
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
   const itemId = item._id ?? item.id;
 
   const modified = item.modifiedTime

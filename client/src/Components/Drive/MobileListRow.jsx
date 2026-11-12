@@ -1,16 +1,12 @@
 import {
-  ChevronLeftIcon,
-  EllipsisVerticalIcon,
   StarIcon,
 } from "@heroicons/react/24/solid";
 import { IconDots, IconFolder } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
-import { getFileType } from "../../../Utils/displayUtils";
-import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import { useAuth, useGDrive } from "../../Contexts";
-import { Divider } from "../Divider";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import "./MobileListRow.css";
+import { getFileKind } from "../../../Utils/fileKind";
 const currentYear = new Date().getFullYear();
 
 // same helper as in ListRow, move it to Utils/formatDate and import it in both
@@ -81,7 +77,7 @@ export default function MobileListRow({
       ? "google-file"
       : "file";
 
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
   const starred = Boolean(isStarred[item._id]);
 
   /* ---------- subtitle: "You opened · 3:45 PM" ---------- */

@@ -1,6 +1,7 @@
 import { createWriteStream } from "fs";
 import { rename, rm } from "fs/promises";
 import path from "path";
+import mime from "mime-types";
 import { Readable } from "node:stream";
 import { fileURLToPath } from "url";
 import Directory from "../models/directory.model.js";
@@ -35,6 +36,7 @@ import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
 import { getCreateCloudfrontSignedUrl } from "../services/s3/cloudfront.js";
 import { sanitizeText } from "../utils/sanitizeText.js";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -414,7 +416,9 @@ export const uploadDriveFileToS3 = async (req, res) => {
     const { mimeType, name, capabilities } = meta.data;
 
     if (capabilities?.canDownload === false) {
-      return res.status(403).json({ message: "The owner has disabled downloading for this file" });
+      return res
+        .status(403)
+        .json({ message: "The owner has disabled downloading for this file" });
     }
 
     let fileResponse;
@@ -424,7 +428,9 @@ export const uploadDriveFileToS3 = async (req, res) => {
     if (mimeType.startsWith("application/vnd.google-apps.")) {
       const target = EXPORT_MAP[mimeType];
       if (!target) {
-        return res.status(415).json({ message: "This Google file type can't be imported" });
+        return res
+          .status(415)
+          .json({ message: "This Google file type can't be imported" });
       }
       fileResponse = await drive.files.export(
         { fileId: driveFileId, mimeType: target.mime },
@@ -449,15 +455,47 @@ export const uploadDriveFileToS3 = async (req, res) => {
     });
   } catch (err) {
     const status = err.code ?? err.response?.status ?? 500;
-    const reason = err.errors?.[0]?.reason ?? err.response?.data?.error?.errors?.[0]?.reason;
+    const reason =
+      err.errors?.[0]?.reason ?? err.response?.data?.error?.errors?.[0]?.reason;
     console.error("Drive fetch failed:", status, reason, err.message);
 
-    return res.status(status === 401 || status === 403 || status === 404 ? status : 500).json({
-      message: err.message,
-      reason,
-    });
+    return res
+      .status(status === 401 || status === 403 || status === 404 ? status : 500)
+      .json({
+        message: err.message,
+        reason,
+      });
   }
 };
+const MIME_RE = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
+
+const normalizeMime = (value) => {
+  const clean = String(value || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  return MIME_RE.test(clean) ? clean : "application/octet-stream";
+};
+
+// Return: { ext, mime } ya null (txt/csv/json like files dosent contain signature)
+export async function sniffS3Object(key) {
+  try {
+    const { Body } = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+        Range: "bytes=0-65535",
+      }),
+    );
+    try {
+      return (await fileTypeFromStream(Body)) ?? null;
+    } finally {
+      Body.destroy?.();
+    }
+  } catch {
+    return null; // client's mimetype will be used as a fallback
+  }
+}
 export const generateSignedUploadUrl = async (req, res, next) => {
   const { name, size, contentType } = req.body;
 
@@ -466,67 +504,45 @@ export const generateSignedUploadUrl = async (req, res, next) => {
   const totalStorage = req.user.totalStorage;
   const uploadLimit = req.user.uploadLimit;
 
-  let fileName = sanitizeFilename(name) || "untitled";
-  const fileExt = path.extname(fileName);
-  const fileType = contentType || "application/octet-stream";
+  const fileType = normalizeMime(contentType);
   const fileSize = Number(size || 0);
-  const derivedExtension = "." + contentType.split("/")[1];
-  let responded;
+
+  // naam: extension nahi hai aur type pata hai to laga do, warna naam waisa hi rehne do
+  let fileName = sanitizeFilename(name) || "untitled";
+  const knownExt =
+    fileType === "application/octet-stream" ? false : mime.extension(fileType);
+  if (!path.extname(fileName) && knownExt) fileName += `.${knownExt}`;
+
+  // S3 key ke liye extension hamesha chahiye (pehle yeh ".undefined" ya ".octet-stream" ban jati thi)
+  const extension = path.extname(fileName) || ".bin";
+
+  if (!fileSize || fileSize > uploadLimit) {
+    return res.status(413).json({ message: "File too large" });
+  }
+
   let uploadedFile;
 
-  const safeResponse = async (status, payload) => {
-    if (responded) return;
-    responded = true;
-    return res.status(status).json(payload);
-  };
-  if (!derivedExtension) {
-    return safeResponse(400, {
-      message: "Unsupported or missing content type!",
-    });
-  }
-  if (!fileExt.trim()) {
-    fileName += derivedExtension;
-  }
-  if (!fileSize || fileSize > uploadLimit) {
-    return res.status(413).json({
-      message: "File too large",
-    });
-  }
-
   try {
-    const parentDir = await Directory.findOne({
-      _id: parentDirId,
-      userId,
-    });
-
+    const parentDir = await Directory.findOne({ _id: parentDirId, userId });
     if (!parentDir) {
-      return safeResponse(404, {
-        message: "Parent directory not found",
-      });
+      return res.status(404).json({ message: "Parent directory not found" });
     }
 
-    const subscription = await Subscription.findOne({
-      userId,
-    });
-
+    const subscription = await Subscription.findOne({ userId });
     if (subscription && subscription.status !== "active") {
-      await updateUserPlan(userId, {
-        uploadLimit: 0,
-      });
-      return res.status(403).json({
-        message: "Your subscription is not active.",
-      });
+      await updateUserPlan(userId, { uploadLimit: 0 });
+      return res
+        .status(403)
+        .json({ message: "Your subscription is not active." });
     }
 
-    const rootDir = await Directory.findOne({
-      userId,
-    }).lean();
+    const rootDir = await Directory.findOne({ userId }).lean();
 
     const totalStorageLeft = totalStorage - rootDir.size;
-    const needed = fileSize - totalStorageLeft;
     if (fileSize > totalStorageLeft) {
-      return safeResponse(507, {
-        message: `Stroage is full. You need ${formatSize(needed)} more storage`,
+      const needed = fileSize - totalStorageLeft;
+      return res.status(507).json({
+        message: `Storage is full. You need ${formatSize(needed)} more storage`,
       });
     }
 
@@ -537,7 +553,8 @@ export const generateSignedUploadUrl = async (req, res, next) => {
 
     uploadedFile = await File.insertOne({
       name: fileName,
-      extension: fileExt || derivedExtension,
+      extension,
+      mimeType: fileType, // abhi client ka bataya hua; upload ke baad sniff se override hoga
       size: fileSize,
       isUploading: true,
       parentDirId: parentDir._id,
@@ -545,6 +562,7 @@ export const generateSignedUploadUrl = async (req, res, next) => {
       currentPlan,
       userId,
     });
+
     const s3Key = `${uploadedFile._id}${uploadedFile.extension}`;
     const url = await getSignedUploadUrl(s3Key, fileType);
 
@@ -559,7 +577,6 @@ export const generateSignedUploadUrl = async (req, res, next) => {
     return next(error);
   }
 };
-
 export const completeUpload = async (req, res, next) => {
   const { fileId } = req.body;
   const userId = req.user._id;
@@ -579,8 +596,8 @@ export const completeUpload = async (req, res, next) => {
     try {
       const contentLength = await getFileSize(s3Key);
       if (uploadedFile.size !== contentLength) {
-        console.log("uploadFIle.size", uploadedFile.size)
-        console.log("uploacontentLengthdFIle.size", contentLength)
+        console.log("uploadFIle.size", uploadedFile.size);
+        console.log("uploacontentLengthdFIle.size", contentLength);
         await deleteFileFromS3(s3Key);
         await uploadedFile.deleteOne();
         return res.status(400).json({ message: "File size dosen't match" });
@@ -613,6 +630,19 @@ export const completeUpload = async (req, res, next) => {
 
       return next(err);
     }
+    const detected = await sniffS3Object(s3Key);
+    const declaredIsGeneric =
+      !uploadedFile.mimeType ||
+      uploadedFile.mimeType === "application/octet-stream";
+
+    if (
+      detected &&
+      detected.ext !== "cfb" &&
+      (detected.mime !== "application/zip" || declaredIsGeneric)
+    ) {
+      uploadedFile.mimeType = detected.mime;
+    }
+
     uploadedFile.isUploading = false;
     await uploadedFile.save();
     await updateParentDirSize(uploadedFile.parentDirId, uploadedFile.size);
@@ -620,6 +650,8 @@ export const completeUpload = async (req, res, next) => {
     return res.status(201).json({
       message: "File uploaded successfully",
       fileId: uploadedFile._id,
+      uploadUrl: url,
+      contentType: fileType,
     });
   } catch (error) {
     if (uploadedFile) {
@@ -628,7 +660,6 @@ export const completeUpload = async (req, res, next) => {
     return next(error);
   }
 };
-
 
 export const getFileById = async (req, res, next) => {
   try {
@@ -679,8 +710,7 @@ export const getFileById = async (req, res, next) => {
 
     res.setHeader(
       "Content-Type",
-      response.headers.get("content-type") ||
-        "application/octet-stream"
+      response.headers.get("content-type") || "application/octet-stream",
     );
 
     const contentLength = response.headers.get("content-length");
@@ -691,17 +721,15 @@ export const getFileById = async (req, res, next) => {
     if (req.query.action === "download") {
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${file.name.replace(/["\\]/g, "_")}"`
+        `attachment; filename="${file.name.replace(/["\\]/g, "_")}"`,
       );
     }
 
     return Readable.fromWeb(response.body).pipe(res);
-
   } catch (error) {
     next(error);
   }
 };
-
 
 export const getFileMetaById = async (req, res, next) => {
   try {
@@ -1076,7 +1104,8 @@ export const softDeleteFile = async (req, res, next) => {
     const ids = req.body?.ids ?? [req.params.id]; // single OR multiple
 
     const files = await File.find({ _id: { $in: ids } });
-    if (!files.length) return res.status(404).json({ message: "File not found!" });
+    if (!files.length)
+      return res.status(404).json({ message: "File not found!" });
 
     // permission check per file
     const checks = await Promise.all(
@@ -1091,9 +1120,12 @@ export const softDeleteFile = async (req, res, next) => {
     const allowed = files.filter(
       (_, i) => user.role === "superuser" || checks[i].allowed,
     );
-    if (!allowed.length) return res.status(403).json({ message: "Unauthorized!" });
+    if (!allowed.length)
+      return res.status(403).json({ message: "Unauthorized!" });
 
-    const owned = allowed.filter((f) => f.userId.toString() === user._id.toString());
+    const owned = allowed.filter(
+      (f) => f.userId.toString() === user._id.toString(),
+    );
     const shared = allowed.filter((f) => !owned.includes(f));
 
     // owned files: one updateMany
@@ -1217,9 +1249,7 @@ export const deleteFile = async (req, res, next) => {
     const fileIds = allowed.map((file) => file._id);
 
     // Delete files from S3
-    const s3Keys = allowed.map(
-      (file) => `${file._id}${file.extension}`,
-    );
+    const s3Keys = allowed.map((file) => `${file._id}${file.extension}`);
 
     await Promise.all(s3Keys.map((key) => deleteFileFromS3(key)));
 
@@ -1607,8 +1637,7 @@ async function grantGoogleAccess({
     return {
       status: 500,
       body: {
-        message:
-          error.response?.data?.error?.message || error.message,
+        message: error.response?.data?.error?.message || error.message,
         permissions: [],
       },
       notify: [],
@@ -1616,14 +1645,9 @@ async function grantGoogleAccess({
   }
 
   for (const user of usersArray) {
-    const email = (
-      user.emailAddress || user.email || ""
-    ).trim().toLowerCase();
+    const email = (user.emailAddress || user.email || "").trim().toLowerCase();
 
-    if (
-      !email ||
-      !["reader", "commenter", "writer"].includes(user.role)
-    ) {
+    if (!email || !["reader", "commenter", "writer"].includes(user.role)) {
       responses.push({
         email,
         success: false,
@@ -1636,7 +1660,7 @@ async function grantGoogleAccess({
       const existing = existingPermissions.find(
         (permission) =>
           permission.type === "user" &&
-          permission.emailAddress?.toLowerCase() === email
+          permission.emailAddress?.toLowerCase() === email,
       );
 
       let permission;
@@ -1703,20 +1727,17 @@ async function grantGoogleAccess({
       responses.push({
         email,
         success: false,
-        message:
-          error.response?.data?.error?.message ||
-          error.message,
+        message: error.response?.data?.error?.message || error.message,
       });
     }
   }
 
   const failures = responses.filter(
-    (permission) => permission.success === false
+    (permission) => permission.success === false,
   );
 
   return {
-    status:
-      failures.length === responses.length ? 500 : 200,
+    status: failures.length === responses.length ? 500 : 200,
     body: {
       message: "Google Drive permissions processed",
       permissions: responses,
@@ -1757,9 +1778,7 @@ async function grantLocalAccess({
   }
 
   if (type === "folder") {
-    const owner = await User.findById(
-      item.userId?._id || item.userId
-    )
+    const owner = await User.findById(item.userId?._id || item.userId)
       .select("parentDirId")
       .lean();
 
@@ -1783,8 +1802,8 @@ async function grantLocalAccess({
 
     const tuple = (result?.tuples || []).find((t) =>
       ["shared_reader", "shared_writer", "reader", "writer"].includes(
-        t.key?.relation
-      )
+        t.key?.relation,
+      ),
     );
 
     return tuple?.key || null;
@@ -1793,7 +1812,7 @@ async function grantLocalAccess({
   const findExistingPermissionSource = async (
     resourceType,
     resourceId,
-    userId
+    userId,
   ) => {
     let currentType = resourceType;
     let currentId = resourceId;
@@ -1802,10 +1821,7 @@ async function grantLocalAccess({
     while (currentId) {
       const currentObject = getFgaObject(currentType, currentId);
 
-      const direct = await findDirectPermission(
-        currentObject,
-        userId
-      );
+      const direct = await findDirectPermission(currentObject, userId);
 
       if (direct) {
         return {
@@ -1813,13 +1829,11 @@ async function grantLocalAccess({
           id: currentId,
           role: direct.relation,
           name: resourceName,
-          isCurrentObject:
-            currentId.toString() === resourceId.toString(),
+          isCurrentObject: currentId.toString() === resourceId.toString(),
         };
       }
 
-      const currentModel =
-        currentType === "folder" ? Directory : File;
+      const currentModel = currentType === "folder" ? Directory : File;
 
       const resource = await currentModel
         .findById(currentId)
@@ -1858,12 +1872,8 @@ async function grantLocalAccess({
   const usersWithSource = await Promise.all(
     usersArray.map(async (user) => ({
       user,
-      source: await findExistingPermissionSource(
-        type,
-        id,
-        user.id
-      ),
-    }))
+      source: await findExistingPermissionSource(type, id, user.id),
+    })),
   );
 
   const cascadeConflicts = [];
@@ -1924,8 +1934,8 @@ async function grantLocalAccess({
 
         const relevant = (existing?.tuples || []).filter((t) =>
           ["reader", "writer", "shared_reader", "shared_writer"].includes(
-            t.key?.relation
-          )
+            t.key?.relation,
+          ),
         );
 
         for (const tuple of relevant) {
@@ -1954,7 +1964,7 @@ async function grantLocalAccess({
             },
           ],
         },
-        { transaction: { disable: true } }
+        { transaction: { disable: true } },
       );
 
       await fgaClient.write(
@@ -1967,7 +1977,7 @@ async function grantLocalAccess({
             },
           ],
         },
-        { transaction: { disable: true } }
+        { transaction: { disable: true } },
       );
 
       if (!source) {
@@ -1982,7 +1992,7 @@ async function grantLocalAccess({
               sharedWithMeTime: new Date(),
             },
           },
-          { upsert: true }
+          { upsert: true },
         );
       }
 
@@ -2022,7 +2032,7 @@ async function grantLocalAccess({
     type,
     item?.userId?._id,
     item.parentDirId,
-    true
+    true,
   );
 
   return {
@@ -2035,22 +2045,14 @@ async function grantLocalAccess({
   };
 }
 
-
 export const giveAccessById = async (req, res, next) => {
   try {
-    const {
-      usersArray,
-      message,
-      type,
-      confirmCascade,
-      notifyPeople,
-    } = req.body || {};
+    const { usersArray, message, type, confirmCascade, notifyPeople } =
+      req.body || {};
 
     const isBatch = Array.isArray(req.body?.items);
 
-    const items = isBatch
-      ? req.body.items
-      : [{ id: req.params.id, type }];
+    const items = isBatch ? req.body.items : [{ id: req.params.id, type }];
 
     if (!Array.isArray(usersArray) || !usersArray.length) {
       return res.status(400).json({
@@ -2066,18 +2068,12 @@ export const giveAccessById = async (req, res, next) => {
 
     const uniqueItems = [
       ...new Map(
-        items.map((item) => [
-          `${item.type}:${item.id}`,
-          item,
-        ])
+        items.map((item) => [`${item.type}:${item.id}`, item]),
       ).values(),
     ];
 
     for (const item of uniqueItems) {
-      if (
-        !item.id ||
-        !["file", "folder", "google"].includes(item.type)
-      ) {
+      if (!item.id || !["file", "folder", "google"].includes(item.type)) {
         return res.status(400).json({
           message: "Invalid item id or type",
           item,
@@ -2085,8 +2081,7 @@ export const giveAccessById = async (req, res, next) => {
       }
     }
 
-    const driveToken =
-      req.signedCookies?.drive_access_token;
+    const driveToken = req.signedCookies?.drive_access_token;
 
     const results = [];
     const notifications = {};
@@ -2128,9 +2123,7 @@ export const giveAccessById = async (req, res, next) => {
             };
           }
 
-          notifications[notification.userId].items.push(
-            notification.item
-          );
+          notifications[notification.userId].items.push(notification.item);
         }
       } catch (error) {
         console.error("ITEM SHARE ERROR:", {
@@ -2144,25 +2137,19 @@ export const giveAccessById = async (req, res, next) => {
           id: itemInfo.id,
           type: itemInfo.type,
           status: 500,
-          message:
-            error.response?.data?.error?.message ||
-            error.message,
+          message: error.response?.data?.error?.message || error.message,
           permissions: [],
         });
       }
     }
 
-    const conflicts = results.filter(
-      (result) => result.needsConfirmation
-    );
+    const conflicts = results.filter((result) => result.needsConfirmation);
 
     if (conflicts.length) {
       return res.status(200).json({
         needsConfirmation: true,
         results,
-        conflict: results.flatMap(
-          (result) => result.conflict || []
-        ),
+        conflict: results.flatMap((result) => result.conflict || []),
       });
     }
 
@@ -2173,9 +2160,7 @@ export const giveAccessById = async (req, res, next) => {
         .select("name email")
         .lean();
 
-      for (const [userId, notification] of Object.entries(
-        notifications
-      )) {
+      for (const [userId, notification] of Object.entries(notifications)) {
         try {
           const recipient = await User.findById(userId)
             .select("name email")
@@ -2200,12 +2185,7 @@ export const giveAccessById = async (req, res, next) => {
     }
 
     if (!isBatch) {
-      const {
-        id,
-        type: itemType,
-        status,
-        ...body
-      } = results[0];
+      const { id, type: itemType, status, ...body } = results[0];
 
       return res.status(status).json(body);
     }
@@ -2220,11 +2200,11 @@ export const giveAccessById = async (req, res, next) => {
             result.status >= 200 &&
             result.status < 300 &&
             result.permissions?.some(
-              (permission) => permission.success !== false
-            )
+              (permission) => permission.success !== false,
+            ),
         ).length,
         failed: results.filter(
-          (result) => result.status < 200 || result.status >= 300
+          (result) => result.status < 200 || result.status >= 300,
         ).length,
       },
     });
@@ -2250,146 +2230,145 @@ export const revokeAccessById = async (req, res, next) => {
     }
 
     // Google Drive permission
-   
-if (type === "google") {
-  const { drive_access_token } = req.signedCookies;
 
-  if (!drive_access_token) {
-    return res.status(401).json({
-      message: "Missing token",
-    });
-  }
+    if (type === "google") {
+      const { drive_access_token } = req.signedCookies;
 
-  const drive = getDriveClient(drive_access_token);
-  const isPublicLink = permissionId === "anyoneWithLink";
-
-  const findPermission = async (fileId) => {
-    const { data } = await drive.permissions.list({
-      fileId,
-      fields:
-        "permissions(id,type,role,emailAddress,permissionDetails(inherited,permissionType,role))",
-    });
-
-    return isPublicLink
-      ? data.permissions?.find((p) => p.type === "anyone")
-      : data.permissions?.find(
-          (p) => p.type === "user" && p.id === permissionId
-        );
-  };
-
-  const targetPermission = await findPermission(id);
-
-  if (!targetPermission) {
-    return res.status(404).json({
-      message: "Permission not found",
-    });
-  }
-
-  const hasInherited = targetPermission.permissionDetails?.some(
-    (d) => d.inherited === true
-  );
-
-  // Inherited permission confirmation
-  if (hasInherited && confirmCascade !== true) {
-    const { data: fileMeta } = await drive.files.get({
-      fileId: id,
-      fields: "parents",
-    });
-
-    let ancestorId = fileMeta.parents?.[0];
-    let ancestorMatch = null;
-
-    while (ancestorId) {
-      const perm = await findPermission(ancestorId);
-
-      if (perm) {
-        const { data: ancestorMeta } = await drive.files.get({
-          fileId: ancestorId,
-          fields: "id,name,parents",
+      if (!drive_access_token) {
+        return res.status(401).json({
+          message: "Missing token",
         });
-
-        ancestorMatch = {
-          fileId: ancestorId,
-          name: ancestorMeta.name,
-          permission: perm,
-        };
-
-        break;
       }
 
-      const { data: nextMeta } = await drive.files.get({
-        fileId: ancestorId,
-        fields: "parents",
-      });
+      const drive = getDriveClient(drive_access_token);
+      const isPublicLink = permissionId === "anyoneWithLink";
 
-      ancestorId = nextMeta.parents?.[0];
-    }
+      const findPermission = async (fileId) => {
+        const { data } = await drive.permissions.list({
+          fileId,
+          fields:
+            "permissions(id,type,role,emailAddress,permissionDetails(inherited,permissionType,role))",
+        });
 
-    return res.status(200).json({
-      needsConfirmation: true,
-      conflict: ancestorMatch
-        ? {
-            ancestorId: ancestorMatch.fileId,
-            ancestorName: ancestorMatch.name,
-            previousRole: ancestorMatch.permission.role,
+        return isPublicLink
+          ? data.permissions?.find((p) => p.type === "anyone")
+          : data.permissions?.find(
+              (p) => p.type === "user" && p.id === permissionId,
+            );
+      };
+
+      const targetPermission = await findPermission(id);
+
+      if (!targetPermission) {
+        return res.status(404).json({
+          message: "Permission not found",
+        });
+      }
+
+      const hasInherited = targetPermission.permissionDetails?.some(
+        (d) => d.inherited === true,
+      );
+
+      // Inherited permission confirmation
+      if (hasInherited && confirmCascade !== true) {
+        const { data: fileMeta } = await drive.files.get({
+          fileId: id,
+          fields: "parents",
+        });
+
+        let ancestorId = fileMeta.parents?.[0];
+        let ancestorMatch = null;
+
+        while (ancestorId) {
+          const perm = await findPermission(ancestorId);
+
+          if (perm) {
+            const { data: ancestorMeta } = await drive.files.get({
+              fileId: ancestorId,
+              fields: "id,name,parents",
+            });
+
+            ancestorMatch = {
+              fileId: ancestorId,
+              name: ancestorMeta.name,
+              permission: perm,
+            };
+
+            break;
           }
-        : null,
-    });
-  }
 
-  // Confirmed inherited permission removal
-  if (hasInherited && confirmCascade === true) {
-    const { data: fileMeta } = await drive.files.get({
-      fileId: id,
-      fields: "parents",
-    });
+          const { data: nextMeta } = await drive.files.get({
+            fileId: ancestorId,
+            fields: "parents",
+          });
 
-    let ancestorId = fileMeta.parents?.[0];
-    let revoked = false;
+          ancestorId = nextMeta.parents?.[0];
+        }
 
-    while (ancestorId) {
-      const perm = await findPermission(ancestorId);
-
-      if (perm) {
-        await drive.permissions.delete({
-          fileId: ancestorId,
-          permissionId: perm.id,
+        return res.status(200).json({
+          needsConfirmation: true,
+          conflict: ancestorMatch
+            ? {
+                ancestorId: ancestorMatch.fileId,
+                ancestorName: ancestorMatch.name,
+                previousRole: ancestorMatch.permission.role,
+              }
+            : null,
         });
-
-        revoked = true;
-        break;
       }
 
-      const { data: nextMeta } = await drive.files.get({
-        fileId: ancestorId,
-        fields: "parents",
+      // Confirmed inherited permission removal
+      if (hasInherited && confirmCascade === true) {
+        const { data: fileMeta } = await drive.files.get({
+          fileId: id,
+          fields: "parents",
+        });
+
+        let ancestorId = fileMeta.parents?.[0];
+        let revoked = false;
+
+        while (ancestorId) {
+          const perm = await findPermission(ancestorId);
+
+          if (perm) {
+            await drive.permissions.delete({
+              fileId: ancestorId,
+              permissionId: perm.id,
+            });
+
+            revoked = true;
+            break;
+          }
+
+          const { data: nextMeta } = await drive.files.get({
+            fileId: ancestorId,
+            fields: "parents",
+          });
+
+          ancestorId = nextMeta.parents?.[0];
+        }
+
+        if (!revoked) {
+          return res.status(404).json({
+            message: "Parent permission not found",
+          });
+        }
+
+        return res.status(200).json({
+          message: "Permission revoked successfully",
+        });
+      }
+
+      // Direct permission removal
+      await drive.permissions.delete({
+        fileId: id,
+        permissionId: targetPermission.id,
       });
 
-      ancestorId = nextMeta.parents?.[0];
-    }
-
-    if (!revoked) {
-      return res.status(404).json({
-        message: "Parent permission not found",
+      return res.status(200).json({
+        message: "Permission revoked successfully",
       });
     }
-
-    return res.status(200).json({
-      message: "Permission revoked successfully",
-    });
-  }
-
-  // Direct permission removal
-  await drive.permissions.delete({
-    fileId: id,
-    permissionId: targetPermission.id,
-  });
-
-  return res.status(200).json({
-    message: "Permission revoked successfully",
-  });
-}
-
 
     // Local (FGA) permission
     const objectType = type === "folder" ? "folder" : "file";

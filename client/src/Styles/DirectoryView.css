@@ -356,10 +356,12 @@ body.gd-drag-active .gd-grid-item.gd-drag-disabled {
   opacity: 0.35;
   filter: grayscale(0.5);
   pointer-events: none;
-  transition: opacity 0.15s ease, filter 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease;
 }
 .gd-grid-item.gd-drag-disabled {
-  opacity: 0.6!important;
+  opacity: 0.6 !important;
   pointer-events: none;
 }
 /* Currently dragged items remain visible */
@@ -741,6 +743,7 @@ body.gd-drag-active::before {
 
 .gd-grid-item.selected {
   background-color: var(--accent-blue-light);
+  outline: 2px solid var(--accent-blue-dark-outine);
 }
 
 .gd-grid-item-header {
@@ -778,7 +781,9 @@ body.gd-drag-active::before {
   text-overflow: ellipsis;
   flex: 1;
 }
-
+.gd-grid-item-name.selected {
+  color: var(--accent-blue-dark-outine);
+}
 .gd-grid-item-menu {
   position: absolute;
   top: 10px;
@@ -955,6 +960,11 @@ body.gd-drag-active::before {
 .badge-pdf {
   background: #ea4335;
 }
+.badge-word {
+  background: #185abd;
+  color: white;
+  font-weight: 700;
+}
 .badge-image {
   background: #34a853;
 }
@@ -970,6 +980,22 @@ body.gd-drag-active::before {
 }
 .badge-alt {
   background: #5f6368;
+}
+.badge-excel {
+  background: #107c41;
+  color: #fff;
+}
+.badge-ppt {
+  background: #c43e1c;
+  color: #fff;
+}
+.badge-audio {
+  background: #1a73e8;
+  color: #fff;
+}
+.badge-text {
+  background: #5f6368;
+  color: #fff;
 }
 
 /* ===================== CONTEXT MENU ===================== */

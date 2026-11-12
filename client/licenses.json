@@ -1,0 +1,717 @@
+{
+  "@esbuild/win32-x64@0.25.12": {
+    "licenses": "MIT",
+    "repository": "https://github.com/evanw/esbuild",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@esbuild\\win32-x64",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@esbuild\\win32-x64\\README.md"
+  },
+  "@googleworkspace/drive-picker-element@0.7.3": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/googleworkspace/drive-picker-element",
+    "publisher": "Justin Poehnelt",
+    "email": "jpoehnelt@google.com",
+    "url": "https://justin.poehnelt.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@googleworkspace\\drive-picker-element",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@googleworkspace\\drive-picker-element\\LICENSE"
+  },
+  "@googleworkspace/drive-picker-react@0.2.0": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/googleworkspace/drive-picker-element",
+    "publisher": "Justin Poehnelt",
+    "email": "jpoehnelt@google.com",
+    "url": "https://justin.poehnelt.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@googleworkspace\\drive-picker-react",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@googleworkspace\\drive-picker-react\\LICENSE"
+  },
+  "@heroicons/react@2.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/heroicons",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@heroicons\\react",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@heroicons\\react\\LICENSE"
+  },
+  "@jridgewell/gen-mapping@0.3.13": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\gen-mapping",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\gen-mapping\\LICENSE"
+  },
+  "@jridgewell/remapping@2.3.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\remapping",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\remapping\\LICENSE"
+  },
+  "@jridgewell/resolve-uri@3.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/resolve-uri",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\resolve-uri",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\resolve-uri\\LICENSE"
+  },
+  "@jridgewell/sourcemap-codec@1.5.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\sourcemap-codec",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\sourcemap-codec\\LICENSE"
+  },
+  "@jridgewell/trace-mapping@0.3.31": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jridgewell/sourcemaps",
+    "publisher": "Justin Ridgewell",
+    "email": "justin@ridgewell.name",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\trace-mapping",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@jridgewell\\trace-mapping\\LICENSE"
+  },
+  "@napi-rs/canvas-win32-x64-msvc@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Brooooooklyn/canvas",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@napi-rs\\canvas-win32-x64-msvc",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@napi-rs\\canvas-win32-x64-msvc\\README.md"
+  },
+  "@napi-rs/canvas@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Brooooooklyn/canvas",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@napi-rs\\canvas",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@napi-rs\\canvas\\LICENSE"
+  },
+  "@react-oauth/google@0.13.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/MomenSherif/react-oauth",
+    "publisher": "Mo'men Sherif",
+    "email": "momensherif.2019@gmail.com",
+    "url": "https://github.com/MomenSherif",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@react-oauth\\google",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@react-oauth\\google\\README.md"
+  },
+  "@rollup/rollup-win32-x64-gnu@4.60.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Lukas Taegert-Atkinson",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@rollup\\rollup-win32-x64-gnu",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@rollup\\rollup-win32-x64-gnu\\README.md"
+  },
+  "@rollup/rollup-win32-x64-msvc@4.60.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Lukas Taegert-Atkinson",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@rollup\\rollup-win32-x64-msvc",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@rollup\\rollup-win32-x64-msvc\\README.md"
+  },
+  "@tailwindcss/node@4.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\node",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\node\\LICENSE"
+  },
+  "@tailwindcss/oxide-win32-x64-msvc@4.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\oxide-win32-x64-msvc",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\oxide-win32-x64-msvc\\LICENSE"
+  },
+  "@tailwindcss/oxide@4.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\oxide",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\oxide\\LICENSE"
+  },
+  "@tailwindcss/vite@4.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\vite",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@tailwindcss\\vite\\LICENSE"
+  },
+  "@types/estree@1.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@types\\estree",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@types\\estree\\LICENSE"
+  },
+  "@types/trusted-types@2.0.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/DefinitelyTyped/DefinitelyTyped",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@types\\trusted-types",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\@types\\trusted-types\\LICENSE"
+  },
+  "agent-base@6.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TooTallNate/node-agent-base",
+    "publisher": "Nathan Rajlich",
+    "email": "nathan@tootallnate.net",
+    "url": "http://n8.io/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\agent-base",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\agent-base\\README.md"
+  },
+  "asynckit@0.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/alexindigo/asynckit",
+    "publisher": "Alex Indigo",
+    "email": "iam@alexindigo.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\asynckit",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\asynckit\\LICENSE"
+  },
+  "axios@1.21.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/axios/axios",
+    "publisher": "Matt Zabriskie",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\axios",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\axios\\LICENSE"
+  },
+  "call-bind-apply-helpers@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/call-bind-apply-helpers",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\call-bind-apply-helpers",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\call-bind-apply-helpers\\LICENSE"
+  },
+  "cloudcore-client@0.0.0": {
+    "licenses": "UNLICENSED",
+    "private": true,
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\README.md"
+  },
+  "combined-stream@1.0.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/felixge/node-combined-stream",
+    "publisher": "Felix Geisendörfer",
+    "email": "felix@debuggable.com",
+    "url": "http://debuggable.com/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\combined-stream",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\combined-stream\\License"
+  },
+  "cookie@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/cookie",
+    "publisher": "Roman Shtylman",
+    "email": "shtylman@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\cookie",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\cookie\\LICENSE"
+  },
+  "core-util-is@1.0.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/isaacs/core-util-is",
+    "publisher": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\core-util-is",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\core-util-is\\LICENSE"
+  },
+  "debug@4.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/debug-js/debug",
+    "publisher": "Josh Junon",
+    "url": "https://github.com/qix-",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\debug",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\debug\\LICENSE"
+  },
+  "delayed-stream@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/felixge/node-delayed-stream",
+    "publisher": "Felix Geisendörfer",
+    "email": "felix@debuggable.com",
+    "url": "http://debuggable.com/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\delayed-stream",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\delayed-stream\\License"
+  },
+  "detect-libc@2.1.2": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/lovell/detect-libc",
+    "publisher": "Lovell Fuller",
+    "email": "npm@lovell.info",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\detect-libc",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\detect-libc\\LICENSE"
+  },
+  "docx-preview@0.4.1": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/VolodymyrBaydalka/docxjs",
+    "publisher": "Volodymyr Baydalka",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\docx-preview",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\docx-preview\\LICENSE"
+  },
+  "dompurify@3.4.17": {
+    "licenses": "(MPL-2.0 OR Apache-2.0)",
+    "repository": "https://github.com/cure53/DOMPurify",
+    "publisher": "Dr.-Ing. Mario Heiderich, Cure53",
+    "email": "mario@cure53.de",
+    "url": "https://cure53.de/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\dompurify",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\dompurify\\LICENSE"
+  },
+  "dunder-proto@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/dunder-proto",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\dunder-proto",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\dunder-proto\\LICENSE"
+  },
+  "enhanced-resolve@5.21.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/webpack/enhanced-resolve",
+    "publisher": "Tobias Koppers @sokra",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\enhanced-resolve",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\enhanced-resolve\\LICENSE"
+  },
+  "es-define-property@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-define-property",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-define-property",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-define-property\\LICENSE"
+  },
+  "es-errors@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-errors",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-errors",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-errors\\LICENSE"
+  },
+  "es-object-atoms@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/es-object-atoms",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-object-atoms",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-object-atoms\\LICENSE"
+  },
+  "es-set-tostringtag@2.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/es-set-tostringtag",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-set-tostringtag",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\es-set-tostringtag\\LICENSE"
+  },
+  "esbuild@0.25.12": {
+    "licenses": "MIT",
+    "repository": "https://github.com/evanw/esbuild",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\esbuild",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\esbuild\\LICENSE.md"
+  },
+  "fdir@6.5.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/thecodrr/fdir",
+    "publisher": "thecodrr",
+    "email": "thecodrr@protonmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\fdir",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\fdir\\LICENSE"
+  },
+  "follow-redirects@1.16.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/follow-redirects/follow-redirects",
+    "publisher": "Ruben Verborgh",
+    "email": "ruben@verborgh.org",
+    "url": "https://ruben.verborgh.org/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\follow-redirects",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\follow-redirects\\LICENSE"
+  },
+  "form-data@4.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/form-data/form-data",
+    "publisher": "Felix Geisendörfer",
+    "email": "felix@debuggable.com",
+    "url": "http://debuggable.com/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\form-data",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\form-data\\License"
+  },
+  "function-bind@1.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Raynos/function-bind",
+    "publisher": "Raynos",
+    "email": "raynos2@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\function-bind",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\function-bind\\LICENSE"
+  },
+  "get-intrinsic@1.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/get-intrinsic",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\get-intrinsic",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\get-intrinsic\\LICENSE"
+  },
+  "get-proto@1.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/get-proto",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\get-proto",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\get-proto\\LICENSE"
+  },
+  "gopd@1.2.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ljharb/gopd",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\gopd",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\gopd\\LICENSE"
+  },
+  "graceful-fs@4.2.11": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/node-graceful-fs",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\graceful-fs",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\graceful-fs\\LICENSE"
+  },
+  "has-symbols@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/has-symbols",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "url": "http://ljharb.codes",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\has-symbols",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\has-symbols\\LICENSE"
+  },
+  "has-tostringtag@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/has-tostringtag",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "url": "http://ljharb.codes",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\has-tostringtag",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\has-tostringtag\\LICENSE"
+  },
+  "hasown@2.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/inspect-js/hasOwn",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\hasown",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\hasown\\LICENSE"
+  },
+  "https-proxy-agent@5.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TooTallNate/node-https-proxy-agent",
+    "publisher": "Nathan Rajlich",
+    "email": "nathan@tootallnate.net",
+    "url": "http://n8.io/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\https-proxy-agent",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\https-proxy-agent\\README.md"
+  },
+  "immediate@3.0.6": {
+    "licenses": "MIT",
+    "repository": "https://github.com/calvinmetcalf/immediate",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\immediate",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\immediate\\LICENSE.txt"
+  },
+  "inherits@2.0.4": {
+    "licenses": "ISC",
+    "repository": "https://github.com/isaacs/inherits",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\inherits",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\inherits\\LICENSE"
+  },
+  "isarray@1.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/juliangruber/isarray",
+    "publisher": "Julian Gruber",
+    "email": "mail@juliangruber.com",
+    "url": "http://juliangruber.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\readable-stream\\node_modules\\isarray",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\readable-stream\\node_modules\\isarray\\README.md"
+  },
+  "jiti@2.7.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/unjs/jiti",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\jiti",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\jiti\\LICENSE"
+  },
+  "js-tokens@4.0.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/lydell/js-tokens",
+    "publisher": "Simon Lydell",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\js-tokens",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\js-tokens\\LICENSE"
+  },
+  "jszip@3.10.2": {
+    "licenses": "(MIT OR GPL-3.0-or-later)",
+    "repository": "https://github.com/Stuk/jszip",
+    "publisher": "Stuart Knightley",
+    "email": "stuart@stuartk.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\jszip",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\jszip\\LICENSE.markdown"
+  },
+  "lie@3.3.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/calvinmetcalf/lie",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lie",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lie\\license.md"
+  },
+  "lightningcss-win32-x64-msvc@1.32.0": {
+    "licenses": "MPL-2.0",
+    "repository": "https://github.com/parcel-bundler/lightningcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lightningcss-win32-x64-msvc",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lightningcss-win32-x64-msvc\\LICENSE"
+  },
+  "lightningcss@1.32.0": {
+    "licenses": "MPL-2.0",
+    "repository": "https://github.com/parcel-bundler/lightningcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lightningcss",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lightningcss\\LICENSE"
+  },
+  "loose-envify@1.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/zertosh/loose-envify",
+    "publisher": "Andres Suarez",
+    "email": "zertosh@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\loose-envify",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\loose-envify\\LICENSE"
+  },
+  "lucide-react@1.24.0": {
+    "licenses": "ISC",
+    "repository": "https://github.com/lucide-icons/lucide",
+    "publisher": "Eric Fennis",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lucide-react",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\lucide-react\\LICENSE"
+  },
+  "magic-string@0.30.21": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Rich-Harris/magic-string",
+    "publisher": "Rich Harris",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\magic-string",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\magic-string\\LICENSE"
+  },
+  "math-intrinsics@1.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/es-shims/math-intrinsics",
+    "publisher": "Jordan Harband",
+    "email": "ljharb@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\math-intrinsics",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\math-intrinsics\\LICENSE"
+  },
+  "mime-db@1.52.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-db",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\mime-db",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\mime-db\\LICENSE"
+  },
+  "mime-types@2.1.35": {
+    "licenses": "MIT",
+    "repository": "https://github.com/jshttp/mime-types",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\mime-types",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\mime-types\\LICENSE"
+  },
+  "ms@2.1.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/vercel/ms",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\ms",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\ms\\license.md"
+  },
+  "nanoid@3.3.20": {
+    "licenses": "MIT",
+    "repository": "https://github.com/ai/nanoid",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.ru",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\nanoid",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\nanoid\\LICENSE"
+  },
+  "pako@1.0.11": {
+    "licenses": "(MIT AND Zlib)",
+    "repository": "https://github.com/nodeca/pako",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\pako",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\pako\\LICENSE"
+  },
+  "pdfjs-dist@6.5.438": {
+    "licenses": "Apache-2.0",
+    "repository": "https://github.com/mozilla/pdf.js",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\pdfjs-dist",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\pdfjs-dist\\LICENSE"
+  },
+  "picocolors@1.1.1": {
+    "licenses": "ISC",
+    "repository": "https://github.com/alexeyraspopov/picocolors",
+    "publisher": "Alexey Raspopov",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\picocolors",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\picocolors\\LICENSE"
+  },
+  "picomatch@4.0.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/micromatch/picomatch",
+    "publisher": "Jon Schlinkert",
+    "url": "https://github.com/jonschlinkert",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\picomatch",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\picomatch\\LICENSE"
+  },
+  "postcss@8.5.32": {
+    "licenses": "MIT",
+    "repository": "https://github.com/postcss/postcss",
+    "publisher": "Andrey Sitnik",
+    "email": "andrey@sitnik.es",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\postcss",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\postcss\\LICENSE"
+  },
+  "print-js@1.6.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/crabbly/Print.js",
+    "publisher": "Rodrigo Vieira",
+    "email": "rodrigo@crabbly.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\print-js",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\print-js\\LICENSE"
+  },
+  "process-nextick-args@2.0.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/calvinmetcalf/process-nextick-args",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\process-nextick-args",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\process-nextick-args\\license.md"
+  },
+  "proxy-from-env@2.1.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/Rob--W/proxy-from-env",
+    "publisher": "Rob Wu",
+    "email": "rob@robwu.nl",
+    "url": "https://robwu.nl/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\proxy-from-env",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\proxy-from-env\\LICENSE"
+  },
+  "react-dom@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-dom",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-dom\\LICENSE"
+  },
+  "react-icons@5.4.0": {
+    "licenses": "MIT",
+    "repository": "https://github.com/react-icons/react-icons",
+    "publisher": "Goran Gajic",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-icons",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-icons\\LICENSE"
+  },
+  "react-router-dom@7.18.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/remix-run/react-router",
+    "publisher": "Remix Software",
+    "email": "hello@remix.run",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-router-dom",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-router-dom\\LICENSE.md"
+  },
+  "react-router@7.18.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/remix-run/react-router",
+    "publisher": "Remix Software",
+    "email": "hello@remix.run",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-router",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react-router\\LICENSE.md"
+  },
+  "react@18.3.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\react\\LICENSE"
+  },
+  "readable-stream@2.3.8": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodejs/readable-stream",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\readable-stream",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\readable-stream\\LICENSE"
+  },
+  "rollup@4.60.4": {
+    "licenses": "MIT",
+    "repository": "https://github.com/rollup/rollup",
+    "publisher": "Rich Harris",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\rollup",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\rollup\\LICENSE.md"
+  },
+  "safe-buffer@5.1.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/feross/safe-buffer",
+    "publisher": "Feross Aboukhadijeh",
+    "email": "feross@feross.org",
+    "url": "http://feross.org",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\safe-buffer",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\safe-buffer\\LICENSE"
+  },
+  "scheduler@0.23.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/facebook/react",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\scheduler",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\scheduler\\LICENSE"
+  },
+  "set-cookie-parser@2.7.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nfriedly/set-cookie-parser",
+    "publisher": "Nathan Friedly",
+    "url": "http://nfriedly.com/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\set-cookie-parser",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\set-cookie-parser\\LICENSE"
+  },
+  "setimmediate@1.0.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/YuzuJS/setImmediate",
+    "publisher": "YuzuJS",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\setimmediate",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\setimmediate\\LICENSE.txt"
+  },
+  "source-map-js@1.2.2": {
+    "licenses": "BSD-3-Clause",
+    "repository": "https://github.com/7rulnik/source-map-js",
+    "publisher": "Valentin 7rulnik Semirulnik",
+    "email": "v7rulnik@gmail.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\source-map-js",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\source-map-js\\LICENSE"
+  },
+  "string_decoder@1.1.1": {
+    "licenses": "MIT",
+    "repository": "https://github.com/nodejs/string_decoder",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\string_decoder",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\string_decoder\\LICENSE"
+  },
+  "tailwindcss@4.3.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/tailwindlabs/tailwindcss",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tailwindcss",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tailwindcss\\LICENSE"
+  },
+  "tapable@2.3.3": {
+    "licenses": "MIT",
+    "repository": "https://github.com/webpack/tapable",
+    "publisher": "Tobias Koppers @sokra",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tapable",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tapable\\LICENSE"
+  },
+  "tinyglobby@0.2.16": {
+    "licenses": "MIT",
+    "repository": "https://github.com/SuperchupuDev/tinyglobby",
+    "publisher": "Superchupu",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tinyglobby",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\tinyglobby\\LICENSE"
+  },
+  "util-deprecate@1.0.2": {
+    "licenses": "MIT",
+    "repository": "https://github.com/TooTallNate/util-deprecate",
+    "publisher": "Nathan Rajlich",
+    "email": "nathan@tootallnate.net",
+    "url": "http://n8.io/",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\util-deprecate",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\util-deprecate\\LICENSE"
+  },
+  "vite@6.4.5": {
+    "licenses": "MIT",
+    "repository": "https://github.com/vitejs/vite",
+    "publisher": "Evan You",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\vite",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\vite\\LICENSE.md"
+  },
+  "xlsx@0.20.3": {
+    "licenses": "Apache-2.0",
+    "repository": "https://git.sheetjs.com/SheetJS/sheetjs",
+    "publisher": "sheetjs",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\xlsx",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\xlsx\\LICENSE"
+  },
+  "zod@4.6.7": {
+    "licenses": "MIT",
+    "repository": "https://github.com/colinhacks/zod",
+    "publisher": "Colin McDonnell",
+    "email": "zod@colinhacks.com",
+    "path": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\zod",
+    "licenseFile": "F:\\recov\\WDC WD5000AAKX-603CA0\\imp code files\\CloudCore\\client\\node_modules\\zod\\LICENSE"
+  }
+}

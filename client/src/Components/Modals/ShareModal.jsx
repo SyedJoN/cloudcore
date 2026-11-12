@@ -12,7 +12,6 @@ import {
 import RoleDropdown from "../Dropdowns/RoleDropdown.jsx";
 import {
   DRIVE_ROLES,
-  getFileType,
   ROLE_DESC,
   ROLE_LABEL,
 } from "../../../Utils/displayUtils.js";
@@ -34,6 +33,7 @@ import { GlobeAmericasIcon } from "@heroicons/react/24/solid";
 import { LockClosedIcon } from "@heroicons/react/24/outline";
 import MouseTooltip from "../Tooltip/Tooltip.jsx";
 import FileBadge from "../File/FileBadge.jsx";
+import { getFileKind } from "../../../Utils/fileKind.js";
 
 export const ROLE_PRIORITY = {
   reader: 1,
@@ -178,7 +178,7 @@ export default function ShareModal({
   const [heightReady, setHeightReady] = useState(false);
 
   const type = getItemType(item);
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
 
   const isOwner = item?.owners?.[0]?.me === true;
 
@@ -2015,7 +2015,7 @@ export default function ShareModal({
                           // per-item icon (previously used the first item's)
                           const itemIconType = it.isDirectory
                             ? null
-                            : getFileType(it?.name || "");
+                            : getFileKind(item);
 
                           return (
                             <div key={id}>

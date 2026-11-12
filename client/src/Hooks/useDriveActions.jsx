@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { getResourceType } from "../../Utils/getResourceType";
-import { DRIVE_ROLES, getFileType } from "../../Utils/displayUtils";
+import { DRIVE_ROLES } from "../../Utils/displayUtils";
 import { updateSharedAccess } from "../../Utils/shareRoleAccess";
 import { moveItem as moveItemFunction } from "../../apis/resourceApi";
 import printJS from "print-js";
@@ -18,7 +18,7 @@ import {
 import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useNavigate } from "react-router-dom";
-import getCategory from "../../Utils/getFileCategory";
+import { getFileKind, getItemCategory } from "../../Utils/fileKind";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -322,55 +322,86 @@ export function useDriveActions({
 
   /* ───────────── Print ───────────── */
 
-  const handlePrint = useCallback(async (item) => {
-    if (isGoogleDriveRoute) return window.open(item?.webViewLink, "_blank");
-    const category = getCategory(item?.name || "");
-    const fileUrl = isGoogleDriveRoute
-      ? item?.webContentLink || item?.webViewLink
-      : `${BASE_URL}/file/${item?._id}`;
+ const handlePrint = useCallback(
+  async (item) => {
+    let category = getItemCategory(item);
+    let fileUrl;
+
+    if (isGoogleDriveRoute) {
+      const mime = item?.mimeType || "";
+      const isGoogleNative = mime.startsWith("application/vnd.google-apps.");
+
+      // Docs aur Slides ko controller PDF bana kar deta hai
+      const exportsAsPdf =
+        mime === "application/vnd.google-apps.document" ||
+        mime === "application/vnd.google-apps.presentation";
+
+      if (exportsAsPdf) category = "pdf";
+
+      const printableHere = exportsAsPdf || (!isGoogleNative && ["pdf", "image"].includes(category));
+
+      // Sheets (xlsx export), Word/Excel/PPT, video waghera: Drive mein kholo
+      if (!printableHere) {
+        const url =
+          item?.webViewLink ||
+          (item?.id ? `https://drive.google.com/file/d/${item.id}/view` : null);
+
+        if (!url) {
+          return toast({ message: "Print link not available", type: "error" });
+        }
+        return window.open(url, "_blank", "noopener,noreferrer");
+      }
+
+      fileUrl = `${BASE_URL}/auth/google-drive/download?fileId=${encodeURIComponent(item.id)}`;
+    } else {
+      fileUrl = `${BASE_URL}/file/${item?._id}`;
+    }
 
     document.getElementById("printJS")?.remove();
 
-    // Word printing whats render on the screen
+    // Word printing (sirf local files, jo screen par render hoti hain)
     if (category === "office-word") {
       return printJS({
         printable: "gdv-stage",
         type: "html",
-        scanStyles: false, // screen's padding/width ignored
+        scanStyles: false,
         style: `
-        @page { margin: 0; }
-        html, body { margin: 0; padding: 0; background: #fff; }
-        #gdv-stage { padding: 0 !important; display: block !important; }
-        .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
-        .docx-wrapper > section.docx {
-          margin: 0 auto !important;
-          box-shadow: none !important;
-          page-break-after: always;
-        }
-      `,
+          @page { margin: 0; }
+          html, body { margin: 0; padding: 0; background: #fff; }
+          #gdv-stage { padding: 0 !important; display: block !important; }
+          .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
+          .docx-wrapper > section.docx {
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            page-break-after: always;
+          }
+        `,
       });
     }
 
-    if (category === "pdf") {
-      try {
-        const res = await fetch(fileUrl, { credentials: "include" });
-        if (!res.ok) throw new Error();
-        const blobUrl = URL.createObjectURL(await res.blob());
-        return printJS({ printable: blobUrl, type: "pdf" });
-      } catch {
-        return toast({ message: "Failed to print", type: "error" });
-      }
-    }
+    try {
+      const res = await fetch(fileUrl, { credentials: "include" });
+      if (!res.ok) throw new Error();
+      const blobUrl = URL.createObjectURL(await res.blob());
 
-    // Image
-    printJS({
-      printable: `${fileUrl}?t=${Date.now()}`,
-      type: "image",
-      headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
-      imageStyle: "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
-      style: "@page { margin: 0; }",
-    });
-  }, [isGoogleDriveRoute]);
+      if (category === "pdf") {
+        return printJS({ printable: blobUrl, type: "pdf" });
+      }
+
+      // image
+      return printJS({
+        printable: blobUrl,
+        type: "image",
+        headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
+        imageStyle: "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
+        style: "@page { margin: 0; }",
+      });
+    } catch {
+      return toast({ message: "Failed to print", type: "error" });
+    }
+  },
+  [isGoogleDriveRoute],
+);
   /* ───────────── Sharing ───────────── */
 
   const handleToggleResourcePublic = useCallback(
@@ -406,7 +437,7 @@ export function useDriveActions({
         const isFolder =
           Boolean(item.isDirectory) ||
           item.mimeType === "application/vnd.google-apps.folder";
-        const iconType = isFolder ? null : getFileType(item?.name || "");
+        const iconType = isFolder ? null : getFileKind(item);
 
         // Revert the modal UI when the user cancels a confirmation.
         // (Multi mode has no shared link state, so nothing to revert.)
@@ -894,7 +925,7 @@ export function useDriveActions({
             (item.isDirectory ??
             item.mimeType === "application/vnd.google-apps.folder")
               ? null
-              : getFileType(item?.name || "");
+              : getFileKind(item);
 
           const chain = [
             {
@@ -1849,7 +1880,7 @@ export function useDriveActions({
         idSet.has(String(i._id ?? i.id)),
       );
       if (!items.length) return;
-      await handleMoveToTrash(items); // toast + Undo pehle se hai
+      await handleMoveToTrash(items); 
     },
     [combinedItems, handleMoveToTrash],
   );

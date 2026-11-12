@@ -1,14 +1,14 @@
-
 import { useEffect, useState } from "react";
 import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
-import { getFileType } from "../../../Utils/displayUtils";
 import { getColor } from "../../../Utils/getProfileColor";
 import { formatDate } from "../../../Utils/formatDate";
 import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
 import { useDriveDrag } from "../../Hooks/useDriveDrag";
+import { readDriveDrag } from "../../../Utils/dragDrop";
+import { getFileKind } from "../../../Utils/fileKind";
 
 const DRAG_MIME = "application/x-drive-items";
 
@@ -51,13 +51,12 @@ export default function GridItem({
       : "file";
 
   const itemId = item._id ?? item.id;
-  const iconType = item.isDirectory ? null : getFileType(item?.name || "");
+  const iconType = item.isDirectory ? null : getFileKind(item);
+
 
   useEffect(() => {
     const check = () => {
-      setIsDragging(
-        document.body.classList.contains("gd-drag-active")
-      );
+      setIsDragging(document.body.classList.contains("gd-drag-active"));
     };
 
     const observer = new MutationObserver(check);
@@ -79,7 +78,7 @@ export default function GridItem({
   });
 
   const isDraggedItem = [...(selectedItems || [])].some(
-    id => String(id) === String(itemId)
+    (id) => String(id) === String(itemId),
   );
 
   const isDisabled = isDragging && isDraggedItem;
@@ -102,28 +101,17 @@ export default function GridItem({
     }
   };
 
-const handleDrop = (e) => {
+  const handleDrop = (e) => {
   if (!item.isDirectory) return;
 
   e.preventDefault();
   e.stopPropagation();
   setIsDropTarget(false);
 
-  try {
-    const ids = JSON.parse(
-      e.dataTransfer.getData(DRAG_MIME) || "[]"
-    );
+  const ids = readDriveDrag(e);
+  if (!ids.length) return;
 
-    if (!ids.length) return;
-
-    onMove?.(
-      ids,
-      item._id ?? item.id,
-      item.name
-    );
-  } catch (error) {
-    console.error("Drop error:", error);
-  }
+  onMove?.(ids, item._id ?? item.id, item.name);
 };
 
   const avatarEl =
@@ -168,6 +156,7 @@ const handleDrop = (e) => {
   return (
     <div
       {...dragProps}
+      data-drive-id={itemId}
       className={`
         gd-grid-item
         ${selected ? "selected" : ""}
@@ -204,6 +193,7 @@ const handleDrop = (e) => {
       }}
     >
       <div
+      data-drag-title
         style={{
           display: "flex",
           alignItems: "center",
@@ -212,13 +202,21 @@ const handleDrop = (e) => {
           gap: 8,
         }}
       >
-        {item.isDirectory ? (
+        <span data-drag-icon style={{ display: "flex", flexShrink: 0 }}>
+             {item.isDirectory ? (
           <IconFolder size={24} style={{ color: "#5f6368", flexShrink: 0 }} />
         ) : (
           <FileBadge type={iconType} />
         )}
+        </span>
+     
 
-        <span className="gd-grid-item-name">{item.name}</span>
+        <span
+        data-drag-name
+          className={`gd-grid-item-name ${selected ? "selected" : ""}`}
+        >
+          {item.name}
+        </span>
 
         <button
           type="button"

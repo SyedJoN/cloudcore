@@ -1,8 +1,9 @@
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { extOf, getFileKind, isLegacyWord } from "../../../Utils/fileKind";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
+const MAX_OFFICE_BYTES = 10 * 1024 * 1024;
 
 // ── Colour + icon per file type ───────────────────────────────────────────────
 const TYPE_META = {
@@ -18,8 +19,10 @@ const TYPE_META = {
   alt:     { bg: "#f1f3f4", color: "#5f6368", icon: "📎",  label: "FILE"    },
 };
 
+const getExt = (filename = "") => filename.split(".").pop().toLowerCase();
+
 function getType(filename = "") {
-  const ext = filename.split(".").pop().toLowerCase();
+  const ext = getExt(filename);
   if (["png","jpg","jpeg","gif","webp","svg","bmp","ico"].includes(ext))        return "image";
   if (["mp4","mov","avi","mkv","webm","ogv"].includes(ext))                     return "video";
   if (["pdf"].includes(ext))                                                    return "pdf";
@@ -33,10 +36,19 @@ function getType(filename = "") {
   return "alt";
 }
 
-// ── Fallback card shown for non-visual types ──────────────────────────────────
-function IconCard({ type, name }) {
+const FILL = {
+  position: "relative",
+  width: "100%",
+  height: "100%",
+  overflow: "hidden",
+  background: "#fff",
+};
+
+// ── Fallback card shown for non-visual types (and while a preview loads) ─────
+function IconCard({ type, item }) {
   const meta = TYPE_META[type] || TYPE_META.alt;
-  const ext  = name?.split(".").pop().toUpperCase() || meta.label;
+  const e = extOf(item).toUpperCase();
+  const label = e && e !== "BIN" && e.length <= 5 ? e : meta.label;
 
   return (
     <div style={{
@@ -53,8 +65,281 @@ function IconCard({ type, name }) {
         background: meta.color + "22",
         padding: "2px 7px", borderRadius: 4,
       }}>
-        {ext.length <= 5 ? ext : meta.label}
+        {label}
       </span>
+    </div>
+  );
+}
+
+// ── helpers: lazy loading, small job queue, cache ────────────────────────────
+
+function useInView() {
+  const ref = useRef(null);
+  const [seen, setSeen] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || seen) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [seen]);
+
+  return [ref, seen];
+}
+
+// ek waqt mein sirf 2 previews render hon, taake grid na atke
+const MAX_PARALLEL = 2;
+let running = 0;
+const queue = [];
+
+function pump() {
+  while (running < MAX_PARALLEL && queue.length) {
+    const { task, resolve, reject } = queue.shift();
+    running++;
+    task()
+      .then(resolve, reject)
+      .finally(() => {
+        running--;
+        pump();
+      });
+  }
+}
+
+function enqueue(task) {
+  return new Promise((resolve, reject) => {
+    queue.push({ task, resolve, reject });
+    pump();
+  });
+}
+
+const thumbCache = new Map(); // PDF image + Excel rows
+const cacheKey = (item, url) =>
+  `${url}|${item.updatedAt ?? item.modifiedTime ?? ""}|${item.size ?? ""}`;
+
+const tooBig = (item) => Number(item.size) > MAX_OFFICE_BYTES;
+
+// ── PDF: pehla page canvas par render ────────────────────────────────────────
+async function renderPdfThumb(url) {
+  const pdfjs = await import("pdfjs-dist");
+  const { default: workerSrc } = await import(
+    "pdfjs-dist/build/pdf.worker.min.mjs?url"
+  );
+  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+
+  const pdf = await pdfjs.getDocument({ url, withCredentials: true }).promise;
+  try {
+    const page = await pdf.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: 400 / base.width }); // ~400px wide
+
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({
+      canvasContext: canvas.getContext("2d"),
+      viewport,
+    }).promise;
+
+    return canvas.toDataURL("image/jpeg", 0.8);
+  } finally {
+    pdf.destroy();
+  }
+}
+
+function PdfThumb({ item, url }) {
+  const [ref, seen] = useInView();
+  const key = cacheKey(item, url);
+  const [src, setSrc] = useState(() => thumbCache.get(key) ?? null);
+
+  useEffect(() => {
+    if (!seen || src) return;
+    let cancelled = false;
+
+    enqueue(() => renderPdfThumb(url))
+      .then((dataUrl) => {
+        thumbCache.set(key, dataUrl);
+        if (!cancelled) setSrc(dataUrl);
+      })
+      .catch(() => {}); 
+
+    return () => {
+      cancelled = true;
+    };
+  }, [seen, src, key, url]);
+
+  return (
+    <div ref={ref} style={FILL}>
+      {src ? (
+        <img
+          src={src}
+          alt={item.name}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "top",
+            display: "block",
+          }}
+        />
+      ) : (
+        <IconCard type="pdf" name={item.name} />
+      )}
+    </div>
+  );
+}
+
+// ── Excel: pehli sheet ki chhoti table ───────────────────────────────────────
+async function loadSheetRows(url) {
+  const XLSX = await import("xlsx");
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error("fetch failed");
+
+  const wb = XLSX.read(await res.arrayBuffer(), { type: "array", sheetRows: 14 });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    blankrows: false,
+    defval: "",
+  });
+
+  return rows.slice(0, 12).map((r) => r.slice(0, 6).map((c) => String(c)));
+}
+
+function SheetThumb({ item, url }) {
+  const [ref, seen] = useInView();
+  const key = cacheKey(item, url);
+  const [rows, setRows] = useState(() => thumbCache.get(key) ?? null);
+
+  useEffect(() => {
+    if (!seen || rows) return;
+    let cancelled = false;
+
+    enqueue(() => loadSheetRows(url))
+      .then((data) => {
+        thumbCache.set(key, data);
+        if (!cancelled) setRows(data);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [seen, rows, key, url]);
+
+  return (
+    <div ref={ref} style={FILL}>
+      {rows && rows.length ? (
+        <table
+          style={{
+            width: "100%",
+            tableLayout: "fixed",
+            borderCollapse: "collapse",
+            fontSize: 9,
+            lineHeight: 1.3,
+            fontFamily: "Arial, sans-serif",
+            color: "#202124",
+          }}
+        >
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r}>
+                {row.map((cell, c) => (
+                  <td
+                    key={c}
+                    style={{
+                      border: "1px solid #e0e0e0",
+                      padding: "2px 4px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontWeight: r === 0 ? 700 : 400,
+                      background: r === 0 ? "#e6f4ea" : "#fff",
+                    }}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <IconCard type="sheet" name={item.name} />
+      )}
+    </div>
+  );
+}
+
+function DocxThumb({ item, url }) {
+  const [ref, seen] = useInView();
+  const hostRef = useRef(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!seen) return;
+    let cancelled = false;
+
+    enqueue(async () => {
+      const { renderAsync } = await import("docx-preview");
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("fetch failed");
+      const blob = await res.blob();
+
+      const host = hostRef.current;
+      if (!host || cancelled) return;
+
+      await renderAsync(blob, host, null, {
+        inWrapper: false,
+        breakPages: true,
+        renderHeaders: false,
+        renderFooters: false,
+        renderFootnotes: false,
+        renderEndnotes: false,
+        useBase64URL: true,
+      });
+      if (cancelled) return;
+
+      const page = host.querySelector("section.docx");
+      const pageWidth = page?.offsetWidth || 794;
+      const outerWidth = ref.current?.clientWidth || 220;
+
+      host.style.width = `${pageWidth}px`;
+      host.style.transform = `scale(${outerWidth / pageWidth})`;
+      setReady(true);
+    }).catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [seen, url]);
+
+  return (
+    <div ref={ref} style={FILL}>
+      <div
+        ref={hostRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          transformOrigin: "top left",
+          opacity: ready ? 1 : 0,
+          pointerEvents: "none",
+        }}
+      />
+      {!ready && (
+        <div style={{ position: "absolute", inset: 0 }}>
+          <IconCard type="doc" name={item.name} />
+        </div>
+      )}
     </div>
   );
 }
@@ -62,35 +347,38 @@ function IconCard({ type, name }) {
 // ── Main preview component ────────────────────────────────────────────────────
 export default function FilePreview({ item }) {
   const [imgError, setImgError] = useState(false);
-  const type = getType(item.name);
+const kind = getFileKind(item);
+const META_KEY = { word: "doc", excel: "sheet", ppt: "slide", text: "doc", folder: "alt" };
+  const type = META_KEY[kind] ?? kind;
+  const isLocal = Boolean(item._id) && !item.webViewLink;
+  const localUrl = isLocal ? `${BASE_URL}/file/${item._id}` : null;
 
-  // Google Drive items have a thumbnailLink
- const gdriveThumbnail = (item.thumbnailLink || (item.hasThumbnail && item.id))
-  ? `https://drive.google.com/thumbnail?id=${item.id}&sz=w220`
-  : null;
+  const gdriveThumbnail = item.thumbnailLink
+    ? item.thumbnailLink.replace(/=s\d+$/, "=s400")
+    : item.hasThumbnail && item.id
+      ? `https://drive.google.com/thumbnail?id=${item.id}&sz=w400`
+      : null;
 
   // Local image — served directly from the backend
-  const localImageUrl = type === "image" && item._id
-    ? `${BASE_URL}/file/${item._id}`
-    : null;
+  const localImageUrl = kind === "image" && localUrl ? localUrl : null;
 
   // Local video — show poster from first frame via video element
-  const localVideoUrl = type === "video" && item._id
-    ? `${BASE_URL}/file/${item._id}`
-    : null;
+  const localVideoUrl = kind === "video" && localUrl ? localUrl : null;
 
   const thumbnailUrl = gdriveThumbnail || localImageUrl;
 
-  // ── Image / GDrive thumbnail ─────────────────────────────────────────────
+  // ── Image / GDrive thumbnail (Drive ke PDF, Word, Excel bhi yahin se aate hain) ──
   if (thumbnailUrl && !imgError) {
     return (
       <img
         src={thumbnailUrl}
         alt={item.name}
+        referrerPolicy="no-referrer"
         onError={() => setImgError(true)}
         style={{
           width: "100%", height: "100%",
           objectFit: "cover",
+          objectPosition: gdriveThumbnail ? "top" : "center",
           display: "block",
         }}
       />
@@ -107,6 +395,17 @@ export default function FilePreview({ item }) {
         onError={() => {}}
       />
     );
+  }
+
+  // ── Local PDF / Word / Excel — asli preview ─────────────────────────────
+ if (localUrl) {
+    const k = cacheKey(item, localUrl);
+
+    if (kind === "pdf") return <PdfThumb key={k} item={item} url={localUrl} />;
+    if (kind === "word" && !isLegacyWord(item) && !tooBig(item))
+      return <DocxThumb key={k} item={item} url={localUrl} />;
+    if (kind === "excel" && !tooBig(item))
+      return <SheetThumb key={k} item={item} url={localUrl} />;
   }
 
   // ── Everything else — styled icon card ──────────────────────────────────
