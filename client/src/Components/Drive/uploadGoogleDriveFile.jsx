@@ -63,7 +63,7 @@ export async function uploadGoogleDriveFile(
     await notifyBackend(S3fileId);
     await refreshUser();
     completeItem(id);
-    onUploadComplete?.("google-drive");
+    onUploadComplete?.("root");
     return { dirId };
   } catch (error) {
     if (S3fileId) await handleCancelUpload(id, S3fileId);
