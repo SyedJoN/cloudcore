@@ -6,11 +6,9 @@ import {
   IconRename,
   IconLink,
   IconRestore,
-  IconNewTab,
   PrintIcon,
 } from "../Icons/Icons";
 import "./FileViewer.css"; // viewers (fv-pdf-stage etc.) still rely on these styles
-import UserAccountBar from "../UserAccountBar";
 import { useLocation } from "react-router-dom";
 import {
   OfficeViewer,
@@ -59,7 +57,6 @@ export default function FileViewerMobile({
   onDownload,
   onRestore,
   onDeleteForever,
-  onDeleteSuccess,
   onCopy,
   onMove,
   meta = false,
@@ -111,7 +108,6 @@ export default function FileViewerMobile({
     ? item?.webContentLink || item?.webViewLink
     : `${BASE_URL}/file/${item?._id}`;
 
-    console.log('cat', category)
 
   /* ---------- capabilities (same rules as MobileContextMenu) ---------- */
 
@@ -342,8 +338,7 @@ export default function FileViewerMobile({
   }
 
   async function handleTrash(target) {
-    await onTrash?.(target);
-    onDeleteSuccess?.(target._id);
+    await onTrash?.(target)
     onClose?.();
   }
 

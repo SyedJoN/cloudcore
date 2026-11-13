@@ -19,6 +19,7 @@ import { copyItem, toggleItemStar } from "../../apis/resourceApi";
 import { axiosWithCreds } from "../../apis/axiosInstances";
 import { useNavigate } from "react-router-dom";
 import { getFileKind, getItemCategory } from "../../Utils/fileKind";
+import { addDirectory } from "../../apis/directoryApi";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -135,51 +136,57 @@ export function useDriveActions({
     [setContextItem, handleSelect],
   );
 
-  const handleRowDoubleClick = useCallback(
-    async (type, id, name) => {
-      if (type === "google-directory") {
-        window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
-        return;
-      }
-      if (type === "directory") {
-        navigate(`/directory/${id}`, {
-          state: { dirContext: previousDirContext.current },
-        });
-        if (isMobile) {
-          setPath((prev) =>
-            [...prev, { id, name }].filter((p) => !p.name?.startsWith("root")),
-          );
-          restartAnimation();
-          setMobileHeaderDirName(name);
-        }
-        return;
-      }
-      const item = combinedItems.find((i) => (i.id ?? i._id) === id);
-      if (item) setViewItem([item]);
-      if (type === "google-file") return;
-      try {
-        await updateFileViewTime(id);
-        setFilesList((prev) =>
-          prev.map((item) =>
-            item._id === id
-              ? { ...item, viewedByMeTime: new Date().toISOString() }
-              : item,
-          ),
-        );
-      } catch (err) {
-        console.log("err", err.message);
-      }
-    },
-    [
-      navigate,
-      previousDirContext,
-      isMobile,
-      restartAnimation,
-      combinedItems,
-      setFilesList,
-    ],
-  );
+const handleRowDoubleClick = useCallback(
+  async (type, id, name) => {
+    if (type === "google-directory") {
+      window.open(`https://drive.google.com/drive/folders/${id}`, "_blank");
+      return;
+    }
 
+    if (type === "directory") {
+      navigate(`/directory/${id}`, {
+        state: { dirContext: previousDirContext.current },
+      });
+
+      setPath((prev) =>
+        [...prev, { id, name }].filter(
+          (p) => !p.name?.startsWith("root"),
+        ),
+      );
+
+      restartAnimation();
+      setMobileHeaderDirName(name);
+      return;
+    }
+
+    const item = combinedItems.find((i) => (i.id ?? i._id) === id);
+    if (item) setViewItem([item]);
+
+    if (type === "google-file") return;
+
+    try {
+      await updateFileViewTime(id);
+
+      setFilesList((prev) =>
+        prev.map((item) =>
+          item._id === id
+            ? { ...item, viewedByMeTime: new Date().toISOString() }
+            : item,
+        ),
+      );
+    } catch (err) {
+      console.log("err", err.message);
+    }
+  },
+  [
+    navigate,
+    previousDirContext,
+    restartAnimation,
+    combinedItems,
+    setFilesList,
+    setViewItem,
+  ],
+);
   /* ───────────── Downloads ───────────── */
 
   const handleDownloadFolder = useCallback(
@@ -322,50 +329,57 @@ export function useDriveActions({
 
   /* ───────────── Print ───────────── */
 
- const handlePrint = useCallback(
-  async (item) => {
-    let category = getItemCategory(item);
-    let fileUrl;
+  const handlePrint = useCallback(
+    async (item) => {
+      let category = getItemCategory(item);
+      let fileUrl;
 
-    if (isGoogleDriveRoute) {
-      const mime = item?.mimeType || "";
-      const isGoogleNative = mime.startsWith("application/vnd.google-apps.");
+      if (isGoogleDriveRoute) {
+        const mime = item?.mimeType || "";
+        const isGoogleNative = mime.startsWith("application/vnd.google-apps.");
 
-      // Docs aur Slides ko controller PDF bana kar deta hai
-      const exportsAsPdf =
-        mime === "application/vnd.google-apps.document" ||
-        mime === "application/vnd.google-apps.presentation";
+        // Docs aur Slides ko controller PDF bana kar deta hai
+        const exportsAsPdf =
+          mime === "application/vnd.google-apps.document" ||
+          mime === "application/vnd.google-apps.presentation";
 
-      if (exportsAsPdf) category = "pdf";
+        if (exportsAsPdf) category = "pdf";
 
-      const printableHere = exportsAsPdf || (!isGoogleNative && ["pdf", "image"].includes(category));
+        const printableHere =
+          exportsAsPdf ||
+          (!isGoogleNative && ["pdf", "image"].includes(category));
 
-      // Sheets (xlsx export), Word/Excel/PPT, video waghera: Drive mein kholo
-      if (!printableHere) {
-        const url =
-          item?.webViewLink ||
-          (item?.id ? `https://drive.google.com/file/d/${item.id}/view` : null);
+        // Sheets (xlsx export), Word/Excel/PPT, video waghera: Drive mein kholo
+        if (!printableHere) {
+          const url =
+            item?.webViewLink ||
+            (item?.id
+              ? `https://drive.google.com/file/d/${item.id}/view`
+              : null);
 
-        if (!url) {
-          return toast({ message: "Print link not available", type: "error" });
+          if (!url) {
+            return toast({
+              message: "Print link not available",
+              type: "error",
+            });
+          }
+          return window.open(url, "_blank", "noopener,noreferrer");
         }
-        return window.open(url, "_blank", "noopener,noreferrer");
+
+        fileUrl = `${BASE_URL}/auth/google-drive/download?fileId=${encodeURIComponent(item.id)}`;
+      } else {
+        fileUrl = `${BASE_URL}/file/${item?._id}`;
       }
 
-      fileUrl = `${BASE_URL}/auth/google-drive/download?fileId=${encodeURIComponent(item.id)}`;
-    } else {
-      fileUrl = `${BASE_URL}/file/${item?._id}`;
-    }
+      document.getElementById("printJS")?.remove();
 
-    document.getElementById("printJS")?.remove();
-
-    // Word printing (sirf local files, jo screen par render hoti hain)
-    if (category === "office-word") {
-      return printJS({
-        printable: "gdv-stage",
-        type: "html",
-        scanStyles: false,
-        style: `
+      // Word printing (sirf local files, jo screen par render hoti hain)
+      if (category === "office-word") {
+        return printJS({
+          printable: "gdv-stage",
+          type: "html",
+          scanStyles: false,
+          style: `
           @page { margin: 0; }
           html, body { margin: 0; padding: 0; background: #fff; }
           #gdv-stage { padding: 0 !important; display: block !important; }
@@ -376,32 +390,33 @@ export function useDriveActions({
             page-break-after: always;
           }
         `,
-      });
-    }
-
-    try {
-      const res = await fetch(fileUrl, { credentials: "include" });
-      if (!res.ok) throw new Error();
-      const blobUrl = URL.createObjectURL(await res.blob());
-
-      if (category === "pdf") {
-        return printJS({ printable: blobUrl, type: "pdf" });
+        });
       }
 
-      // image
-      return printJS({
-        printable: blobUrl,
-        type: "image",
-        headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
-        imageStyle: "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
-        style: "@page { margin: 0; }",
-      });
-    } catch {
-      return toast({ message: "Failed to print", type: "error" });
-    }
-  },
-  [isGoogleDriveRoute],
-);
+      try {
+        const res = await fetch(fileUrl, { credentials: "include" });
+        if (!res.ok) throw new Error();
+        const blobUrl = URL.createObjectURL(await res.blob());
+
+        if (category === "pdf") {
+          return printJS({ printable: blobUrl, type: "pdf" });
+        }
+
+        // image
+        return printJS({
+          printable: blobUrl,
+          type: "image",
+          headerStyle: "font-size:14px;font-weight:normal;text-align:center;",
+          imageStyle:
+            "max-width:100%;max-height:90vh;display:block;margin:0 auto;",
+          style: "@page { margin: 0; }",
+        });
+      } catch {
+        return toast({ message: "Failed to print", type: "error" });
+      }
+    },
+    [isGoogleDriveRoute],
+  );
   /* ───────────── Sharing ───────────── */
 
   const handleToggleResourcePublic = useCallback(
@@ -1880,7 +1895,7 @@ export function useDriveActions({
         idSet.has(String(i._id ?? i.id)),
       );
       if (!items.length) return;
-      await handleMoveToTrash(items); 
+      await handleMoveToTrash(items);
     },
     [combinedItems, handleMoveToTrash],
   );
@@ -1919,6 +1934,8 @@ export function useDriveActions({
     setShowCreateDir,
     showRename,
     setShowRename,
+    newDirname,
+    setNewDirname,
     renameValue,
     setRenameValue,
     shareItem,

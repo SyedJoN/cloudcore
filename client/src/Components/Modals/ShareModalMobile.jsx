@@ -1702,7 +1702,6 @@ export default function ShareModalMobile({
                     <SectionLabel>People with access</SectionLabel>
 
                     {sortedPeople.map((person) => {
-                      console.log("PERSON:", person);
                       const roleLocked =
                         person.role === "owner" || !canChangeRole;
                       const email = person?.emailAddress ?? person?.email;

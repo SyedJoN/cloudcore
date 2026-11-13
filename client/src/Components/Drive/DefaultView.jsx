@@ -168,28 +168,25 @@ const DefaultView = ({
           user={user}
         />
       )}
-      {isDesktop
-        ? viewMode === "grid"
-        : true && (
-            <div className="sort-btn pb-2 -mx-1.5 py-2">
-              {isMobile ? (
-                <SortButtonMobile
-                  viewMode={viewMode}
-                  onToggleView={onToggleView}
-                  sortConfig={sortConfig}
-                  setSortConfig={setSortConfig}
-                />
-              ) : (
-                <SortButton
-                  viewMode={viewMode}
-                  onToggleView={onToggleView}
-                  sortConfig={sortConfig}
-                  setSortConfig={setSortConfig}
-                />
-              )}
-            </div>
+      {(isDesktop ? viewMode === "grid" : true) && (
+        <div className="sort-btn pb-2 -mx-1.5 py-2">
+          {isMobile ? (
+            <SortButtonMobile
+              viewMode={viewMode}
+              onToggleView={onToggleView}
+              sortConfig={sortConfig}
+              setSortConfig={setSortConfig}
+            />
+          ) : (
+            <SortButton
+              viewMode={viewMode}
+              onToggleView={onToggleView}
+              sortConfig={sortConfig}
+              setSortConfig={setSortConfig}
+            />
           )}
-
+        </div>
+      )}
       {isDesktop ? viewMode === "list" && listHeaderRow : null}
 
       {sortedItems.length === 0 ? (

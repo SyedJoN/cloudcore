@@ -769,11 +769,7 @@ body.gd-drag-active::before {
 }
 
 .gd-grid-item-name {
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;

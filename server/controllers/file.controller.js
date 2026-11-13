@@ -37,6 +37,7 @@ import { getFgaObject } from "../utils/getFgaObject.js";
 import { getCreateCloudfrontSignedUrl } from "../services/s3/cloudfront.js";
 import { sanitizeText } from "../utils/sanitizeText.js";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
+import { listObjects } from "./directory.controller.js";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -2673,45 +2674,160 @@ export const updateGoogleDrivePermission = async (req, res, next) => {
   }
 };
 
+export const recordView = (userId, itemId, itemType) => {
+  const now = new Date();
+  return FileActivity.updateOne(
+    { file: itemId, user: userId, type: "view" },
+    {
+      $set: {
+        occuredAt: now,
+        itemType,
+        itemModel: itemType === "file" ? "File" : "Directory",
+      },
+      $inc: { viewCount: 1 },
+      $push: { recentViews: { $each: [now], $slice: -20 } },
+    },
+    { upsert: true },
+  );
+};
+
+/* ---------- modified: updateFileViewTime ---------- */
 export const updateFileViewTime = async (req, res, next) => {
   const { id } = req.params;
   const userId = req.user?._id;
 
   if (!id) {
-    return res.status(400).json({
-      message: "File Id is required!",
-    });
+    return res.status(400).json({ message: "File Id is required!" });
   }
-
   if (!userId) {
-    return res.status(401).json({
-      message: "Unauthorized",
-    });
+    return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
-    await FileActivity.findOneAndUpdate(
-      {
-        file: id,
-        user: userId,
-        type: "view",
-      },
-      {
-        $set: {
-          occuredAt: new Date(),
-        },
-      },
-      {
-        upsert: true,
-        returnDocument: "after",
-      },
-    );
-
-    return res.status(200).json({
-      message: "View record updated!",
-    });
+    await recordView(userId, id, "file");
+    return res.status(200).json({ message: "View record updated!" });
   } catch (error) {
     console.error(error);
     next(error);
+  }
+};
+
+/* ---------- new: getSuggestions ---------- */
+const DAY = 24 * 60 * 60 * 1000;
+const HALF_LIFE_MS = 7 * DAY;
+
+const scoreOf = (views, now) =>
+  views.reduce(
+    (sum, t) => sum + Math.pow(0.5, (now - new Date(t).getTime()) / HALF_LIFE_MS),
+    0,
+  );
+
+export const getSuggestions = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const now = Date.now();
+
+    // config
+    const LIMIT = { file: 18, folder: 6 };
+    const FREQUENT_WINDOW_MS = 7 * DAY; // "frequent" = 7 din mein kam az kam 3 baar
+    const FREQUENT_MIN_VIEWS = 3;
+    const populate = [
+      { path: "userId", select: "name email avatar" },
+      { path: "path", select: "name" },
+      { path: "parentDirId" },
+      { path: "lastModifyingUser" },
+    ];
+
+    // teeno independent hain, to ek saath chalte hain
+    const [activities, allowedFileIds, allowedFolderIds] = await Promise.all([
+      FileActivity.find({ user: userId, type: "view" })
+        .sort({ occuredAt: -1 })
+        .limit(200)
+        .lean(),
+      listObjects("file", userId), // sirf wahi jo user ab bhi dekh sakta hai
+      listObjects("folder", userId),
+    ]);
+
+    const okFile = new Set(allowedFileIds.map(String));
+    const okFolder = new Set(allowedFolderIds.map(String));
+    const rootDirId = String(req.user?.parentDirId);
+
+    const ranked = activities
+      .map((a) => {
+        // purane docs (recentViews se pehle ke) mein sirf occuredAt hota hai
+        const views = a.recentViews?.length ? a.recentViews : [a.occuredAt];
+        const recent = views.filter(
+          (t) => now - new Date(t).getTime() < FREQUENT_WINDOW_MS,
+        ).length;
+
+        return {
+          ...a,
+          score: scoreOf(views, now),
+          frequent: recent >= FREQUENT_MIN_VIEWS,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // type + access ke hisaab se top N (skipId: apna root folder suggestion mein nahi)
+    const pick = (type, allowed, skipId) =>
+      ranked
+        .filter(
+          (a) =>
+            (a.itemType ?? "file") === type &&
+            allowed.has(String(a.file)) &&
+            String(a.file) !== skipId,
+        )
+        .slice(0, LIMIT[type]);
+
+    const fileActs = pick("file", okFile);
+    const folderActs = pick("folder", okFolder, rootDirId);
+
+    const load = (Model, acts) =>
+      Model.find({ _id: { $in: acts.map((a) => a.file) }, isDeleted: false })
+        .populate(populate)
+        .lean();
+
+    const [files, folders] = await Promise.all([
+      load(File, fileActs),
+      load(Directory, folderActs),
+    ]);
+
+    // activities ke order mein docs, role aur view info ke saath
+    const hydrate = (docs, acts, type) => {
+      const byId = new Map(docs.map((d) => [String(d._id), d]));
+
+      const rows = acts
+        .map((a) => ({ a, d: byId.get(String(a.file)) }))
+        .filter((x) => x.d); // delete ho chuki / nahi mili
+
+      return Promise.all(
+        rows.map(async ({ a, d }) => {
+          const role = await resolveRole(d, type, userId, d.parentDirId);
+          const isMine = String(d.userId?._id ?? d.userId) === String(userId);
+
+          return {
+            ...d, // mimeType, extension waghera lean doc se khud aate hain
+            ...role,
+            isDirectory: type === "folder",
+            lastViewedAt: a.occuredAt,
+            viewCount: a.viewCount ?? 1,
+            suggestionReason: a.frequent ? "frequent" : "opened",
+            rootType: isMine ? "mine" : "shared",
+            locationLabel: isMine ? "" : "Shared with me",
+          };
+        }),
+      );
+    };
+
+    const [fileItems, folderItems] = await Promise.all([
+      hydrate(files, fileActs, "file"),
+      hydrate(folders, folderActs, "folder"),
+    ]);
+
+    res.json({ files: fileItems, directories: folderItems });
+  } catch (err) {
+    next(err);
   }
 };

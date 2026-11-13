@@ -43,6 +43,7 @@ import SharedAccess from "../models/sharedAccess.model.js";
 import FileActivity from "../models/fileActivity.model.js";
 import { getFgaObject } from "../utils/getFgaObject.js";
 import mongoose from "mongoose";
+import { recordView } from "./file.controller.js";
 
 async function getSharedWithMeTime({ itemId, itemType, userId }) {
   if (!itemId || !userId) return null;
@@ -380,7 +381,7 @@ async function listSharedObjects(type, userId) {
   return [...new Set(combined)].map((o) => o.split(":").pop()).filter(Boolean);
 }
 
-async function listObjects(type, userId) {
+export async function listObjects(type, userId) {
   const canRead = await fgaClient.listObjects({
     user: getFgaObject("user", userId),
     relation: "can_read",
@@ -398,23 +399,33 @@ export const getDirectory = async (req, res, next) => {
     const rootDir = await Directory.findOne({ userId })
       .populate("path", "name")
       .lean();
+
     const parentDir = await Directory.findOne({ _id })
       .populate("path", "name")
       .lean();
+
     if (!parentDir)
       return res.status(404).json({ message: "Directory not found" });
 
     const isPublic = parentDir.isPublic;
+
     // fetching children
     if (isPublic) {
       const [files, directories] = await Promise.all([
-        File.find({ parentDirId: parentDir._id, isDeleted: false })
+        File.find({
+          parentDirId: parentDir._id,
+          isDeleted: false,
+        })
           .populate("userId", "name email avatar")
           .populate("path", "name")
           .populate("parentDirId")
           .populate("lastModifyingUser")
           .lean(),
-        Directory.find({ parentDirId: parentDir._id, isDeleted: false })
+
+        Directory.find({
+          parentDirId: parentDir._id,
+          isDeleted: false,
+        })
           .populate("userId", "name email avatar")
           .populate("path", "name")
           .populate("parentDirId")
@@ -449,6 +460,7 @@ export const getDirectory = async (req, res, next) => {
       }
 
       const { files: _, directories: __, ...parentDirData } = parentDir;
+
       const actualParent = parentDir.parentDirId
         ? await Directory.findById(parentDir.parentDirId)
             .select("_id name parentDirId isPublic publicRole")
@@ -465,6 +477,9 @@ export const getDirectory = async (req, res, next) => {
               viewedByMeTime,
               modifiedByMeTime,
             } = await resolveRole(f, "file", userId, parentDir);
+
+            const isMine = String(f.userId?._id ?? f.userId) === String(userId);
+
             return {
               ...f,
               owners,
@@ -472,9 +487,12 @@ export const getDirectory = async (req, res, next) => {
               permissions,
               viewedByMeTime,
               modifiedByMeTime,
+              locationLabel: !isMine ? "Shared with me" : "",
+              rootType: isMine ? "mine" : "shared",
             };
           }),
         ),
+
         Promise.all(
           directories.map(async (d) => {
             const { owners, capabilities, permissions } = await resolveRole(
@@ -483,30 +501,38 @@ export const getDirectory = async (req, res, next) => {
               userId,
               parentDir,
             );
+
+            const isMine = String(d.userId?._id ?? d.userId) === String(userId);
+
             return {
               ...d,
               owners,
               capabilities,
               permissions,
+              locationLabel: !isMine ? "Shared with me" : "",
+              rootType: isMine ? "mine" : "shared",
             };
           }),
         ),
       ]);
+
       const permissions = await resolveRole(
         parentDir,
         "folder",
         userId,
         actualParent,
       );
+
       const parentDirWithRole = {
         ...parentDirData,
         ...permissions,
       };
+
       return res.status(200).json({
         ...parentDirWithRole,
         files: filesWithRoles,
         directories: directoriesWithRoles,
-        totalUsage: rootDir.size,
+        totalUsage: rootDir?.size,
       });
     }
 
@@ -546,8 +572,8 @@ export const getDirectory = async (req, res, next) => {
         .populate("path", "name")
         .populate("parentDirId")
         .populate("lastModifyingUser")
-
         .lean(),
+
       Directory.find({
         _id: { $in: allowedFolderIds },
         parentDirId: parentDir._id,
@@ -557,7 +583,6 @@ export const getDirectory = async (req, res, next) => {
         .populate("parentDirId")
         .populate("path", "name")
         .populate("lastModifyingUser")
-
         .lean(),
     ]);
 
@@ -570,6 +595,10 @@ export const getDirectory = async (req, res, next) => {
           viewedByMeTime,
           modifiedByMeTime,
         } = await resolveRole(file, "file", userId, parentDir);
+
+        const isMine =
+          String(file.userId?._id ?? file.userId) === String(userId);
+
         return {
           ...file,
           owners,
@@ -577,6 +606,8 @@ export const getDirectory = async (req, res, next) => {
           permissions,
           viewedByMeTime,
           modifiedByMeTime,
+          locationLabel: !isMine ? "Shared with me" : "",
+          rootType: isMine ? "mine" : "shared",
         };
       }),
     );
@@ -589,14 +620,20 @@ export const getDirectory = async (req, res, next) => {
           userId,
           parentDir,
         );
+
+        const isMine = String(dir.userId?._id ?? dir.userId) === String(userId);
+
         return {
           ...dir,
           owners,
           capabilities,
           permissions,
+          locationLabel: !isMine ? "Shared with me" : "",
+          rootType: isMine ? "mine" : "shared",
         };
       }),
     );
+
     const { owners, capabilities, permissions } = await resolveRole(
       parentDir,
       "folder",
@@ -610,16 +647,22 @@ export const getDirectory = async (req, res, next) => {
       capabilities,
       permissions,
     };
+
+    if (req.params.id) {
+      recordView(userId, parentDir._id, "folder").catch(console.error);
+    }
+
     return res.status(200).json({
       ...parentDirectoryWithRoles,
       files: filesWithRoles,
       directories: directoriesWithRoles,
-      totalUsage: rootDir.size,
+      totalUsage: rootDir?.size,
     });
   } catch (error) {
     next(error);
   }
 };
+
 export const getTrashItems = async (req, res, next) => {
   try {
     const id = req.params.id;
@@ -800,7 +843,8 @@ export const getSharedWithMe = async (req, res, next) => {
             .select("_id name parentDirId isPublic publicRole")
             .lean();
         }
-
+        const isMine =
+          String(file.userId?._id ?? file.userId) === String(userId);
         const { owners, capabilities, permissions, sharedWithMeTime } =
           await resolveRole(file, "file", userId, parentDir, true);
 
@@ -810,6 +854,7 @@ export const getSharedWithMe = async (req, res, next) => {
           capabilities,
           permissions,
           sharedWithMeTime,
+          rootType: isMine ? "mine" : "shared",
         };
       }),
     );
@@ -827,7 +872,8 @@ export const getSharedWithMe = async (req, res, next) => {
               .lean();
           }
         }
-
+    const isMine =
+          String(directory.userId?._id ?? directory.userId) === String(userId);
         const { owners, capabilities, permissions, sharedWithMeTime } =
           await resolveRole(directory, "folder", userId, parentDir, true);
 
@@ -837,6 +883,7 @@ export const getSharedWithMe = async (req, res, next) => {
           capabilities,
           permissions,
           sharedWithMeTime,
+          rootType: isMine ? "mine" : "shared"
         };
       }),
     );
@@ -1109,7 +1156,8 @@ export const softDeleteDirectory = async (req, res, next) => {
     const dirs = await Directory.find({ _id: { $in: ids }, isDeleted: false })
       .select("parentDirId userId size")
       .lean();
-    if (!dirs.length) return res.status(404).json({ message: "Directory not found" });
+    if (!dirs.length)
+      return res.status(404).json({ message: "Directory not found" });
 
     const checks = await Promise.all(
       dirs.map((d) =>
@@ -1123,7 +1171,8 @@ export const softDeleteDirectory = async (req, res, next) => {
     const allowed = dirs.filter(
       (_, i) => user.role === "superuser" || checks[i].allowed,
     );
-    if (!allowed.length) return res.status(403).json({ message: "Unauthorized!" });
+    if (!allowed.length)
+      return res.status(403).json({ message: "Unauthorized!" });
 
     // collect every nested folder + file, one query per level
     let frontier = allowed.map((d) => d._id);
@@ -1147,9 +1196,15 @@ export const softDeleteDirectory = async (req, res, next) => {
     const trashedTime = Date.now();
     await Promise.all([
       allFileIds.length
-        ? File.updateMany({ _id: { $in: allFileIds } }, { isDeleted: true, trashedTime })
+        ? File.updateMany(
+            { _id: { $in: allFileIds } },
+            { isDeleted: true, trashedTime },
+          )
         : null,
-      Directory.updateMany({ _id: { $in: allDirIds } }, { isDeleted: true, trashedTime }),
+      Directory.updateMany(
+        { _id: { $in: allDirIds } },
+        { isDeleted: true, trashedTime },
+      ),
     ]);
 
     // one size update per parent folder
@@ -1389,8 +1444,12 @@ export const restoreDirectory = async (req, res, next) => {
 
     while (frontier.length) {
       const [childDirs, childFiles] = await Promise.all([
-        Directory.find({ parentDirId: { $in: frontier } }).select("_id").lean(),
-        File.find({ parentDirId: { $in: frontier } }).select("_id").lean(),
+        Directory.find({ parentDirId: { $in: frontier } })
+          .select("_id")
+          .lean(),
+        File.find({ parentDirId: { $in: frontier } })
+          .select("_id")
+          .lean(),
       ]);
       frontier = childDirs.map((d) => d._id);
       allDirIds.push(...frontier);
@@ -1461,25 +1520,17 @@ export const requestAccess = async (req, res, next) => {
   }
 };
 
-
 export const sendLink = async (req, res, next) => {
   try {
     const { items, toEmails, message, notifyPeople } = req.body;
 
-    if (
-      !Array.isArray(items) ||
-      items.length === 0 ||
-      items.length > 50
-    ) {
+    if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
       return res.status(400).json({
         message: "Send between 1 and 50 items",
       });
     }
 
-    if (
-      !Array.isArray(toEmails) ||
-      toEmails.length === 0
-    ) {
+    if (!Array.isArray(toEmails) || toEmails.length === 0) {
       return res.status(400).json({
         message: "At least one recipient is required",
       });
@@ -1502,7 +1553,7 @@ export const sendLink = async (req, res, next) => {
         toEmails
           .filter((email) => typeof email === "string")
           .map((email) => email.trim().toLowerCase())
-          .filter(Boolean)
+          .filter(Boolean),
       ),
     ];
 
@@ -1590,8 +1641,7 @@ export const sendLink = async (req, res, next) => {
       }
     }
 
-    const sent =
-      successfulRecipients > 0 ? validItems.length : 0;
+    const sent = successfulRecipients > 0 ? validItems.length : 0;
 
     if (!sent) {
       return res.status(500).json({
@@ -1616,7 +1666,6 @@ export const sendLink = async (req, res, next) => {
     next(error);
   }
 };
-
 
 export const toggleItemStar = async (req, res, next) => {
   try {
@@ -2818,16 +2867,12 @@ export const completeFolderUpload = async (req, res, next) => {
   }
 };
 
-
-
 export const copyItems = async (req, res, next) => {
   try {
     const userId = req.user?._id;
     const providerType = req.body?.providerType;
 
-    const items =
-      req.body?.items ??
-      (req.body?.item ? [req.body.item] : []);
+    const items = req.body?.items ?? (req.body?.item ? [req.body.item] : []);
 
     const allowedProviderTypes = ["local", "google"];
 
@@ -2890,8 +2935,7 @@ export const copyItems = async (req, res, next) => {
 
       const drive = getDriveClient(drive_access_token);
 
-      const GOOGLE_FOLDER_MIME =
-        "application/vnd.google-apps.folder";
+      const GOOGLE_FOLDER_MIME = "application/vnd.google-apps.folder";
 
       const GOOGLE_FIELDS = [
         "id",
@@ -2910,26 +2954,24 @@ export const copyItems = async (req, res, next) => {
       // -----------------------------------------
 
       const getGoogleItemDetails = async (fileId) => {
-        const [fileResponse, permissionsResponse] =
-          await Promise.all([
-            drive.files.get({
-              fileId,
-              fields: GOOGLE_FIELDS,
-            }),
+        const [fileResponse, permissionsResponse] = await Promise.all([
+          drive.files.get({
+            fileId,
+            fields: GOOGLE_FIELDS,
+          }),
 
-            drive.permissions.list({
-              fileId,
-              fields:
-                "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
-            }),
-          ]);
+          drive.permissions.list({
+            fileId,
+            fields:
+              "permissions(id,type,emailAddress,role,pendingOwner,displayName)",
+          }),
+        ]);
 
         return {
           ...fileResponse.data,
           owners: fileResponse.data.owners || [],
           capabilities: fileResponse.data.capabilities || {},
-          permissions:
-            permissionsResponse.data.permissions || [],
+          permissions: permissionsResponse.data.permissions || [],
         };
       };
 
@@ -2965,11 +3007,7 @@ export const copyItems = async (req, res, next) => {
 
           for (const file of response.data.files || []) {
             if (file.mimeType === GOOGLE_FOLDER_MIME) {
-              await copyGoogleFolder(
-                file.id,
-                newFolderId,
-                file.name,
-              );
+              await copyGoogleFolder(file.id, newFolderId, file.name);
             } else {
               await drive.files.copy({
                 fileId: file.id,
@@ -3004,9 +3042,7 @@ export const copyItems = async (req, res, next) => {
             fields: "id",
           });
 
-          const copiedItem = await getGoogleItemDetails(
-            copiedFile.data.id,
-          );
+          const copiedItem = await getGoogleItemDetails(copiedFile.data.id);
 
           copiedItems.push({
             copiedItem,
@@ -3017,8 +3053,7 @@ export const copyItems = async (req, res, next) => {
             fields: "id,name,parents,mimeType",
           });
 
-          const destinationParentId =
-            sourceFolder.data.parents?.[0];
+          const destinationParentId = sourceFolder.data.parents?.[0];
 
           if (!destinationParentId) {
             return res.status(400).json({
@@ -3077,13 +3112,7 @@ export const copyItems = async (req, res, next) => {
     // Recursively copy local files and folders
     // -----------------------------------------
 
-    const copyLocalItem = async (
-      source,
-      type,
-      parentDirId,
-      path,
-      name,
-    ) => {
+    const copyLocalItem = async (source, type, parentDirId, path, name) => {
       const Model = type === "folder" ? Directory : File;
 
       const copiedItem = new Model({
@@ -3100,11 +3129,9 @@ export const copyItems = async (req, res, next) => {
         copiedItem.extension = source.extension;
         copiedItem.isUploading = true;
 
-        const newS3Key =
-          `${copiedItem._id}${copiedItem.extension}`;
+        const newS3Key = `${copiedItem._id}${copiedItem.extension}`;
 
-        const oldS3Key =
-          `${source._id}${source.extension}`;
+        const oldS3Key = `${source._id}${source.extension}`;
 
         await copyS3File(oldS3Key, newS3Key);
 
@@ -3132,21 +3159,17 @@ export const copyItems = async (req, res, next) => {
 
       // Recursively copy folder contents
       if (type === "folder") {
-        const [childFolders, childFiles] =
-          await Promise.all([
-            Directory.find({
-              parentDirId: source._id,
-            }).lean(),
+        const [childFolders, childFiles] = await Promise.all([
+          Directory.find({
+            parentDirId: source._id,
+          }).lean(),
 
-            File.find({
-              parentDirId: source._id,
-            }).lean(),
-          ]);
+          File.find({
+            parentDirId: source._id,
+          }).lean(),
+        ]);
 
-        const childPath = [
-          ...path,
-          copiedItem._id,
-        ];
+        const childPath = [...path, copiedItem._id];
 
         for (const folder of childFolders) {
           await copyLocalItem(
@@ -3179,12 +3202,9 @@ export const copyItems = async (req, res, next) => {
     const copiedDocuments = [];
 
     for (const item of normalizedItems) {
-      const Model =
-        item.type === "folder" ? Directory : File;
+      const Model = item.type === "folder" ? Directory : File;
 
-      const dbItem = await Model.findById(
-        item.itemId,
-      ).lean();
+      const dbItem = await Model.findById(item.itemId).lean();
 
       if (!dbItem) {
         return res.status(404).json({
@@ -3215,16 +3235,9 @@ export const copyItems = async (req, res, next) => {
 
     const batchSize = 100;
 
-    for (
-      let i = 0;
-      i < relationships.length;
-      i += batchSize
-    ) {
+    for (let i = 0; i < relationships.length; i += batchSize) {
       await fgaClient.write({
-        writes: relationships.slice(
-          i,
-          i + batchSize,
-        ),
+        writes: relationships.slice(i, i + batchSize),
       });
     }
 
@@ -3233,27 +3246,21 @@ export const copyItems = async (req, res, next) => {
     // -----------------------------------------
 
     const copiedItems = await Promise.all(
-      copiedDocuments.map(
-        async ({ copiedItem, type }) => {
-          const {
-            owners,
-            capabilities,
-            permissions,
-          } = await resolveRole(
-            copiedItem,
-            type,
-            userId,
-            copiedItem.parentDirId,
-          );
+      copiedDocuments.map(async ({ copiedItem, type }) => {
+        const { owners, capabilities, permissions } = await resolveRole(
+          copiedItem,
+          type,
+          userId,
+          copiedItem.parentDirId,
+        );
 
-          return {
-            copiedItem,
-            owners,
-            capabilities,
-            permissions,
-          };
-        },
-      ),
+        return {
+          copiedItem,
+          owners,
+          capabilities,
+          permissions,
+        };
+      }),
     );
 
     // =========================================
@@ -3271,21 +3278,15 @@ export const copyItems = async (req, res, next) => {
 
     if (error?.code === 403) {
       return res.status(403).json({
-        message:
-          error?.cause?.message ||
-          "You can't copy this item",
+        message: error?.cause?.message || "You can't copy this item",
       });
     }
 
     return res.status(500).json({
-      message:
-        error.message ||
-        "Something went wrong while copying items",
+      message: error.message || "Something went wrong while copying items",
     });
   }
 };
-
-
 
 export const moveItems = async (req, res, next) => {
   try {
@@ -3351,19 +3352,18 @@ export const moveItems = async (req, res, next) => {
         });
       }
 
-  const alreadyInDestination = resolvedItems.filter(
-  ({ document }) =>
-    String(document.parentDirId) === destinationFolderId,
-);
+      const alreadyInDestination = resolvedItems.filter(
+        ({ document }) => String(document.parentDirId) === destinationFolderId,
+      );
 
-if (alreadyInDestination.length) {
-  const message =
-    alreadyInDestination.length === 1
-      ? `${alreadyInDestination[0].document.name} is already in ${destinationName}`
-      : `Selected items are already in ${destinationName}`;
+      if (alreadyInDestination.length) {
+        const message =
+          alreadyInDestination.length === 1
+            ? `${alreadyInDestination[0].document.name} is already in ${destinationName}`
+            : `Selected items are already in ${destinationName}`;
 
-  return res.status(400).json({ message });
-}
+        return res.status(400).json({ message });
+      }
 
       if (type === "folder") {
         const folderId = String(document._id);
@@ -3435,10 +3435,7 @@ if (alreadyInDestination.length) {
 
       const oldPath = (document.path || []).map(String);
 
-      const newPath = [
-        ...destinationPath.map(String),
-        destinationFolderId,
-      ];
+      const newPath = [...destinationPath.map(String), destinationFolderId];
 
       const object = getFgaObject(type, document._id);
 
@@ -3503,13 +3500,9 @@ if (alreadyInDestination.length) {
 
       // Find all descendants
       const [descendantFolders, descendantFiles] = await Promise.all([
-        Directory.find({ path: document._id })
-          .select("_id path")
-          .lean(),
+        Directory.find({ path: document._id }).select("_id path").lean(),
 
-        File.find({ path: document._id })
-          .select("_id path")
-          .lean(),
+        File.find({ path: document._id }).select("_id path").lean(),
       ]);
 
       // Update descendant folder paths
@@ -3580,9 +3573,7 @@ if (alreadyInDestination.length) {
 
     return res.status(200).json({
       message: `${resolvedItems.length} item(s) moved to ${destinationName} successfully`,
-      movedIds: resolvedItems.map(({ document }) =>
-        String(document._id),
-      ),
+      movedIds: resolvedItems.map(({ document }) => String(document._id)),
       moved: {
         files: fileCount,
         folders: folderCount,
@@ -3596,4 +3587,3 @@ if (alreadyInDestination.length) {
     });
   }
 };
-

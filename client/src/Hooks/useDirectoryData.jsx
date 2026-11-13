@@ -9,6 +9,7 @@ const isRootName = (n) => (n ?? "").startsWith("root");
 export function useDirectoryData({
   route,
   dirId,
+  user,
   dirContext,
   isSharedRoute,
   isRecentRoute,
@@ -26,8 +27,22 @@ export function useDirectoryData({
   const [crumbs, setCrumbs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [needsAccess, setNeedsAccess] = useState(false);
+  const [folderRoot, setFolderRoot] = useState(undefined);
 
   const controllerRef = useRef(null);
+
+  const rootKey = useMemo(() => {
+    if (folderRoot === undefined) return undefined; // abhi load ho raha hai
+
+    // 1. backend ka rootType, jab bheja ho
+    if (folderRoot?.type)
+      return folderRoot.type === "mine" ? "drive" : "shared";
+
+    if (folderRoot?.email)
+      return folderRoot.email === user?.email ? "drive" : "shared";
+
+    return null;
+  }, [folderRoot, user?.email]);
 
   const startRequest = () => {
     controllerRef.current?.abort();
@@ -48,6 +63,7 @@ export function useDirectoryData({
       setIsLoading(true);
       setDirectoriesList([]);
       setFilesList([]);
+      setFolderRoot((prev) => (prev?.type || prev?.email ? prev : undefined));
 
       try {
         const { fetch } = ROUTE_CONFIG[dirType];
@@ -68,17 +84,30 @@ export function useDirectoryData({
                 : data?.name;
 
         setDirectoryName(name);
+        const firstRoot = data?.path?.find((p) => isRootName(p.name));
+        const rootEmail = firstRoot?.name?.replace(/^root-/, "");
+        setFolderRoot({
+          type: data?.rootType ?? null,
+          email: rootEmail ?? null,
+        });
+
         const cleanPath = Array.isArray(data?.path)
-          ? data?.path
+          ? data.path
               .filter((p) => !isRootName(p.name))
               .map((p) => ({ id: p._id, name: p.name }))
           : (data?.path ?? []);
+
         const currentCrumb = data?.path
           ? isRootName(data?.name)
             ? {}
             : { id: data?._id, name: data?.name }
           : {};
-        setCrumbs([...cleanPath, currentCrumb]);
+
+        setCrumbs([
+          ...(!user?.email === undefined ? [{ name: "Shared with me" }] : []),
+          ...cleanPath,
+          ...(Object.keys(currentCrumb).length ? [currentCrumb] : []),
+        ]);
 
         if (!isRecentRoute ? !data?.directories || !data?.files : !data?.files)
           return;
@@ -219,6 +248,7 @@ export function useDirectoryData({
     isLoading,
     needsAccess,
     getDirectoryItems,
+    rootKey,
     getTrashItems,
     combinedItems,
     filteredFiles,

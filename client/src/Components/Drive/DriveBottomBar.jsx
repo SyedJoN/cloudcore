@@ -11,8 +11,8 @@ import GoogleDriveSVG from "../Icons/GoogleDriveSVG";
 import { GDrivePicker, NAV_ITEMS } from "./DriveSidebar";
 import { BottomSheet, SheetItem } from "./BottomSheet";
 
-const TAB_KEYS = ["home", "starred", "shared", "root"];
-const TAB_LABELS = { root: "Files" };
+const TAB_KEYS = ["home", "starred", "shared", "drive"];
+const TAB_LABELS = { drive: "Files" };
 
 /* ---------- Main mobile component ---------- */
 export default function DriveBottomBar({

@@ -51,7 +51,7 @@ function GoogleLoginBtn({ setServerError, priceId }) {
         setServerError(err || "Error while logging google");
       }}
       useOneTap
-      width={346}
+      width="100%"
       size="medium"
       text="continue_with"
       theme="outline"

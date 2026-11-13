@@ -1,0 +1,94 @@
+/* Google Drive layout toggle: light theme (default) */
+.gd-view-toggle {
+  --vt-border: #747775;
+  --vt-fg: #444746;
+  --vt-hover: rgb(68 71 70 / 0.08);
+  --vt-sel-bg: #c2e7ff;
+  --vt-sel-fg: #001d35;
+
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 32px;
+  overflow: hidden; /* selected side pill ke kinare tak jaye */
+  border: 1px solid var(--vt-border);
+  border-radius: 20px;
+}
+
+/* Dark theme: apne app ke dark selector ke hisaab se ek line badal lein */
+:root[data-theme="dark"] .gd-view-toggle,
+.dark .gd-view-toggle,
+.theme-dark .gd-view-toggle {
+  --vt-border: #8e918f;
+  --vt-fg: #e3e3e3;
+  --vt-hover: rgb(227 227 227 / 0.08);
+  --vt-sel-bg: #004a77;
+  --vt-sel-fg: #c2e7ff;
+}
+
+.gd-view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--vt-fg);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.gd-view-toggle-btn:nth-child(1) {
+    border-right: 2px solid var(--border);
+}
+.gd-view-toggle-btn:hover:not(.selected) {
+  background: var(--vt-hover);
+}
+
+.gd-view-toggle-btn.selected {
+  background: var(--accent-blue-light);
+  color: var(--vt-sel-fg);
+  cursor: default;
+}
+
+.gd-view-toggle-btn:focus-visible {
+  outline: 2px solid var(--vt-sel-fg);
+  outline-offset: -3px;
+}
+
+.gd-view-toggle-icon {
+  width: 22px;
+  height: 22px;
+}
+
+/* check icon: width 0 se 16px tak khulta hai, isliye pill ki width bhi smooth badalti hai */
+.gd-view-toggle-check-wrap {
+  display: flex;
+  flex-shrink: 0;
+  width: 0;
+  margin-right: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    width 0.2s cubic-bezier(0.2, 0, 0, 1),
+    margin-right 0.2s cubic-bezier(0.2, 0, 0, 1),
+    opacity 0.15s ease;
+}
+
+.gd-view-toggle-btn.selected .gd-view-toggle-check-wrap {
+  width: 18px;
+  margin-right: 2px;
+  opacity: 1;
+}
+
+.gd-view-toggle-check {
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gd-view-toggle-btn,
+  .gd-view-toggle-check-wrap {
+    transition: none;
+  }
+}

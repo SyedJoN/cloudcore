@@ -101,11 +101,19 @@ const MAX_PARALLEL = 2;
 let running = 0;
 const queue = [];
 
+const withTimeout = (promise, ms) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`preview task timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+
 function pump() {
   while (running < MAX_PARALLEL && queue.length) {
     const { task, resolve, reject } = queue.shift();
     running++;
-    task()
+    withTimeout(task(), 30000)
       .then(resolve, reject)
       .finally(() => {
         running--;
@@ -128,54 +136,105 @@ const cacheKey = (item, url) =>
 const tooBig = (item) => Number(item.size) > MAX_OFFICE_BYTES;
 
 // ── PDF: pehla page canvas par render ────────────────────────────────────────
-async function renderPdfThumb(url) {
-  const pdfjs = await import("pdfjs-dist");
-  const { default: workerSrc } = await import(
-    "pdfjs-dist/build/pdf.worker.min.mjs?url"
-  );
-  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
 
-  const pdf = await pdfjs.getDocument({ url, withCredentials: true }).promise;
+
+async function renderPdfThumb(url) {
+  let stage = "fetch";
+  let loadingTask;
+
   try {
+    const res = await fetch(url, { credentials: "include" });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const buf = await res.arrayBuffer();
+
+    stage = "import pdfjs";
+
+    const pdfjs = await import("pdfjs-dist");
+
+
+    stage = "import worker";
+
+    const { default: workerSrc } = await import(
+      "pdfjs-dist/build/pdf.worker.min.mjs?url"
+    );
+
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+
+    stage = "parse";
+
+    loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buf),
+    });
+
+    const pdf = await loadingTask.promise;
+
+
+    stage = "render";
+
     const page = await pdf.getPage(1);
+
     const base = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: 400 / base.width }); // ~400px wide
+
+    const viewport = page.getViewport({
+      scale: 400 / base.width,
+    });
 
     const canvas = document.createElement("canvas");
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Canvas 2D context unavailable");
+    }
+
     await page.render({
-      canvasContext: canvas.getContext("2d"),
+      canvasContext: context,
       viewport,
     }).promise;
 
     return canvas.toDataURL("image/jpeg", 0.8);
+
+  } catch (err) {
+    err.message = `[stage: ${stage}] ${err.message}`;
+    throw err;
+
   } finally {
-    pdf.destroy();
+    if (loadingTask) {
+      try {
+        await loadingTask.destroy();
+      } catch (err) {
+        console.warn("[pdf] cleanup failed:", err);
+      }
+    }
   }
 }
+
 
 function PdfThumb({ item, url }) {
   const [ref, seen] = useInView();
   const key = cacheKey(item, url);
   const [src, setSrc] = useState(() => thumbCache.get(key) ?? null);
 
-  useEffect(() => {
-    if (!seen || src) return;
-    let cancelled = false;
+useEffect(() => {
+  if (!seen || src) return;
+  let cancelled = false;
 
-    enqueue(() => renderPdfThumb(url))
-      .then((dataUrl) => {
-        thumbCache.set(key, dataUrl);
-        if (!cancelled) setSrc(dataUrl);
-      })
-      .catch(() => {}); 
+  enqueue(() => renderPdfThumb(url))
+    .then((dataUrl) => {
+      thumbCache.set(key, dataUrl);
+      if (!cancelled) setSrc(dataUrl);
+    })
+    .catch((err) => console.error("[pdf] thumbnail failed:", item.name, err));
 
-    return () => {
-      cancelled = true;
-    };
-  }, [seen, src, key, url]);
-
+  return () => {
+    cancelled = true;
+  };
+}, [seen, src, key, url]);
   return (
     <div ref={ref} style={FILL}>
       {src ? (
@@ -191,7 +250,7 @@ function PdfThumb({ item, url }) {
           }}
         />
       ) : (
-        <IconCard type="pdf" name={item.name} />
+        <IconCard type="pdf" name={item} />
       )}
     </div>
   );
@@ -273,7 +332,7 @@ function SheetThumb({ item, url }) {
           </tbody>
         </table>
       ) : (
-        <IconCard type="sheet" name={item.name} />
+        <IconCard type="sheet" name={item} />
       )}
     </div>
   );
@@ -337,7 +396,7 @@ function DocxThumb({ item, url }) {
       />
       {!ready && (
         <div style={{ position: "absolute", inset: 0 }}>
-          <IconCard type="doc" name={item.name} />
+          <IconCard type="doc" name={item} />
         </div>
       )}
     </div>
@@ -409,5 +468,5 @@ const META_KEY = { word: "doc", excel: "sheet", ppt: "slide", text: "doc", folde
   }
 
   // ── Everything else — styled icon card ──────────────────────────────────
-  return <IconCard type={type} name={item.name} />;
+  return <IconCard type={type} name={item} />;
 }

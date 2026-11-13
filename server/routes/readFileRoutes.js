@@ -5,6 +5,7 @@ import {
   getFileById,
   getFileMetaById,
   getRecentFiles,
+  getSuggestions,
 } from "../controllers/file.controller.js";
 import { validateSuperAdmin } from "../middlewares/validateRoleMiddleware.js";
 import { checkAuth } from "../middlewares/authMiddleware.js";
@@ -17,6 +18,7 @@ router.param("id", validateIdMiddleware);
 
 
 // GET 
+router.get("/get-suggestions", checkAuth, getSuggestions)
 router.get("/user-files", checkAuth, validateSuperAdmin, fetchUserWithFiles)
 router.get("/recent-files", checkAuth, getRecentFiles)
 router.get("/:id/meta", getFileMetaById);

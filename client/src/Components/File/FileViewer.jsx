@@ -104,7 +104,6 @@ export default function FileViewer({
   onPrint,
   onRestore,
   onDeleteForever,
-  onDeleteSuccess,
   meta = false,
 }) {
   const { refreshUser } = useAuth();
@@ -374,7 +373,6 @@ export default function FileViewer({
                   title="Move to trash"
                   onClick={async () => {
                     await onTrash?.(item);
-                    onDeleteSuccess?.(item._id);
                     onClose?.();
                   }}
                 >

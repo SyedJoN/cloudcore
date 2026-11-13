@@ -1,10 +1,10 @@
 import {
-  getRootDirectory,
   getDirectory,
   getSharedItems,
   getTrash,
   getGoogleDrive,
   getStarredItems,
+  getHomeDirectory,
 } from "../apis/directoryApi";
 import { getRecentFiles } from "../apis/fileApi";
 
@@ -19,9 +19,9 @@ export const ROUTE_CONFIG = {
     label: "Home",
     path: "/home",
     flatBreadcrumb: false,
-    fetch: getRootDirectory,
+    fetch: getHomeDirectory,
   },
-  root: {
+  drive: {
     label: "My Drive",
     path: "/drive",
     flatBreadcrumb: false,
@@ -30,7 +30,7 @@ export const ROUTE_CONFIG = {
   shared: {
     label: "Shared with me",
     path: "/shared",
-    flatBreadcrumb: true,
+    flatBreadcrumb: false,
     fetch: getSharedItems,
   },
   recent: {
@@ -54,5 +54,5 @@ export const ROUTE_CONFIG = {
 };
 
 export function getRouteConfig(dirContext) {
-  return ROUTE_CONFIG[dirContext] ?? ROUTE_CONFIG.root;
+  return ROUTE_CONFIG[dirContext] ?? ROUTE_CONFIG.drive;
 }

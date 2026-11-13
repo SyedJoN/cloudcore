@@ -212,7 +212,6 @@ function createFly({ title, root, rect }, index, total) {
 function startStackDrag(e, sources, total) {
   // native ghost chhupao, hum apna chip banate hain
   e.dataTransfer.setDragImage(EMPTY_IMG, 0, 0);
-console.log("[drag] types after setDragImage:", Array.from(e.dataTransfer.types));
   const cur = { x: e.clientX, y: e.clientY };
   const flies = sources.map((s, i) => createFly(s, i, total));
 

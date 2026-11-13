@@ -81,13 +81,7 @@ export const updateSharedAccess = async ({
 const confirmationResponse = allResponses.find(
   (r) => r?.needsConfirmation
 );
-  console.log("STEP 1: updateSharedAccess called");
 
-console.log("Previous:", previousPermissions);
-console.log("Current:", currentPermissions);
-
-console.log("To Grant:", personsToGrant);
-console.log("To Remove:", personsToRemove);
 
 return {
   changed: true,

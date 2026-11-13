@@ -4,6 +4,11 @@ import { useAuth } from "../../Contexts/AuthContext";
 import { getRouteConfig } from "../../../Utils/routeConfig";
 import { useDevice } from "../../Contexts/DeviceContext";
 import { useDropZone } from "../../Hooks/useDropZone";
+import ViewToggle from "./ViewToggle";
+
+// In contexts mein folder ka asli root (My Drive / Shared with me) data se decide hota hai,
+// chahe aap Home, search ya direct link se aaye hon. Google Drive bhi yahi karta hai.
+const OWNER_CONTEXTS = ["home", "drive", "shared"];
 
 /**
  * Breadcrumb button that can optionally accept dropped drive items.
@@ -28,25 +33,36 @@ function CrumbButton({ disabled, onClick, onDrop, children, className = "" }) {
 
 export default function DriveToolbar({
   dirContext,
+  isHomeRoute,
   crumbs,
   setCrumbs,
   disabled,
   viewMode,
   onToggleView,
   toggleDetailsBar,
+  rootKey, // "drive" | "shared" | null  (useDirectoryData se aata hai)
   onMove, // (ids: string[], targetFolderId: string | null, targetName: string) => void
 }) {
   const navigate = useNavigate();
   const { loggedIn } = useAuth();
   const { device } = useDevice();
+
+  // Folder ke andar ho to uska asli root, warna route ka apna context
+ let effectiveContext = dirContext;
+if (OWNER_CONTEXTS.includes(dirContext) && rootKey && crumbs.length > 0) {
+  effectiveContext = rootKey;
+} else if (dirContext === "home") {
+  effectiveContext = "drive";
+}
+const isResolving = dirContext === "home" && rootKey === undefined;
   const {
     label: rootLabel,
     path: rootPath,
     flatBreadcrumb,
-  } = getRouteConfig(dirContext);
+  } = getRouteConfig(effectiveContext);
 
   // Only My Drive supports moving via breadcrumb
-  const canDrop = !!onMove && dirContext === "root";
+  const canDrop = !!onMove && effectiveContext === "drive";
 
   // At the root (no crumbs) the root button is the current location -> not a target
   const rootDrop =
@@ -64,13 +80,20 @@ export default function DriveToolbar({
       }}
       onDrop={rootDrop}
     >
-      {loggedIn ? rootLabel : ""}
+{loggedIn && !isResolving ? rootLabel : undefined}
     </CrumbButton>
   );
+  console.log("[toolbar]", { dirContext, rootKey, crumbs: crumbs.length });
 
   return (
     <div className="gd-toolbar" onMouseDown={(e) => e.stopPropagation()}>
-      {!flatBreadcrumb ? (
+      {isHomeRoute ? (
+        <div className="gd-breadcrumb">
+          <span className="text-clip! hover:bg-transparent! cursor-default! gd-breadcrumb-item gd-breadcrumb-current">
+            Welcome to Drive
+          </span>
+        </div>
+      ) : !flatBreadcrumb ? (
         <div className="gd-breadcrumb">
           {rootButton}
 
@@ -97,7 +120,7 @@ export default function DriveToolbar({
                   disabled={disabled}
                   onClick={() => {
                     navigate(`/directory/${crumb.id}`, {
-                      state: { dirContext },
+                      state: { dirContext: effectiveContext },
                     });
                   }}
                   onDrop={
@@ -125,23 +148,21 @@ export default function DriveToolbar({
           </span>
         </div>
       )}
-
-      <div className="gd-toolbar-actions">
-        <button
-          className="gd-icon-btn"
-          title={viewMode === "grid" ? "List view" : "Grid view"}
-          onClick={onToggleView}
-        >
-          {viewMode === "grid" ? <IconList /> : <IconGrid />}
-        </button>
+      
+<>
+{!isHomeRoute &&
+  <ViewToggle viewMode={viewMode} onToggleView={onToggleView}/>
+}
+    
+          
         <button
           onClick={toggleDetailsBar}
           className={`gd-icon-btn ${device === "mobile" ? "hidden!" : ""}`}
           title="Info"
         >
-          <IconInfo />
+          <IconInfo className="text-red-300" />
         </button>
-      </div>
+        </>
     </div>
   );
 }

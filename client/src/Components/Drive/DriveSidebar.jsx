@@ -50,15 +50,15 @@ export const NAV_ITEMS = [
     path: "/home",
     Icon: HomeIcon,
     IconSolid: HomeIconSolid,
-    isActive: ({ dirContext }) => dirContext === "home",
+    isActive: ({ dirContext, dirId }) => dirContext === "home" && !dirId,
   },
   {
-    key: "root",
+    key: "drive",
     label: "My Drive",
     path: "/drive",
     Icon: InboxStackIcon,
     IconSolid: InboxStackIconSolid,
-    isActive: ({ dirContext, dirId }) => dirContext === "root" && !dirId,
+    isActive: ({ dirContext, dirId }) => dirContext === "drive" && !dirId,
   },
   {
     key: "shared",
@@ -302,11 +302,11 @@ export default function DriveSidebar({
   );
 
   // Already at My Drive root -> dropping there would be a no-op, so don't accept drops
-  const isAtMyDriveRoot = dirContext === "root" && !dirId;
+  const isAtMyDriveRoot = dirContext === "drive" && !dirId;
 
   const dropHandlers = {
     trash: onDropToTrash,
-    root:
+    drive:
       onMove && !isAtMyDriveRoot
         ? (ids) => onMove(ids, null, "My Drive")
         : undefined,

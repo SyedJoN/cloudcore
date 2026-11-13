@@ -1,7 +1,7 @@
 import { axiosWithCreds } from "./axiosInstances";
 
-export async function getRootDirectory(_id, config = {}) {
-  const response = await axiosWithCreds.get(`/directory/`, config);
+export async function getHomeDirectory(_id, config = {}) {
+  const response = await axiosWithCreds.get(`/file/get-suggestions`, config);
   return response;
 }
 

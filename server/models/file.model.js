@@ -30,10 +30,10 @@ const fileSchema = new Schema(
       type: String,
       required: true,
     },
-mimeType: {
-  type: String,
-  required: true
-},
+    mimeType: {
+      type: String,
+      required: true,
+    },
     size: {
       type: Number,
       default: 0,

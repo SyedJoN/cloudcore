@@ -58,6 +58,7 @@ import MobileMoveModal from "../Components/Modals/MobileMoveModal";
 import ShareModalMobile from "../Components/Modals/ShareModalMobile";
 import useDriveActions from "../Hooks/useDriveActions";
 import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
+import HomeView from "../Components/Drive/HomeView";
 
 export default function DirectoryView({ route }) {
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
@@ -168,7 +169,7 @@ export default function DirectoryView({ route }) {
               ? "home"
               : isStarredRoute
                 ? "starred"
-                : "root");
+                : "drive");
   const previousDirContext = useRef(dirContext);
   const resumedDriveUploadRef = useRef(false);
 
@@ -213,23 +214,25 @@ export default function DirectoryView({ route }) {
   }, [dirId]);
 
   const {
+    rootKey,
     directoryName,
     isLoading,
     needsAccess,
     crumbs,
     setCrumbs,
     directoriesList,
+    lastDirectory,
     filesList,
     setFilesList,
     setDirectoriesList,
     getDirectoryItems,
-    lastDirectory,
     setLastDirectory,
     combinedItems,
     filteredFiles,
   } = useDirectoryData({
     dirId,
     dirContext,
+    user,
     isSharedRoute,
     isRecentRoute,
     isTrashRoute,
@@ -240,9 +243,7 @@ export default function DirectoryView({ route }) {
     navigate,
     searchQuery,
   });
-
-  CascadeConfirmationModal;
-  const refreshCurrentDirectory = (type = "") =>
+  const refreshCurrentDirectory = (type = "") => {
     getDirectoryItems(
       type === "google" || isGoogleDriveRoute
         ? "google-drive"
@@ -252,9 +253,9 @@ export default function DirectoryView({ route }) {
             ? "starred"
             : isTrashRoute
               ? "trash"
-              : "root",
+              : "drive",
     );
-
+  };
   const {
     fileInputRef,
     uploadQueue,
@@ -353,6 +354,8 @@ export default function DirectoryView({ route }) {
     mobileHeaderDirName,
     showCreateDir,
     setShowCreateDir,
+    newDirname,
+    setNewDirname,
     showRename,
     setShowRename,
     renameValue,
@@ -405,11 +408,6 @@ export default function DirectoryView({ route }) {
   });
 
   const handleMove = async (ids, destinationId, destinationName) => {
-    console.log("path", breadcrumbs);
-    console.log("user:", user);
-    console.log("lastDirectory:", lastDirectory);
-    console.log("user?.parentDirId:", user?.parentDirId);
-    // Sidebar "My Drive" and the root breadcrumb pass null
     const targetId = destinationId ?? user?.parentDirId;
 
     if (!targetId) {
@@ -487,13 +485,14 @@ export default function DirectoryView({ route }) {
   }, [isGoogleDrive, isGoogleDriveRoute]);
 
   useEffect(() => {
-    if (isGoogleDriveRoute) getDirectoryItems("google-drive");
+    if (isHomeRoute) getDirectoryItems("home");
+    else if (isGoogleDriveRoute) getDirectoryItems("google-drive");
     else if (dirContext === "trash" || isTrashRoute) getDirectoryItems("trash");
     else if (isRecentRoute) getDirectoryItems("recent");
     else if (isSharedRoute) getDirectoryItems("shared");
     else if (isStarredRoute) getDirectoryItems("starred");
     else {
-      getDirectoryItems("root");
+      getDirectoryItems("drive");
     }
     setContextItem(null);
     clearSelection();
@@ -504,6 +503,7 @@ export default function DirectoryView({ route }) {
     dirId,
     isSharedRoute,
     isTrashRoute,
+    isHomeRoute,
     isStarredRoute,
     location.pathname,
   ]);
@@ -853,16 +853,20 @@ export default function DirectoryView({ route }) {
               <DriveToolbar
                 dirId={dirId}
                 crumbs={crumbs}
+                rootKey={rootKey}
+                path={path}
                 setCrumbs={setCrumbs}
                 dirContext={dirContext}
                 directoryName={directoryName}
                 onDropToTrash={handleDropOnTrash}
                 onMove={handleMove}
+                isHomeRoute={isHomeRoute}
                 isSharedRoute={isSharedRoute}
                 breadcrumbs={breadcrumbs}
                 setBreadcrumbs={setBreadcrumbs}
                 disabled={isUploading}
                 viewMode={viewMode}
+                onDoubleClick={handleRowDoubleClick}
                 onToggleView={() =>
                   setViewMode((v) => (v === "grid" ? "list" : "grid"))
                 }
@@ -985,6 +989,75 @@ export default function DirectoryView({ route }) {
 
                       await handleToggleStar(items);
                     }}
+                  />
+                ) : isHomeRoute ? (
+                  <HomeView
+                    files={filteredFiles}
+                    folders={directoriesList}
+                    setSelectedItems={setSelectedItems}
+                    isGoogleDrive={isGoogleDrive}
+                    isHomeRoute={isHomeRoute}
+                    items={combinedItems}
+                    open={open}
+                    onMove={handleMove}
+                    setOpen={setOpen}
+                    selectionMode={selectionMode}
+                    setSelectionMode={setSelectionMode}
+                    sortConfig={sortConfig}
+                    setSortConfig={setSortConfig}
+                    setSortedFilesForViewer={setSortedFilesForViewer}
+                    viewMode={viewMode}
+                    dirId={dirId}
+                    selectedItems={selectedItems}
+                    handleSelectAll={handleSelectAll}
+                    onSelect={handleSelect}
+                    onToggleView={() =>
+                      setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                    }
+                    onRowClick={handleRowClick}
+                    onDoubleClick={handleRowDoubleClick}
+                    onShare={(itemId) => {
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) setShareItem(item);
+                    }}
+                    onRename={(itemId) => {
+                      const item = combinedItems.find(
+                        (i) => (i.id ?? i._id) === itemId,
+                      );
+                      if (item) openRename(item);
+                    }}
+                    onDownload={(itemId) => {
+                      const item = combinedItems.find(
+                        (item) => (item.id ?? item._id) === itemId,
+                      );
+                      if (!item) return;
+                      if (item && item.isDirectory) {
+                        handleDownloadFolder(item);
+                      } else {
+                        handleDownload(item);
+                      }
+
+                      clearSelection();
+                    }}
+                    onContextMenu={handleContextMenu}
+                    setContextItem={setContextItem}
+                    listHeaderRow={listHeaderRow}
+                    isStarred={isStarred}
+                    setIsStarred={setIsStarred}
+                    route={route}
+                    combinedItems={combinedItems}
+                    onStar={async (itemId) => {
+                      const items = combinedItems.filter(
+                        (item) => (item.id ?? item._id) === itemId,
+                      );
+
+                      if (!items.length) return;
+
+                      await handleToggleStar(items);
+                    }}
+                    clearSelection={clearSelection}
                   />
                 ) : (
                   <DefaultView

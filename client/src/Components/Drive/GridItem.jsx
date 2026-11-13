@@ -10,10 +10,7 @@ import { useDriveDrag } from "../../Hooks/useDriveDrag";
 import { readDriveDrag } from "../../../Utils/dragDrop";
 import { getFileKind } from "../../../Utils/fileKind";
 
-const DRAG_MIME = "application/x-drive-items";
-
 export default function GridItem({
-  combinedItems,
   item,
   avatar,
   owner,
@@ -23,6 +20,7 @@ export default function GridItem({
   onRowClick,
   onDoubleClick,
   onContextMenu,
+  subtitle,
   onMove,
 }) {
   const { user } = useAuth();
@@ -52,7 +50,6 @@ export default function GridItem({
 
   const itemId = item._id ?? item.id;
   const iconType = item.isDirectory ? null : getFileKind(item);
-
 
   useEffect(() => {
     const check = () => {
@@ -102,17 +99,17 @@ export default function GridItem({
   };
 
   const handleDrop = (e) => {
-  if (!item.isDirectory) return;
+    if (!item.isDirectory) return;
 
-  e.preventDefault();
-  e.stopPropagation();
-  setIsDropTarget(false);
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDropTarget(false);
 
-  const ids = readDriveDrag(e);
-  if (!ids.length) return;
+    const ids = readDriveDrag(e);
+    if (!ids.length) return;
 
-  onMove?.(ids, item._id ?? item.id, item.name);
-};
+    onMove?.(ids, item._id ?? item.id, item.name);
+  };
 
   const avatarEl =
     avatar && !hasImgError ? (
@@ -193,7 +190,7 @@ export default function GridItem({
       }}
     >
       <div
-      data-drag-title
+        data-drag-title
         style={{
           display: "flex",
           alignItems: "center",
@@ -203,20 +200,35 @@ export default function GridItem({
         }}
       >
         <span data-drag-icon style={{ display: "flex", flexShrink: 0 }}>
-             {item.isDirectory ? (
-          <IconFolder size={24} style={{ color: "#5f6368", flexShrink: 0 }} />
-        ) : (
-          <FileBadge type={iconType} />
-        )}
+          {item.isDirectory ? (
+            <IconFolder size={24} style={{ color: "#5f6368", flexShrink: 0 }} />
+          ) : (
+            <FileBadge type={iconType} />
+          )}
         </span>
-     
+        {subtitle ? (
+          <div className="flex flex-col flex-1">
+            <span
+              data-drag-name
+              className={`gd-grid-item-name ${selected ? "selected" : ""}`}
+            >
+              {item.name}
+            </span>
 
-        <span
-        data-drag-name
-          className={`gd-grid-item-name ${selected ? "selected" : ""}`}
-        >
-          {item.name}
-        </span>
+            <span
+              className={`gd-grid-item-name text-(--text-secondary)! text-xs! ${selected ? "selected" : ""}`}
+            >
+              {subtitle}
+            </span>
+          </div>
+        ) : (
+          <span
+            data-drag-name
+            className={`gd-grid-item-name ${selected ? "selected" : ""}`}
+          >
+            {item.name}
+          </span>
+        )}
 
         <button
           type="button"

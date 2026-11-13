@@ -84,8 +84,7 @@ export default function MobileContextMenu({
   onPreview,
 }) {
   const { toast } = useToast();
-  console.log({ itemProp, items });
-  // Normalise: always an array. `item` is the first one.
+
   const raw = items?.length ? items : itemProp;
   const targets = Array.isArray(raw) ? raw.filter(Boolean) : raw ? [raw] : [];
 

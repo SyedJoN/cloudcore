@@ -514,9 +514,6 @@ export default function FileViewPage({ route = null }) {
           onTrash={() => handleMoveToTrash(item[0])}
           onStar={() => handleToggleStar(item)}
           onDownload={handleDownload}
-          onDeleteSuccess={() => {
-            console.log("on delete success");
-          }}
         />
       ) : (
         <FileViewer
