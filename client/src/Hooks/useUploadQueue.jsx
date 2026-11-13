@@ -148,7 +148,6 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
         setUploadXhrMap((prev) => ({ ...prev, [current._id]: xhr }));
         xhr.setRequestHeader("Content-Type", contentType);
         xhr.send(current.file);
-        xhr.send(current.file);
       } catch (error) {
         showError(error.message || "Failed fetching uploadUrl");
         await processUploadQueue(rest);

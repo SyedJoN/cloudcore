@@ -554,7 +554,7 @@ export const generateSignedUploadUrl = async (req, res, next) => {
     uploadedFile = await File.insertOne({
       name: fileName,
       extension,
-      mimeType: fileType, // abhi client ka bataya hua; upload ke baad sniff se override hoga
+      mimeType: fileType, // setting filetype sent from client
       size: fileSize,
       isUploading: true,
       parentDirId: parentDir._id,
@@ -569,6 +569,7 @@ export const generateSignedUploadUrl = async (req, res, next) => {
     return res.status(200).json({
       fileId: uploadedFile._id,
       uploadUrl: url,
+      contentType: fileType,
     });
   } catch (error) {
     if (uploadedFile) {
@@ -650,8 +651,6 @@ export const completeUpload = async (req, res, next) => {
     return res.status(201).json({
       message: "File uploaded successfully",
       fileId: uploadedFile._id,
-      uploadUrl: url,
-      contentType: fileType,
     });
   } catch (error) {
     if (uploadedFile) {
