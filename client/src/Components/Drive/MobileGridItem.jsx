@@ -7,27 +7,31 @@ import { useLocation } from "react-router-dom";
 import { useAuth, useGDrive } from "../../Contexts";
 import "./MobileGridItem.css";
 import { getFileKind } from "../../../Utils/fileKind";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 export default function MobileGridItem({
   item,
   avatar,
   owner,
   selected,
+  isHomeRoute,
   setSelectedItems = () => {},
   selectionMode = false,
   setSelectionMode = () => {},
   onSelect,
-  onRowClick,
   onDoubleClick,
   onContextMenu,
   // NEW
-  pickerMode = false, // used inside the move modal: no menu / selection / long-press
-  disabled = false, // greyed-out and static
-  onOpen, // called when an enabled card is tapped in picker mode
+  pickerMode = false,
+  disabled = false,
+  onOpen,
 }) {
   const { user } = useAuth();
   const { isGoogleDrive } = useGDrive();
   const [hasImgError, setHasImgError] = useState(false);
+  const {device } = useDevice();
+  const isDesktop = device === "windows";
+  const isMobile = device === "mobile";
   const lastTap = useRef(0);
 
   // press state (scale + state layer)
@@ -48,13 +52,6 @@ export default function MobileGridItem({
 
   const iconType = item.isDirectory ? null : getFileKind(item);
   const itemId = item._id ?? item.id;
-
-  const modified = item.modifiedTime
-    ? new Date(item.modifiedTime).getTime()
-    : 0;
-  const viewed = item.viewedByMeTime
-    ? new Date(item.viewedByMeTime).getTime()
-    : 0;
 
   useEffect(() => () => clearTimeout(pressTimer.current), []);
 
@@ -82,17 +79,7 @@ export default function MobileGridItem({
     [setSelectedItems],
   );
 
-  const handleTouchEnd = () => {
-    if (selectionMode) return;
-    const now = Date.now();
 
-    if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.name);
-      lastTap.current = 0;
-    } else {
-      lastTap.current = now;
-    }
-  };
 
   const handleClick = () => {
     if (disabled) return;
@@ -145,7 +132,7 @@ export default function MobileGridItem({
 
   return (
     <div
-      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""}`}
+      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""} ${isMobile && isHomeRoute ? "mobile-home" : ""}`}
       data-id={itemId}
       onClick={handleClick}
       onContextMenu={handleContextMenu}

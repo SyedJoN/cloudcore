@@ -14,8 +14,6 @@ const sortLabels = {
 const SortButtonMobile = ({
   sortConfig,
   setSortConfig,
-  viewMode = "list",
-  onToggleView,
 }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -40,23 +38,13 @@ const SortButtonMobile = ({
     setSortConfig((prev) => ({ ...prev, ...changes }));
   };
 
-  // Parent only exposes a toggle, so only call it when the mode actually changes
-  const selectView = (mode) => {
-    if (mode !== viewMode) onToggleView?.();
-  };
-
-  const viewBtn = (mode) =>
-    `flex h-8 w-8 items-center justify-center rounded-full
-     text-(--text-secondary) cursor-pointer transition-colors duration-150
-     ${viewMode === mode ? "bg-(--folder-color) text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark-hover)"}`;
-
   return (
 
     <div
       ref={menuRef}
       className="relative flex w-full items-center justify-between py-1"
     >
-      {/* Sort label: always shows name + direction, in both list and grid */}
+   
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -72,28 +60,6 @@ const SortButtonMobile = ({
           )}
         </span>
       </button>
-
-      {/* Separate list / grid buttons */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className={viewBtn("list")}
-          onClick={() => selectView("list")}
-          aria-label="List view"
-          aria-pressed={viewMode === "list"}
-        >
-          <IconList color={`${viewMode === "list" ? "var(--surface-container-dark)" : "var(--text-primary)"}`} />
-        </button>
-        <button
-          type="button"
-          className={viewBtn("grid")}
-          onClick={() => selectView("grid")}
-          aria-label="Grid view"
-          aria-pressed={viewMode === "grid"}
-        >
-          <IconGrid color={`${viewMode === "grid" ? "var(--surface-container-dark)" : "var(--text-primary)"}`}  />
-        </button>
-      </div>
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 origin-top animate-[sortDropdown_100ms_ease-out]">

@@ -48,13 +48,13 @@ export default function DriveToolbar({
   const { device } = useDevice();
 
   // Folder ke andar ho to uska asli root, warna route ka apna context
- let effectiveContext = dirContext;
-if (OWNER_CONTEXTS.includes(dirContext) && rootKey && crumbs.length > 0) {
-  effectiveContext = rootKey;
-} else if (dirContext === "home") {
-  effectiveContext = "drive";
-}
-const isResolving = dirContext === "home" && rootKey === undefined;
+  let effectiveContext = dirContext;
+  if (OWNER_CONTEXTS.includes(dirContext) && rootKey && crumbs.length > 0) {
+    effectiveContext = rootKey;
+  } else if (dirContext === "home") {
+    effectiveContext = "drive";
+  }
+  const isResolving = dirContext === "home" && rootKey === undefined;
   const {
     label: rootLabel,
     path: rootPath,
@@ -80,10 +80,9 @@ const isResolving = dirContext === "home" && rootKey === undefined;
       }}
       onDrop={rootDrop}
     >
-{loggedIn && !isResolving ? rootLabel : undefined}
+      {loggedIn && !isResolving ? rootLabel : undefined}
     </CrumbButton>
   );
-  console.log("[toolbar]", { dirContext, rootKey, crumbs: crumbs.length });
 
   return (
     <div className="gd-toolbar" onMouseDown={(e) => e.stopPropagation()}>
@@ -148,13 +147,12 @@ const isResolving = dirContext === "home" && rootKey === undefined;
           </span>
         </div>
       )}
-      
-<>
-{!isHomeRoute &&
-  <ViewToggle viewMode={viewMode} onToggleView={onToggleView}/>
-}
-    
-          
+
+      <>
+        {!isHomeRoute && (
+          <ViewToggle viewMode={viewMode} onToggleView={onToggleView} />
+        )}
+
         <button
           onClick={toggleDetailsBar}
           className={`gd-icon-btn ${device === "mobile" ? "hidden!" : ""}`}
@@ -162,7 +160,7 @@ const isResolving = dirContext === "home" && rootKey === undefined;
         >
           <IconInfo className="text-red-300" />
         </button>
-        </>
+      </>
     </div>
   );
 }

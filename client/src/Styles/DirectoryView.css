@@ -611,8 +611,11 @@ body.gd-drag-active::before {
   flex-direction: column;
 }
 .gd-main.mobile {
-  margin-inline: 8px;
+  margin-inline: 6px;
   border-radius: 16px;
+}
+.gd-main.mobile.home {
+  padding: 0 0px 18px 0px!important;
 }
 
 /* ===================== TOOLBAR ===================== */
@@ -794,6 +797,9 @@ body.gd-drag-active::before {
 .gd-list.mobile {
   margin-inline: -10px;
   gap: 3px;
+}
+.gd-list.mobile.home {
+  padding-inline: 18px;
 }
 .gd-list-header {
   position: sticky;

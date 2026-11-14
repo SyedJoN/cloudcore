@@ -244,6 +244,7 @@ export default function DirectoryView({ route }) {
     searchQuery,
   });
   const refreshCurrentDirectory = (type = "") => {
+    console.log('type', type)
     getDirectoryItems(
       type === "google" || isGoogleDriveRoute
         ? "google-drive"
@@ -583,10 +584,18 @@ export default function DirectoryView({ route }) {
 
   const handleSort = (key) => {
     setSortConfig((prev) => ({
+      ...prev,
       key,
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
+  useEffect(() => {
+    setSortConfig(
+      isSharedRoute
+        ? { key: "sharedWithMeTime", direction: "desc", folders: "mixed" }
+        : { key: "name", direction: "asc", folders: "top" },
+    );
+  }, [isSharedRoute]);
   const headerColumns =
     isHomeRoute || isGoogleDriveRoute || route === undefined
       ? [
@@ -842,7 +851,7 @@ export default function DirectoryView({ route }) {
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className={`gd-main ${isMobile ? "mobile" : ""}`}
+            className={`gd-main ${isMobile ? "mobile" : ""} ${isHomeRoute ? "home" : ""}`}
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
@@ -943,8 +952,14 @@ export default function DirectoryView({ route }) {
                     items={isRecentRoute ? filteredFiles : combinedItems}
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
+                    isSharedRoute={isSharedRoute}
                     isRecentRoute={isRecentRoute}
+                    isDesktop={isDesktop}
+                    isMobile={isMobile}
                     viewMode={viewMode}
+                    onToggleView={() =>
+                      setViewMode((v) => (v === "grid" ? "list" : "grid"))
+                    }
                     selectedItems={selectedItems}
                     onSelect={handleSelect}
                     onRowClick={handleRowClick}
@@ -995,8 +1010,8 @@ export default function DirectoryView({ route }) {
                     files={filteredFiles}
                     folders={directoriesList}
                     setSelectedItems={setSelectedItems}
-                    isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
+                    isGoogleDrive={isGoogleDrive}
                     items={combinedItems}
                     open={open}
                     onMove={handleMove}
@@ -1064,7 +1079,10 @@ export default function DirectoryView({ route }) {
                     setSelectedItems={setSelectedItems}
                     isGoogleDrive={isGoogleDrive}
                     isHomeRoute={isHomeRoute}
+                    isSharedRoute={isSharedRoute}
                     items={combinedItems}
+                    isDesktop={isDesktop}
+                    isMobile={isMobile}
                     open={open}
                     onMove={handleMove}
                     setOpen={setOpen}

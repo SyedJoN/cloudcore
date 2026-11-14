@@ -12,6 +12,7 @@ import MobileListRow from "./MobileListRow";
 import { useAuth } from "../../Contexts";
 import { useDevice } from "../../Contexts/DeviceContext";
 import ViewToggle from "./ViewToggle";
+import ViewToggleMobile from "./ViewToggleMobile";
 
 /* ---------- helpers ---------- */
 
@@ -33,23 +34,26 @@ const formatWhen = (value) => {
 };
 
 /* ---------- small UI pieces ---------- */
-
-const Section = ({ title, right, children }) => {
+ 
+const Section = ({ title, right, isHomeRoute = true, isMobile = true,children }) => {
   const [open, setOpen] = useState(true);
   return (
     <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 min-h-10">
+      <div className="flex items-center justify-between mb-3 m-3 min-h-10">
         <button
           type="button"
+          disabled={!isHomeRoute}
           onClick={() => setOpen((o) => !o)}
           className="flex items-center gap-2 text-base font-medium cursor-pointer"
           aria-expanded={open}
         >
-          <ChevronDownIcon
-            className={`h-4 w-4 transition-transform ${
-              open ? "" : "-rotate-90"
-            }`}
-          />
+          {isHomeRoute && !isMobile && (
+            <ChevronDownIcon
+              className={`h-4 w-4 transition-transform ${
+                open ? "" : "-rotate-90"
+              }`}
+            />
+          )}
           {title}
         </button>
 
@@ -71,6 +75,7 @@ const HomeView = ({
   onToggleView,
   listHeaderRow,
   selectedItems,
+  isHomeRoute,
   setSelectedItems,
   selectionMode,
   setSelectionMode,
@@ -124,6 +129,7 @@ const HomeView = ({
     selectionActive: (selectedItems?.size ?? 0) > 0,
     selectionMode,
     setSelectionMode,
+    isHomeRoute,
     handleSelectAll,
     handleDropOnTrash,
     onSelect,
@@ -152,14 +158,17 @@ const HomeView = ({
   });
 
   const fileContainerClass =
-    viewMode === "grid"
-      ? isMobile
-        ? "mgi-grid"
-        : "gd-grid"
-      : isMobile
-        ? "gd-list mobile"
-        : "gd-list";
-
+  viewMode === "grid"
+    ? isMobile
+      ? isHomeRoute
+        ? "mgi-grid mobile"
+        : "mgi-grid"
+      : "gd-grid"
+    : isMobile
+      ? isHomeRoute
+        ? "gd-list mobile home"
+        : "gd-list mobile"
+      : "gd-list";
   const isEmpty = !loading && folders.length === 0 && files.length === 0;
 
   return (
@@ -173,8 +182,8 @@ const HomeView = ({
         </div>
       )}
 
-      {folders.length > 0 && (
-        <Section title="Suggested folders">
+      {folders.length > 0 && isDesktop && (
+        <Section title="Suggested folders" isHomeRoute={isHomeRoute} isMobile={isMobile}>
           <div className={`gd-grid ${isMobile ? "" : "gd-grid-on-top"} py-1!`}>
             {folders.map((item) => {
               const { key, ...rest } = itemProps(item);
@@ -196,8 +205,17 @@ const HomeView = ({
 
       {(files.length > 0 || loading) && (
         <Section
-          title="Suggested files"
-          right={<ViewToggle viewMode={viewMode} onToggleView={onToggleView} />}
+          title={isDesktop ? "Suggested files" : "Files"}
+          right={
+            isMobile ? (
+              <ViewToggleMobile
+                viewMode={viewMode}
+                onToggleView={onToggleView}
+              />
+            ) : (
+              <ViewToggle viewMode={viewMode} onToggleView={onToggleView} />
+            )
+          }
         >
           {isDesktop && viewMode === "list" && listHeaderRow}
 

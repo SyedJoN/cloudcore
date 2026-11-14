@@ -68,7 +68,7 @@ export function useUploadQueue({ dirId, showError, onQueueComplete }) {
       if (!queue.length) {
         setUploadQueue([]);
         setTimeout(() => {
-          onQueueComplete?.();
+          onQueueComplete?.('drive');
           isUploadingRef.current = false;
           setIsUploading(false);
         }, 1000);

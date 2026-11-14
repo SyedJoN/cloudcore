@@ -16,6 +16,7 @@ import MobileListRow from "./MobileListRow";
 import MobileGridItem from "./MobileGridItem";
 import SortButtonMobile from "../ListRow/SortButtonMobile";
 import { MdOutlineSelectAll, MdClose } from "react-icons/md";
+import ViewToggleMobile from "./ViewToggleMobile";
 
 const DefaultView = ({
   items,
@@ -26,6 +27,8 @@ const DefaultView = ({
   viewMode,
   isGoogleDrive,
   dirId,
+  isDesktop,
+  isMobile,
   selectedItems,
   setSelectedItems,
   handleDropOnTrash,
@@ -50,10 +53,6 @@ const DefaultView = ({
 }) => {
   const [filters, setFilters] = useState(DEFAULT_RECENT_FILTERS);
   const { user } = useAuth();
-  const { device } = useDevice();
-
-  const isDesktop = device === "windows";
-  const isMobile = device === "mobile";
 
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
@@ -171,12 +170,16 @@ const DefaultView = ({
       {(isDesktop ? viewMode === "grid" : true) && (
         <div className="sort-btn pb-2 -mx-1.5 py-2">
           {isMobile ? (
-            <SortButtonMobile
-              viewMode={viewMode}
-              onToggleView={onToggleView}
-              sortConfig={sortConfig}
-              setSortConfig={setSortConfig}
-            />
+            <div className="flex items-center">
+              <SortButtonMobile
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+              />
+              <ViewToggleMobile
+                viewMode={viewMode}
+                onToggleView={onToggleView}
+              />
+            </div>
           ) : (
             <SortButton
               viewMode={viewMode}

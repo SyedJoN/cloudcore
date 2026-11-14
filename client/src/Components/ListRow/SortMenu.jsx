@@ -1,5 +1,47 @@
 import React from "react";
 
+/* ------------------------------------------------------------------ */
+/*  Options: My Drive vs Shared with me                                */
+/* ------------------------------------------------------------------ */
+
+const SORT_KEYS = {
+  drive: [
+    { key: "name", label: "Name" },
+    { key: "modifiedTime", label: "Date modified" },
+  ],
+  shared: [
+    { key: "sharedTime", label: "Date shared" },
+    { key: "name", label: "Name" },
+    { key: "modifiedTime", label: "Date modified" },
+    { key: "modifiedByMeTime", label: "Date modified by me" },
+    { key: "viewedByMeTime", label: "Date opened by me" },
+  ],
+};
+
+const LABELS = {
+  drive: {
+    direction: {
+      name: { asc: "A → Z", desc: "Z → A" },
+      date: { asc: "Oldest → Newest", desc: "Newest → Oldest" },
+    },
+    directionOrder: { name: ["asc", "desc"], date: ["asc", "desc"] },
+    folders: { top: "Folders on top", mixed: "Mixed with files" },
+  },
+  shared: {
+    direction: {
+      name: { asc: "A to Z", desc: "Z to A" },
+      date: { asc: "Old to new", desc: "New to old" },
+    },
+    // Google Drive (Shared with me) mein dates ke liye "New to old" pehle aata hai
+    directionOrder: { name: ["asc", "desc"], date: ["desc", "asc"] },
+    folders: { top: "On top", mixed: "Mixed with files" },
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/*  UI                                                                 */
+/* ------------------------------------------------------------------ */
+
 const SortOption = ({ checked, children, onClick, setOpen }) => {
   return (
     <button
@@ -40,8 +82,27 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
   );
 };
 
-const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
-  const isName = sortConfig.key === "name";
+const SectionLabel = ({ children }) => (
+  <div className="px-4 py-1.5">
+    <p className="text-xs font-medium text-(--text-secondary) cursor-default">
+      {children}
+    </p>
+  </div>
+);
+
+const Divider = () => <div className="my-2 h-px bg-[#e8eaed]" />;
+
+const SortMenu = ({
+  sortConfig,
+  onSortChange,
+  setOpen,
+  isSharedRoute = false,
+}) => {
+  const variant = isSharedRoute ? "shared" : "drive";
+  const labels = LABELS[variant];
+
+  // direction ke labels: name ke liye A→Z, baaki sab dates hain
+  const kind = sortConfig.key === "name" ? "name" : "date";
 
   return (
     <div className="w-65 overflow-hidden bg-(--surface-container) py-2 shadow-(--shadow-1) cursor-default">
@@ -51,100 +112,52 @@ const SortMenu = ({ sortConfig, onSortChange, setOpen }) => {
       </div>
 
       {/* Sort by */}
-      <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-(--text-secondary) cursor-default">
-          Sort by
-        </p>
-      </div>
-
+      <SectionLabel>Sort by</SectionLabel>
       <div>
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.key === "name"}
-          onClick={() => onSortChange({ key: "name" })}
-        >
-          Name
-        </SortOption>
-
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.key === "modifiedTime"}
-          onClick={() =>
-            onSortChange({
-              key: "modifiedTime",
-            })
-          }
-        >
-          Date modified
-        </SortOption>
+        {SORT_KEYS[variant].map(({ key, label }) => (
+          <SortOption
+            key={key}
+            setOpen={setOpen}
+            checked={sortConfig.key === key}
+            onClick={() => onSortChange({ key })}
+          >
+            {label}
+          </SortOption>
+        ))}
       </div>
 
-      <div className="my-2 h-px bg-[#e8eaed]" />
+      <Divider />
 
       {/* Direction */}
-      <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-(--text-primary)">
-          Sort direction
-        </p>
-      </div>
-
+      <SectionLabel>Sort direction</SectionLabel>
       <div>
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.direction === "asc"}
-          onClick={() =>
-            onSortChange({
-              direction: "asc",
-            })
-          }
-        >
-          {isName ? "A → Z" : "Oldest → Newest"}
-        </SortOption>
-
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.direction === "desc"}
-          onClick={() =>
-            onSortChange({
-              direction: "desc",
-            })
-          }
-        >
-          {isName ? "Z → A" : "Newest → Oldest"}
-        </SortOption>
+        {labels.directionOrder[kind].map((direction) => (
+          <SortOption
+            key={direction}
+            setOpen={setOpen}
+            checked={sortConfig.direction === direction}
+            onClick={() => onSortChange({ direction })}
+          >
+            {labels.direction[kind][direction]}
+          </SortOption>
+        ))}
       </div>
 
-      <div className="my-2 h-px bg-[#e8eaed]" />
+      <Divider />
 
       {/* Folders */}
-      <div className="px-4 py-1.5">
-        <p className="text-xs font-medium text-(--text-primary)">Folders</p>
-      </div>
-
+      <SectionLabel>Folders</SectionLabel>
       <div>
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.folders === "top"}
-          onClick={() =>
-            onSortChange({
-              folders: "top",
-            })
-          }
-        >
-          Folders on top
-        </SortOption>
-
-        <SortOption
-          setOpen={setOpen}
-          checked={sortConfig.folders === "mixed"}
-          onClick={() =>
-            onSortChange({
-              folders: "mixed",
-            })
-          }
-        >
-          Mixed with files
-        </SortOption>
+        {["top", "mixed"].map((value) => (
+          <SortOption
+            key={value}
+            setOpen={setOpen}
+            checked={sortConfig.folders === value}
+            onClick={() => onSortChange({ folders: value })}
+          >
+            {labels.folders[value]}
+          </SortOption>
+        ))}
       </div>
     </div>
   );

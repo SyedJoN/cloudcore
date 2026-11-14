@@ -7,12 +7,23 @@ import {
 } from "./ApplyRecentFilters";
 import { GridItem, ListRow } from "..";
 import { useAuth } from "../../../Contexts";
+import SortButton from "../../ListRow/SortButton.jsx";
+import SortButtonMobile from "../../ListRow/SortButtonMobile.jsx";
+import ViewToggleMobile from "../ViewToggleMobile.jsx";
+import MobileGridItem from "../MobileGridItem.jsx";
+import MobileListRow from "../MobileListRow.jsx";
+import { Divider } from "../../Divider.jsx";
 
 export default function RecentView({
   items,
   sortConfig,
+  setSortConfig,
   viewMode,
+  isMobile,
+  isDesktop,
   isRecentRoute,
+  onToggleView,
+  isSharedRoute,
   dirId,
   isStarred,
   setIsStarred,
@@ -41,23 +52,66 @@ export default function RecentView({
     [filteredItems],
   );
 
-  const ItemComponent = viewMode === "grid" ? GridItem : ListRow;
+  const ItemComponent = isDesktop
+    ? viewMode === "grid"
+      ? GridItem
+      : ListRow
+    : viewMode === "grid"
+      ? MobileGridItem
+      : MobileListRow;
 
   return (
     <div className="gd-recent">
-      <RecentFilters
-        items={items}
-        filters={filters}
-        onChange={setFilters}
-        user={user}
-        isRecentRoute={isRecentRoute}
-      />
-      {viewMode === "list" && listHeaderRow}
+      {isDesktop && (
+        <RecentFilters
+          items={items}
+          filters={filters}
+          onChange={setFilters}
+          user={user}
+          isRecentRoute={isRecentRoute}
+        />
+      )}
+      {(isDesktop && viewMode === "grid" && !isRecentRoute) ||
+      (isMobile && !isRecentRoute) ? (
+        <div className="sort-btn pl-1">
+          {isMobile ? (
+            <div className="flex items-center">
+              <SortButtonMobile
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+                />
+              <ViewToggleMobile
+                viewMode={viewMode}
+                onToggleView={onToggleView}
+                />
+            </div>
+          ) : (
+            <SortButton
+            isSharedRoute={isSharedRoute}
+            viewMode={viewMode}
+            onToggleView={onToggleView}
+            sortConfig={sortConfig}
+              setSortConfig={setSortConfig}
+            />
+          )}
+        </div>
+      ) : null}
+      {viewMode === "list" && isDesktop && listHeaderRow}
 
       {groups.map(({ label, items: groupItems }) => (
         <div key={label} className="gd-recency-group">
           <div className="gd-section-label">{label}</div>
-          <div className={viewMode === "grid" ? "gd-grid" : "gd-list"}>
+          <div
+            className={
+              viewMode === "grid"
+                ? isMobile
+                  ? "mgi-grid"
+                  : "gd-grid"
+                : isMobile
+                  ? "gd-list mobile"
+                  : "gd-list"
+            }
+          >
             {groupItems.map((item) => (
               <ItemComponent
                 key={item._id ?? item.id}
