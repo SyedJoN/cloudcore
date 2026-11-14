@@ -761,8 +761,6 @@ body.gd-drag-active::before {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  font-size: 12px;
-  font-weight: 400;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;

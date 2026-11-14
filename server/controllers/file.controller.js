@@ -903,6 +903,8 @@ export const getRecentFiles = async (req, res, next) => {
 
     const sharedFilesWithRoles = await Promise.all(
       sharedFiles.map(async (file) => {
+        const isMine = String(file.userId?._id ?? file.userId) === String(userId);
+
         const {
           owners,
           capabilities,
@@ -917,7 +919,7 @@ export const getRecentFiles = async (req, res, next) => {
           permissions,
           viewedByMeTime,
           modifiedByMeTime,
-          isShared: true,
+          rootType: isMine ? "mine" : "shared",
         };
       }),
     );
@@ -2718,7 +2720,8 @@ const HALF_LIFE_MS = 7 * DAY;
 
 const scoreOf = (views, now) =>
   views.reduce(
-    (sum, t) => sum + Math.pow(0.5, (now - new Date(t).getTime()) / HALF_LIFE_MS),
+    (sum, t) =>
+      sum + Math.pow(0.5, (now - new Date(t).getTime()) / HALF_LIFE_MS),
     0,
   );
 

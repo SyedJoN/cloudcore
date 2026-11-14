@@ -244,7 +244,7 @@ export default function DirectoryView({ route }) {
     searchQuery,
   });
   const refreshCurrentDirectory = (type = "") => {
-    console.log('type', type)
+    console.log("type", type);
     getDirectoryItems(
       type === "google" || isGoogleDriveRoute
         ? "google-drive"
@@ -596,8 +596,14 @@ export default function DirectoryView({ route }) {
         : { key: "name", direction: "asc", folders: "top" },
     );
   }, [isSharedRoute]);
-  const headerColumns =
-    isHomeRoute || isGoogleDriveRoute || route === undefined
+  const headerColumns = isHomeRoute
+    ? [
+        { label: "Name", key: "name" },
+        { label: "Reason suggested", key: "reason" },
+        { label: "Owner", key: null },
+        { label: "Location", key: null },
+      ]
+    : isGoogleDriveRoute || route === "drive"
       ? [
           { label: "Name", key: "name" },
           { label: "Owner", key: null },
@@ -636,7 +642,7 @@ export default function DirectoryView({ route }) {
 
   const listHeaderRow = (
     <div
-      className={`gd-list-header ${route === "home" || route === "google-drive" || route === undefined ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"} md:text-[11px]`}
+      className={`gd-list-header ${route === "home" || route === "google-drive" || route === "drive" ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"} md:text-[11px]`}
     >
       {headerColumns.map((column, index) => (
         <span
@@ -658,7 +664,7 @@ export default function DirectoryView({ route }) {
         </span>
       ))}
 
-      {!isRecentRoute && (
+      {!isRecentRoute && !isHomeRoute && (
         <SortButton sortConfig={sortConfig} setSortConfig={setSortConfig} />
       )}
     </div>
@@ -1679,7 +1685,7 @@ export default function DirectoryView({ route }) {
           isStarred={isStarred}
           onClose={() => setViewItem(null)}
           isSharedRoute={isSharedRoute}
-          files={sortedFilesForViewer}
+          files={isHomeRoute ? filteredFiles : sortedFilesForViewer}
           onNavigate={(item) => setViewItem([item])}
           onDownload={async (payload) => {
             const items = Array.isArray(payload)

@@ -34,12 +34,18 @@ const formatWhen = (value) => {
 };
 
 /* ---------- small UI pieces ---------- */
- 
-const Section = ({ title, right, isHomeRoute = true, isMobile = true,children }) => {
+
+const Section = ({
+  title,
+  right,
+  isHomeRoute = true,
+  isMobile = true,
+  children,
+}) => {
   const [open, setOpen] = useState(true);
   return (
     <section className="mb-6">
-      <div className="flex items-center justify-between mb-3 m-3 min-h-10">
+      <div className={`flex items-center justify-between mb-3 ${isMobile ? 'm-3' : ''}  min-h-10`}>
         <button
           type="button"
           disabled={!isHomeRoute}
@@ -158,17 +164,17 @@ const HomeView = ({
   });
 
   const fileContainerClass =
-  viewMode === "grid"
-    ? isMobile
-      ? isHomeRoute
-        ? "mgi-grid mobile"
-        : "mgi-grid"
-      : "gd-grid"
-    : isMobile
-      ? isHomeRoute
-        ? "gd-list mobile home"
-        : "gd-list mobile"
-      : "gd-list";
+    viewMode === "grid"
+      ? isMobile
+        ? isHomeRoute
+          ? "mgi-grid mobile"
+          : "mgi-grid"
+        : "gd-grid"
+      : isMobile
+        ? isHomeRoute
+          ? "gd-list mobile home"
+          : "gd-list mobile"
+        : "gd-list";
   const isEmpty = !loading && folders.length === 0 && files.length === 0;
 
   return (
@@ -183,7 +189,12 @@ const HomeView = ({
       )}
 
       {folders.length > 0 && isDesktop && (
-        <Section title="Suggested folders" isHomeRoute={isHomeRoute} isMobile={isMobile}>
+        
+        <Section
+          title="Suggested folders"
+          isHomeRoute={isHomeRoute}
+          isMobile={isMobile}
+        >
           <div className={`gd-grid ${isMobile ? "" : "gd-grid-on-top"} py-1!`}>
             {folders.map((item) => {
               const { key, ...rest } = itemProps(item);
@@ -205,6 +216,8 @@ const HomeView = ({
 
       {(files.length > 0 || loading) && (
         <Section
+                  isHomeRoute={isHomeRoute}
+          isMobile={isMobile}
           title={isDesktop ? "Suggested files" : "Files"}
           right={
             isMobile ? (

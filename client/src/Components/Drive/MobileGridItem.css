@@ -50,10 +50,10 @@ grid-template-columns: 1fr!important
   transition: transform 220ms cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 .mgi-card.mobile-home {
-  border-top: 1px solid var(--divider);
+  border-top: 2px solid var(--surface-container);
   background-color: var(--surface-white);
   border-radius: 0;
-  max-height: 246px;
+  max-height: 324px;
 }
 .mgi-card.mobile-home > .mgi-preview {
   margin-inline: 24px;

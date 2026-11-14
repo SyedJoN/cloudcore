@@ -12,6 +12,7 @@ import { FolderIcon, InboxIcon, UsersIcon } from "@heroicons/react/24/solid";
 import TrashRoute from "../ListRow/TrashRoute";
 import StarredRoute from "../ListRow/StarredRoute";
 import { getFileKind } from "../../../Utils/fileKind";
+import DriveRoute from "../ListRow/DriveRoute";
 
 const currentYear = new Date().getFullYear();
 
@@ -75,7 +76,7 @@ export default function ListRow({
 
   const isGoogleDriveRoute = route === "google-drive";
 
-  const isDriveRoute = route === undefined;
+  const isDriveRoute = route === "drive";
 
   const isHomeRoute = route === "home";
 
@@ -91,17 +92,17 @@ export default function ListRow({
 
   const lastPathItem = path[path.length - 1];
 
-  const pathId = item.isShared
-    ? "/shared"
-    : lastPathItem?.name?.startsWith("root")
-      ? "/"
-      : `/directory/${lastPathItem?._id}`;
+  const pathId = lastPathItem?.name?.startsWith("root")
+    ? item.rootType === "shared"
+      ? "/shared"
+      : "/drive"
+    : `/directory/${lastPathItem?._id}`;
 
-  const pathName = item.isShared
-    ? "Shared with me"
-    : lastPathItem?.name?.startsWith("root")
-      ? "My Drive"
-      : lastPathItem?.name;
+  const pathName = lastPathItem?.name?.startsWith("root")
+    ? item.rootType === "shared"
+      ? "Shared with me"
+      : "My Drive"
+    : lastPathItem?.name;
 
   const locationIcon =
     pathName === "Shared with me" ? (
@@ -211,14 +212,13 @@ export default function ListRow({
 
   return (
     <div
-      className={`gd-list-row ${selected ? "selected" : ""} ${route === "home" || route === "google-drive" || route === undefined ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"}`}
+      className={`gd-list-row ${selected ? "selected" : ""} ${route === "home" || route === "google-drive" || route === "drive" ? "five-columns" : route === "shared" ? "four-columns" : "six-columns"}`}
       data-id={itemId}
       onClick={() => onRowClick(itemId)}
       onMouseEnter={() => setIsListHovered(true)}
       onMouseLeave={() => setIsListHovered(false)}
       onDoubleClick={() => onDoubleClick?.(type, itemId)}
-      
-       onContextMenu={(e) => {
+      onContextMenu={(e) => {
         e.preventDefault();
         if (!selectedItems.has(itemId)) {
           onSelect?.(itemId);
@@ -237,8 +237,20 @@ export default function ListRow({
         <span>{item.name}</span>
       </div>
 
-      {isHomeRoute || isGoogleDriveRoute || isDriveRoute ? (
+      {isHomeRoute ? (
         <HomeRoute
+          {...commonRouteProps}
+          locationIcon={locationIcon}
+          myActivityType={myActivityType}
+          myActivityTime={myActivityTime}
+          owner={ownerName}
+          avatar={avatar}
+          size={size}
+          locationDetails={locationDetails}
+          navigate={navigate}
+        />
+      ) : isGoogleDriveRoute || isDriveRoute ? (
+        <DriveRoute
           {...commonRouteProps}
           owner={ownerName}
           avatar={avatar}

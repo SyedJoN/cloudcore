@@ -8,7 +8,7 @@ export const protectedRoutes = [
     children: [
       {
         path: "/drive",
-        element: <DirectoryView />,
+        element: <DirectoryView route="drive" />,
       },
       {
         path: "/google-drive",

@@ -1,31 +1,46 @@
 import { UseAvatar } from "../../Hooks/useAvatar";
 import { IconDots } from "../Icons/Icons";
 import RowActions from "./RowActions";
+
 export default function HomeRoute({
   owner,
   avatar,
-  lastModifiedAt,
-  modifiedBy,
   size,
+  myActivityType,
+  myActivityTime,
+  locationDetails,
+  locationIcon,
+  navigate,
   ...actionProps
 }) {
   return (
     <>
       <div className="gd-list-row-cell md:text-[11px]">
-       <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14}/> <span>{owner}</span>
+        {myActivityTime !== null
+          ? `${myActivityTime} · ${myActivityType} by me`
+          : ""}
+      </div>
+      <div className="gd-list-row-cell md:text-[11px]">
+        <UseAvatar name={owner} avatar={avatar} size={24} fontSize={14} />{" "}
+        <span>{owner}</span>
       </div>
 
-      <div className="gd-list-row-cell md:text-[11px]">
-        {lastModifiedAt} {modifiedBy ? modifiedBy : ''}
-      </div>
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
 
-      <div className="gd-list-row-cell md:text-[11px]">
-        {size}
+          if (location.pathname === locationDetails.pathId) {
+            return;
+          }
+
+          navigate(locationDetails.pathId);
+        }}
+        className="gd-location-btn md:text-[11px]"
+      >
+        <span className="pr-2">{locationIcon}</span> {locationDetails.name}
       </div>
-     
 
       <RowActions {...actionProps} />
-   
     </>
   );
 }

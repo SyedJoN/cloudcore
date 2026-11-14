@@ -8,6 +8,7 @@ import { useAuth, useGDrive } from "../../Contexts";
 import "./MobileGridItem.css";
 import { getFileKind } from "../../../Utils/fileKind";
 import { useDevice } from "../../Contexts/DeviceContext";
+import { formatDate } from "../../../Utils/formatDate";
 
 export default function MobileGridItem({
   item,
@@ -28,17 +29,25 @@ export default function MobileGridItem({
 }) {
   const { user } = useAuth();
   const { isGoogleDrive } = useGDrive();
+  const location = useLocation();
   const [hasImgError, setHasImgError] = useState(false);
-  const {device } = useDevice();
+  const { device } = useDevice();
   const isDesktop = device === "windows";
   const isMobile = device === "mobile";
   const lastTap = useRef(0);
+
+  const isDriveRoute = location.pathname.endsWith("/drive");
+  const isRecentRoute = location.pathname.endsWith("/recent");
+  const isSharedRoute = location.pathname.endsWith("/shared");
+  const isTrashRoute = location.pathname.endsWith("/trash");
+
+  const showActiviyBar =
+    isDriveRoute || isRecentRoute || isSharedRoute || isTrashRoute;
 
   // press state (scale + state layer)
   const [pressed, setPressed] = useState(false);
   const pressTimer = useRef(null);
 
-  const location = useLocation();
   const path = location.pathname;
   const isGoogleDriveRoute = path.endsWith("/google-drive");
 
@@ -79,8 +88,6 @@ export default function MobileGridItem({
     [setSelectedItems],
   );
 
-
-
   const handleClick = () => {
     if (disabled) return;
     if (pickerMode) {
@@ -116,6 +123,10 @@ export default function MobileGridItem({
   const avatarEl =
     avatar && !hasImgError ? (
       <img
+        style={{
+          width: isMobile ? "26px" : "100%",
+          height: isMobile ? "26px" : "100%",
+        }}
         className="mgi-avatar"
         src={avatar}
         alt={owner ?? user?.name}
@@ -129,7 +140,15 @@ export default function MobileGridItem({
         {user?.name?.charAt(0)?.toUpperCase()}
       </span>
     );
+  const modified = item.modifiedTime
+    ? new Date(item.modifiedTime).getTime()
+    : 0;
 
+  const viewed = item.viewedByMeTime
+    ? new Date(item.viewedByMeTime).getTime()
+    : 0;
+
+  const isOpened = viewed > modified;
   return (
     <div
       className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""} ${isMobile && isHomeRoute ? "mobile-home" : ""}`}
@@ -187,6 +206,23 @@ export default function MobileGridItem({
         ) : (
           <FilePreview item={item} />
         )}
+      </div>
+      <div
+        style={{
+          display: showActiviyBar ? "none" : "flex",
+          alignItems: "center",
+          padding: isMobile ? "0 0 0 28px" : "0px 8px 0px 12px",
+          gap: 8,
+        }}
+      >
+        {avatarEl}
+
+        <span className="gd-grid-item-last-action flex flex-col items-start!">
+          <span className="text-sm">You {isOpened ? "opened" : "modified"}</span>
+          <span className="text-sm">
+            {formatDate(isOpened ? item.viewedByMeTime : item.modifiedTime)}
+          </span>
+        </span>
       </div>
     </div>
   );
