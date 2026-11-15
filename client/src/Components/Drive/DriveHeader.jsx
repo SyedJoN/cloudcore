@@ -1,23 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { googleLogout } from "@react-oauth/google";
-import { getColor } from "../../../Utils/getProfileColor.js";
 import {
-  IconDrive,
   IconSearch,
-  IconGrid,
-  IconList,
-  IconSettings,
 } from "../Icons/Icons.jsx";
 import GoogleDriveBtn from "../ThirdPartyButtons/GoogleDrive.jsx";
 import UserAccountBar from "../UserAccountBar.jsx";
 import { Cloud } from "lucide-react";
-import ThemeToggleBtn from "../Buttons/ThemeToggleBtn.jsx";
 import { useGDrive } from "../../Contexts/GoogleDriveAuthContext.jsx";
 import { Bars3Icon } from "@heroicons/react/24/solid";
 import SearchBar from "../SearchBar.jsx";
 import { useSidebar } from "../../Contexts/SidebarContext.jsx";
 import { useDevice } from "../../Contexts/DeviceContext.jsx";
+import { ThemeToggleBtn } from "../Buttons/ThemeToggleBtn.jsx";
 
 export default function DriveHeader({ searchQuery, onSearchChange }) {
   const {device } = useDevice();

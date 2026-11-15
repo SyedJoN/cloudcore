@@ -306,7 +306,7 @@
   border-bottom-right-radius: 0;
 }
 .gd-body.mobile.selection-mode {
-padding-bottom: 0;
+  padding-bottom: 0;
 }
 .gd-body.mobile.animation {
   animation: scaleIn 100ms ease-in-out normal;
@@ -532,7 +532,7 @@ body.gd-drag-active::before {
 }
 
 .gd-nav-item:hover {
-  background: var(--surface-container-dark);
+  background: var(--surface-container-base);
 }
 
 .gd-nav-item.active {
@@ -618,7 +618,7 @@ body.gd-drag-active::before {
   border-radius: 16px;
 }
 .gd-main.mobile.home {
-  padding: 0 0px 18px 0px!important;
+  padding: 0 0px 18px 0px !important;
 }
 
 /* ===================== TOOLBAR ===================== */
@@ -728,7 +728,6 @@ body.gd-drag-active::before {
 }
 .gd-grid-item {
   background: var(--surface-container-dark);
-  border: 1px solid var(--surface-container-dark);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition:
@@ -738,13 +737,11 @@ body.gd-drag-active::before {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-1);
   position: relative;
 }
 
 .gd-grid-item:hover {
   background: var(--btn-hover-primary);
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.2);
 }
 
 .gd-grid-item.selected {
@@ -1403,9 +1400,6 @@ body.gd-overlay-open {
 .gd-user-menu {
   background: var(--surface-container-dark);
   border-radius: var(--radius-lg);
-  box-shadow:
-    0 4px 12px rgba(60, 64, 67, 0.25),
-    0 1px 3px rgba(60, 64, 67, 0.2);
   overflow: hidden;
   animation: ctx-appear 0.12s ease;
 }

@@ -9,12 +9,12 @@ import { NAV_ITEMS } from "./DriveSidebar";
 import UserAccountDrawerMobile from "../UserAccountDrawerBar";
 import { UseAvatar } from "../../Hooks/useAvatar";
 import { Divider } from "../Divider";
+import { ThemeToggleBtnMobile } from "../Buttons/ThemeToggleBtn";
 
-/* ------------------------------------------------------------------ */
-/* Slide-in drawer (sidebar without the "New" button)                  */
-/* ------------------------------------------------------------------ */
+
+// Slide-in drawer   
+
 function MobileDrawer({ open, onClose, dirId, dirContext }) {
-  const { isGoogleDrive } = useGDrive();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -53,7 +53,7 @@ function MobileDrawer({ open, onClose, dirId, dirContext }) {
         aria-hidden={!open}
         aria-label="Navigation"
       >
-        <h2 className="gd-title pl-6 py-2">
+        <h2 className="gd-title pl-6 py-2 font-medium">
             Cloud Core
             </h2>
             <Divider fullWidth={true}/>
@@ -76,7 +76,19 @@ function MobileDrawer({ open, onClose, dirId, dirContext }) {
             );
           })}
         </nav>
+  {/* Dark / Light mode toggle */}
+    <div className="flex flex-col gap-2 items-start justify-between px-6 py-4">
+  <div className="flex flex-col gap-1">
+    <span className="text-sm font-semibold text-(--text-primary)">
+      Appearance
+    </span>
+    <span className="text-xs text-(--text-secondary)">
+      Switch between light and dark mode
+    </span>
+  </div>
 
+  <ThemeToggleBtnMobile />
+</div>
         <div className="gd-storage-section">
           <div className="gd-storage-bar-bg">
             <div

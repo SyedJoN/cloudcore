@@ -35,7 +35,7 @@
   --accent-blue-badge: #f1f1f1;
   --monochrome-bg-mobile: #131314;
   --monochrome-text-mobile: #fff;
-  --btn-hover-primary: rgba(32, 33, 36, 0.08);
+  --btn-hover-primary: rgba(32, 33, 36, 0.15);
   --btn-hover-secondary: rgba(32, 33, 36, 0.05);
   --sidebar-width: 256px;
   --header-height: 64px;
