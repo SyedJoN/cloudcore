@@ -91,6 +91,7 @@ export default function DirectoryView({ route }) {
   );
 
   const isHomeRoute = route === "home" || params.get("usp") === "drive_link";
+  const isDriveRoute = route === "drive";
   const isSharedRoute = route === "shared";
   const isTrashRoute = route === "trash";
   const isGoogleDriveRoute = route === "google-drive" && isGoogleDrive;
@@ -141,20 +142,13 @@ export default function DirectoryView({ route }) {
     }
   }, [location.pathname, device]);
 
-  const [sortConfig, setSortConfig] = useState({
-    key: "name",
-    direction: "asc",
-    folders: "top",
-  });
+  const getDefaultSort = (shared) =>
+  shared
+    ? { key: "sharedWithMeTime", direction: "desc", folders: "mixed" }
+    : { key: "name", direction: "asc", folders: "top" };
 
-  //   confirmModal.resolve?.(false);
+const [sortConfig, setSortConfig] = useState(() => getDefaultSort(isSharedRoute));
 
-  //   setConfirmModal({
-  //     open: false,
-  //     message: "",
-  //     resolve: null,
-  //   });
-  // };
   const dirContext =
     location.state?.dirContext ||
     (isTrashRoute
@@ -318,6 +312,7 @@ export default function DirectoryView({ route }) {
     handleSelectAll,
     clearSelection,
     handleContextMenu,
+    handleMultiContextMenu,
     open,
     setOpen,
     handleMainMouseDown,
@@ -589,13 +584,9 @@ export default function DirectoryView({ route }) {
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
-  useEffect(() => {
-    setSortConfig(
-      isSharedRoute
-        ? { key: "sharedWithMeTime", direction: "desc", folders: "mixed" }
-        : { key: "name", direction: "asc", folders: "top" },
-    );
-  }, [isSharedRoute]);
+useEffect(() => {
+  setSortConfig(getDefaultSort(isSharedRoute));
+}, [isSharedRoute]);
   const headerColumns = isHomeRoute
     ? [
         { label: "Name", key: "name" },
@@ -830,7 +821,7 @@ export default function DirectoryView({ route }) {
       )}
 
       <div
-        className={`gd-body ${isMobile ? "mobile" : ""} ${animate ? "animation" : ""}`}
+        className={`gd-body ${isMobile ? "mobile" : ""} ${animate ? "animation" : ""} ${selectionMode ? "selection-mode" : ""}`}
       >
         {isDesktop && user.email && (
           <DriveSidebar
@@ -956,8 +947,12 @@ export default function DirectoryView({ route }) {
                 ) : isRecentRoute || isSharedRoute ? (
                   <RecentView
                     items={isRecentRoute ? filteredFiles : combinedItems}
+                    combinedItems={combinedItems}
                     sortConfig={sortConfig}
                     setSortConfig={setSortConfig}
+                    selectionMode={selectionMode}
+                    setSelectionMode={setSelectionMode}
+                    setSelectedItems={setSelectedItems}
                     isSharedRoute={isSharedRoute}
                     isRecentRoute={isRecentRoute}
                     isDesktop={isDesktop}
@@ -968,6 +963,7 @@ export default function DirectoryView({ route }) {
                     }
                     selectedItems={selectedItems}
                     onSelect={handleSelect}
+                    handleSelectAll={handleSelectAll}
                     onRowClick={handleRowClick}
                     onDoubleClick={handleRowDoubleClick}
                     onShare={(itemId) => {
@@ -996,11 +992,11 @@ export default function DirectoryView({ route }) {
                       clearSelection();
                     }}
                     onContextMenu={handleContextMenu}
+                    onMultiContextMenu={handleMultiContextMenu}
                     listHeaderRow={listHeaderRow}
                     isStarred={isStarred}
                     setIsStarred={setIsStarred}
                     route={route}
-                    combinedItems={combinedItems}
                     onStar={async (itemId) => {
                       const items = combinedItems.filter(
                         (item) => (item.id ?? item._id) === itemId,
@@ -1013,10 +1009,15 @@ export default function DirectoryView({ route }) {
                   />
                 ) : isHomeRoute ? (
                   <HomeView
+                  combinedItems={combinedItems}
                     files={filteredFiles}
                     folders={directoriesList}
                     setSelectedItems={setSelectedItems}
                     isHomeRoute={isHomeRoute}
+                    isDriveRoute={isDriveRoute}
+                    isSharedRoute={isSharedRoute}
+                    isRecentRoute={isRecentRoute}
+                    isTrashRoute={isTrashRoute}
                     isGoogleDrive={isGoogleDrive}
                     items={combinedItems}
                     open={open}
@@ -1063,12 +1064,12 @@ export default function DirectoryView({ route }) {
                       clearSelection();
                     }}
                     onContextMenu={handleContextMenu}
+                    onMultiContextMenu={handleMultiContextMenu}
                     setContextItem={setContextItem}
                     listHeaderRow={listHeaderRow}
                     isStarred={isStarred}
                     setIsStarred={setIsStarred}
                     route={route}
-                    combinedItems={combinedItems}
                     onStar={async (itemId) => {
                       const items = combinedItems.filter(
                         (item) => (item.id ?? item._id) === itemId,
@@ -1133,6 +1134,7 @@ export default function DirectoryView({ route }) {
                       clearSelection();
                     }}
                     onContextMenu={handleContextMenu}
+                    onMultiContextMenu={handleMultiContextMenu}
                     setContextItem={setContextItem}
                     listHeaderRow={listHeaderRow}
                     isStarred={isStarred}
@@ -1166,7 +1168,7 @@ export default function DirectoryView({ route }) {
           />
         )}
       </div>
-      {isMobile && (
+      {isMobile && !selectionMode && (
         <DriveBottomBar
           enqueueItem={enqueueItem}
           setItemProgress={setItemProgress}

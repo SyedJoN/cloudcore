@@ -14,7 +14,7 @@
   --surface-container-dark: #e9eef6;
   --surface-container-mobile-dark: #f6fafe;
   --surface-container-dark-hover: #f6fafe;
-  --surface-container-mobile-dark-hover: #e9eef6;
+  --surface-container-mobile-dark-hover: rgba(0,0,0,.2);
   --btn-bg-medium: rgba(32, 33, 36, 0.08);
   --border-inverse: #000000;
   --border: #e0e0e0;
@@ -35,6 +35,7 @@
   --monochrome-bg-mobile: #131314;
   --monochrome-text-mobile: #fff;
   --btn-hover-primary: rgba(32, 33, 36, 0.08);
+  --btn-hover-secondary: rgba(32, 33, 36, 0.05);
   --sidebar-width: 256px;
   --header-height: 64px;
   --chip-height: 36px;
@@ -81,6 +82,8 @@
   --border-inverse: #cdc9c9;
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
+  --btn-hover-secondary: rgba(173, 173, 173, 0.4);
+
   --btn-bg-medium: #37393b;
   --monochrome-bg-mobile: #fff;
   --monochrome-text-mobile: #131314;

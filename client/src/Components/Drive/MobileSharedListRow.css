@@ -1,0 +1,130 @@
+/* Shared with me: mobile list row (Google Drive style) */
+.msr-row {
+  --msr-fg: var(--text-primary, #e3e3e3);
+  --msr-muted: var(--text-secondary, #c4c7c5);
+
+  display: flex;
+  align-items: center;
+  padding: 6px 4px 6px 16px;
+  border-top: 1px solid var(--divider);
+  color: var(--msr-fg);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.msr-row:active {
+  background: color-mix(in srgb, var(--msr-fg) 8%, transparent);
+}
+
+.msr-row.selected {
+  background: color-mix(in srgb, #a8c7fa 18%, transparent);
+}
+
+/* sharer ka avatar */
+.msr-avatar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+}
+
+.msr-avatar.fallback {
+  background: #5f6368;
+  color: #e8eaed;
+}
+
+/* file type tile (folder par tile nahi, sirf icon) */
+.msr-thumb {
+  position: relative;
+  z-index: 0;
+  right: 7px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height:36px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--msr-fg) 10%, transparent);
+}
+
+.msr-thumb.folder {
+  background: transparent;
+  color: var(--msr-muted);
+}
+
+/* name + subtitle */
+.msr-text {
+  flex: 1;
+  padding-left: 12px;
+  min-width: 0;
+}
+
+.msr-title {
+  overflow: hidden;
+  font-size: 16px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msr-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 18px;
+  color: var(--msr-muted);
+}
+
+.msr-sub svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.msr-sub-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* kebab / checkbox */
+.msr-kebab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--msr-fg);
+}
+
+.msr-kebab:active {
+  background: color-mix(in srgb, var(--msr-fg) 12%, transparent);
+}
+
+.msr-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--msr-muted);
+  border-radius: 50%;
+}
+
+.msr-check.on {
+  border-color: #a8c7fa;
+  background: #a8c7fa;
+  color: #062e6f;
+}

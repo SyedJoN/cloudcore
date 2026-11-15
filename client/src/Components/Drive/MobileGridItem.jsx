@@ -78,6 +78,8 @@ export default function MobileGridItem({
 
   const handleToggle = useCallback(
     (id) => {
+    console.log('kebab')
+
       setSelectedItems((prev) => {
         const next = new Set(prev);
         if (next.has(id)) next.delete(id);
@@ -135,7 +137,11 @@ export default function MobileGridItem({
     ) : (
       <span
         className="mgi-avatar mgi-avatar-letter"
-        style={{ background: getColor(user?.name) }}
+        style={{
+          width: isMobile ? "26px" : "100%",
+          height: isMobile ? "26px" : "100%",
+          background: getColor(user?.name),
+        }}
       >
         {user?.name?.charAt(0)?.toUpperCase()}
       </span>
@@ -211,15 +217,20 @@ export default function MobileGridItem({
         style={{
           display: showActiviyBar ? "none" : "flex",
           alignItems: "center",
-          padding: isMobile ? "0 0 0 28px" : "0px 8px 0px 12px",
-          gap: 8,
+          marginBottom: 6,
+          padding: isMobile ? "8px 0 12px 28px" : "0px 8px 0px 12px",
+          height: 40,
+          gap: 16,
+          mb: 2,
         }}
       >
         {avatarEl}
 
-        <span className="gd-grid-item-last-action flex flex-col items-start!">
-          <span className="text-sm">You {isOpened ? "opened" : "modified"}</span>
+        <span className="gd-grid-item-last-action gap-0! pt-0! pb-0! flex flex-col items-start!">
           <span className="text-sm">
+            You {isOpened ? "opened" : "modified"}
+          </span>
+          <span className="text-xs text-(--text-tertiary)">
             {formatDate(isOpened ? item.viewedByMeTime : item.modifiedTime)}
           </span>
         </span>

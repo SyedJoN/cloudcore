@@ -21,86 +21,108 @@ export function useSelectionAndContextMenu({
     setSelectedItems(new Set(combinedItems.map((i) => i.id ?? i._id)));
   }, [combinedItems]);
 
-const getId = (i) => String(i?.id ?? i?._id);
-const toIdList = (v) =>
-  (Array.isArray(v) ? v : [v]).filter((x) => x != null).map(String);
+  const getId = (i) => String(i?.id ?? i?._id);
+  const toIdList = (v) =>
+    (Array.isArray(v) ? v : [v]).filter((x) => x != null).map(String);
 
-const handleContextMenu = useCallback(
-  (e, idOrIds) => {
-    e.stopPropagation();
-    e.preventDefault();
+  const handleContextMenu = useCallback(
+    (e, idOrIds) => {
+      e.stopPropagation();
+      e.preventDefault();
 
-    let ids = toIdList(idOrIds);
+      let ids = toIdList(idOrIds);
 
-    // Right-clicking an item inside a multi-selection acts on the whole selection
-    if (ids.length === 1 && selectedItems?.size > 1) {
-      const selectedIds = [...selectedItems].map(String);
-      if (selectedIds.includes(ids[0])) ids = selectedIds;
-    }
+      // Right-clicking an item inside a multi-selection acts on the whole selection
+      if (ids.length === 1 && selectedItems?.size > 1) {
+        const selectedIds = [...selectedItems].map(String);
+        if (selectedIds.includes(ids[0])) ids = selectedIds;
+      }
 
-    // Toggle off if clicking the same target (item or set of items) again
-    const currentIds = (
-      Array.isArray(contextItem) ? contextItem : contextItem ? [contextItem] : []
-    ).map(getId);
+      // Toggle off if clicking the same target (item or set of items) again
+      const currentIds = (
+        Array.isArray(contextItem)
+          ? contextItem
+          : contextItem
+            ? [contextItem]
+            : []
+      ).map(getId);
 
-    const sameTarget =
-      ids.length === currentIds.length &&
-      ids.every((id) => currentIds.includes(id));
+      const sameTarget =
+        ids.length === currentIds.length &&
+        ids.every((id) => currentIds.includes(id));
 
-    if (open && sameTarget) {
-      setOpen(false);
-      setContextItem(null);
-      return;
-    }
+      if (open && sameTarget) {
+        setOpen(false);
+        setContextItem(null);
+        return;
+      }
 
-    // Menu positioning (unchanged)
-    const spaceLeft = e.clientX;
-    const spaceRight = window.innerWidth - e.clientX;
+      // Menu positioning (unchanged)
+      const spaceLeft = e.clientX;
+      const spaceRight = window.innerWidth - e.clientX;
 
-    let left = false;
-    let x = e.clientX;
+      let left = false;
+      let x = e.clientX;
 
-    if (spaceRight >= CONTEXT_MENU_WIDTH) {
-      left = false;
-      x = e.clientX;
-    } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
-      left = true;
-      x = e.clientX - CONTEXT_MENU_WIDTH;
-    } else {
-      left = spaceLeft > spaceRight;
-      x = left ? 0 : e.clientX;
-    }
+      if (spaceRight >= CONTEXT_MENU_WIDTH) {
+        left = false;
+        x = e.clientX;
+      } else if (spaceLeft >= CONTEXT_MENU_WIDTH) {
+        left = true;
+        x = e.clientX - CONTEXT_MENU_WIDTH;
+      } else {
+        left = spaceLeft > spaceRight;
+        x = left ? 0 : e.clientX;
+      }
 
-    setOpenLeft(left);
-    setOpen(true);
-    setContextPos({ x, y: e.clientY });
+      setOpenLeft(left);
+      setOpen(true);
+      setContextPos({ x, y: e.clientY });
 
-    // Resolve each id with the original lookup rules, de-duplicating results
-    // (several ids can resolve to the same lastDirectory).
-    const resolved = [];
-    const seen = new Set();
+      // Resolve each id with the original lookup rules, de-duplicating results
+      // (several ids can resolve to the same lastDirectory).
+      const resolved = [];
+      const seen = new Set();
 
-    for (const id of ids) {
-      const parentMatch = combinedItems.find(
-        (i) => String(i.parentDirId?.id ?? i.parentDirId?._id) === id,
+      for (const id of ids) {
+        const parentMatch = combinedItems.find(
+          (i) => String(i.parentDirId?.id ?? i.parentDirId?._id) === id,
+        );
+        const itemMatch = combinedItems.find((i) => getId(i) === id);
+        const item = parentMatch ? lastDirectory : (itemMatch ?? lastDirectory);
+
+        if (!item) continue;
+        const key = getId(item);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        resolved.push(item);
+      }
+
+      // Single target keeps the old shape (an object); multiple becomes an array
+      setContextItem(
+        resolved.length > 1 ? resolved : (resolved[0] ?? lastDirectory),
       );
-      const itemMatch = combinedItems.find((i) => getId(i) === id);
-      const item = parentMatch ? lastDirectory : (itemMatch ?? lastDirectory);
+    },
+    [open, contextItem, combinedItems, lastDirectory, selectedItems],
+  );
 
-      if (!item) continue;
-      const key = getId(item);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      resolved.push(item);
-    }
+  const handleMultiContextMenu = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    // Single target keeps the old shape (an object); multiple becomes an array
-    setContextItem(
-      resolved.length > 1 ? resolved : (resolved[0] ?? lastDirectory),
-    );
-  },
-  [open, contextItem, combinedItems, lastDirectory, selectedItems],
-);
+      const selectedIds = new Set([...selectedItems].map(String));
+
+      const ids = combinedItems
+        .map(getId)
+        .filter((id) => selectedIds.has(String(id)));
+
+      if (!ids.length) return;
+
+      handleContextMenu?.(e, ids);
+    },
+    [handleContextMenu, selectedItems, combinedItems],
+  );
 
   const handleMainMouseDown = useCallback(
     (e) => {
@@ -177,6 +199,7 @@ const handleContextMenu = useCallback(
     clearSelection,
     handleSelectAll,
     handleContextMenu,
+    handleMultiContextMenu,
     open,
     setOpen,
     handleMainMouseDown,

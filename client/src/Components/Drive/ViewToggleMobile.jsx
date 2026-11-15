@@ -6,7 +6,7 @@ export default function ViewToggleMobile({ viewMode, onToggleView }) {
   };
 
   const viewBtn = (mode) =>
-    `flex h-8 w-8 flex-1 items-center justify-center rounded-full
+    `flex h-10 w-10 flex-1 items-center justify-center rounded-full
      text-(--text-secondary) cursor-pointer transition-colors duration-150
      ${viewMode === mode ? "bg-(--text-primary) text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark-hover)"}`;
   return (

@@ -13,6 +13,8 @@ import { useAuth } from "../../Contexts";
 import { useDevice } from "../../Contexts/DeviceContext";
 import ViewToggle from "./ViewToggle";
 import ViewToggleMobile from "./ViewToggleMobile";
+import { MdClose, MdOutlineSelectAll } from "react-icons/md";
+import { ChevronLeftIcon, EllipsisVerticalIcon } from "lucide-react";
 
 /* ---------- helpers ---------- */
 
@@ -45,7 +47,9 @@ const Section = ({
   const [open, setOpen] = useState(true);
   return (
     <section className="mb-6">
-      <div className={`flex items-center justify-between mb-3 ${isMobile ? 'm-3' : ''}  min-h-10`}>
+      <div
+        className={`flex items-center justify-between mb-3 ${isMobile ? "m-3" : ""}  min-h-10`}
+      >
         <button
           type="button"
           disabled={!isHomeRoute}
@@ -77,6 +81,7 @@ const Section = ({
 const HomeView = ({
   loading = false,
   items,
+  combinedItems,
   viewMode,
   onToggleView,
   listHeaderRow,
@@ -90,6 +95,7 @@ const HomeView = ({
   onRowClick,
   onDoubleClick,
   onContextMenu,
+  onMultiContextMenu,
   onShare,
   onRename,
   onDownload,
@@ -108,10 +114,6 @@ const HomeView = ({
   const isMobile = device === "mobile";
   const folders = items.filter((it) => it.isDirectory);
   const files = items.filter((it) => !it.isDirectory);
-
-  useEffect(() => {
-    console.log({ folders, files });
-  }, [files, folders]);
 
   const FileItem = isDesktop
     ? viewMode === "grid"
@@ -189,7 +191,6 @@ const HomeView = ({
       )}
 
       {folders.length > 0 && isDesktop && (
-        
         <Section
           title="Suggested folders"
           isHomeRoute={isHomeRoute}
@@ -216,7 +217,7 @@ const HomeView = ({
 
       {(files.length > 0 || loading) && (
         <Section
-                  isHomeRoute={isHomeRoute}
+          isHomeRoute={isHomeRoute}
           isMobile={isMobile}
           title={isDesktop ? "Suggested files" : "Files"}
           right={
@@ -238,14 +239,55 @@ const HomeView = ({
               <p>Try adjusting or clearing your filters.</p>
             </div>
           ) : (
-            <div className={fileContainerClass}>
-              {files.map((item) => {
-                const { key, ...rest } = itemProps(item);
-                return (
-                  <FileItem key={key} {...rest} footer={footerText(item)} />
-                );
-              })}
-            </div>
+            <>
+              {selectionMode && (
+                <div className="mlr-selection-bar">
+                  <button
+                    onClick={() => {
+                      setSelectedItems(new Set());
+                      setSelectionMode(false);
+                    }}
+                    aria-label="Back"
+                    className="mlr-bar-btn"
+                  >
+                    {selectedItems.size >= combinedItems.length ? (
+                      <MdClose className="h-6 w-6" />
+                    ) : (
+                      <ChevronLeftIcon className="h-6 w-6" />
+                    )}
+                  </button>
+                  <div className="flex items-center justify-between flex-1">
+                    <p className="mlr-bar-count">
+                      {selectedItems.size} selected
+                    </p>
+                    <div className="flex">
+                      <button
+                        onClick={() => handleSelectAll?.()}
+                        aria-label="Back"
+                        className="mlr-bar-btn"
+                      >
+                        <MdOutlineSelectAll className="h-6 w-6" />
+                      </button>
+                      <button
+                        onClick={onMultiContextMenu}
+                        aria-label="Back"
+                        className="mlr-bar-btn"
+                      >
+                        <EllipsisVerticalIcon className="h-6 w-6" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className={fileContainerClass}>
+                {files.map((item) => {
+                  const { key, ...rest } = itemProps(item);
+                  return (
+                    <FileItem key={key} {...rest} footer={footerText(item)} />
+                  );
+                })}
+              </div>
+            </>
           )}
         </Section>
       )}

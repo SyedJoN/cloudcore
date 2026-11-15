@@ -1,9 +1,5 @@
 import React from "react";
 
-/* ------------------------------------------------------------------ */
-/*  Options: My Drive vs Shared with me                                */
-/* ------------------------------------------------------------------ */
-
 const SORT_KEYS = {
   drive: [
     { key: "name", label: "Name" },
@@ -50,15 +46,16 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
         onClick();
         setOpen(false);
       }}
-      className="
+      className={`
         flex h-9 w-full items-center
         px-3
         text-left
         text-sm
         text-(--text-primary)
-        hover:bg-(--surface-container-dark)
+        hover:bg-(--btn-hover-secondary)
+        ${checked ? "bg-(--btn-hover-primary)" : ""}
         cursor-pointer
-      "
+      `}
     >
       {/* Google Drive style check */}
       <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center">
@@ -96,6 +93,7 @@ const SortMenu = ({
   sortConfig,
   onSortChange,
   setOpen,
+  isDesktop = true,
   isSharedRoute = false,
 }) => {
   const variant = isSharedRoute ? "shared" : "drive";
@@ -107,9 +105,7 @@ const SortMenu = ({
   return (
     <div className="w-65 overflow-hidden bg-(--surface-container) py-2 shadow-(--shadow-1) cursor-default">
       {/* Title */}
-      <div className="px-4 pb-2 pt-2 cursor-default">
-        <h3 className="text-[16px] font-medium text-(--text-primary)">Sort</h3>
-      </div>
+
 
       {/* Sort by */}
       <SectionLabel>Sort by</SectionLabel>
@@ -129,6 +125,7 @@ const SortMenu = ({
       <Divider />
 
       {/* Direction */}
+
       <SectionLabel>Sort direction</SectionLabel>
       <div>
         {labels.directionOrder[kind].map((direction) => (
@@ -145,20 +142,24 @@ const SortMenu = ({
 
       <Divider />
 
-      {/* Folders */}
-      <SectionLabel>Folders</SectionLabel>
-      <div>
-        {["top", "mixed"].map((value) => (
-          <SortOption
-            key={value}
-            setOpen={setOpen}
-            checked={sortConfig.folders === value}
-            onClick={() => onSortChange({ folders: value })}
-          >
-            {labels.folders[value]}
-          </SortOption>
-        ))}
-      </div>
+      {isDesktop && (
+        <>
+          {/* Folders */}
+          <SectionLabel>Folders</SectionLabel>
+          <div>
+            {["top", "mixed"].map((value) => (
+              <SortOption
+                key={value}
+                setOpen={setOpen}
+                checked={sortConfig.folders === value}
+                onClick={() => onSortChange({ folders: value })}
+              >
+                {labels.folders[value]}
+              </SortOption>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import SortMenu from "./SortMenu";
 import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/solid";
-import { IconGrid, IconList } from "../Icons/Icons";
-import { Divider } from "../Divider";
+
 
 const sortLabels = {
   name: "Name",
   modifiedTime: "Date modified",
+  sharedTime: "Date shared",
   sharedWithMeTime: "Date shared",
+  modifiedByMeTime: "Date modified by me",
+  viewedByMeTime: "Date opened by me",
   trashedTime: "Date trashed",
 };
 
 const SortButtonMobile = ({
+  isSharedRoute,
   sortConfig,
   setSortConfig,
+  isDesktop
 }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -67,6 +71,8 @@ const SortButtonMobile = ({
             setOpen={setOpen}
             sortConfig={sortConfig}
             onSortChange={handleSortChange}
+            isSharedRoute={isSharedRoute}
+            isDesktop={isDesktop}
           />
         </div>
       )}

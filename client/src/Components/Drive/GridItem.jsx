@@ -196,7 +196,7 @@ export default function GridItem({
           alignItems: "center",
           padding: "0px 8px 0px 12px",
           flex: "0 0 3rem",
-          gap: 8,
+          gap: 16,
         }}
       >
         <span data-drag-icon style={{ display: "flex", flexShrink: 0 }}>
@@ -265,16 +265,16 @@ export default function GridItem({
           display: showActiviyBar ? "none" : "flex",
           alignItems: "center",
           padding: "0px 8px 0px 12px",
-          gap: 8,
+          gap: 16,
         }}
       >
         {avatarEl}
 
         <span className="gd-grid-item-last-action">
-          <span>You {isOpened ? "opened" : "modified"}</span>
-          <span>•</span>
-          <span>
-            {formatDate(isOpened ? item.viewedByMeTime : item.modifiedTime)}
+          <span className="text-xs text-(--text-secondary)">You {isOpened ? "opened" : "modified"}</span>
+          <span className="text-xs">•</span>
+          <span className="text-xs text-(--text-secondary)">
+            {(isOpened ? item.viewedByMeTime : item.modifiedTime)}
           </span>
         </span>
       </div>

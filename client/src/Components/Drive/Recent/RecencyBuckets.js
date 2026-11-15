@@ -1,3 +1,6 @@
+
+const DAY = 86400000;
+
 export function getLastActivityTime(item) {
   const modified = item.modifiedByMeTime
     ? new Date(item.modifiedByMeTime)?.getTime()
@@ -52,6 +55,56 @@ const FIXED_ORDER = [
   "Last week",
   "Earlier this year",
 ];
+
+export function bucketLabel(ts, now = new Date(), weekStartsOn = 1) {
+  if (!ts) return "Older"; // time hai hi nahi (jaise kabhi khola nahi)
+
+  const date = new Date(ts);
+  const today = startOfDay(now);
+  const day = startOfDay(date);
+  
+  const diffDays = Math.round((today - day) / DAY);
+
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+
+  // is hafte ki shuruaat (weekStartsOn: 0 = Sunday, 1 = Monday)
+  const daysSinceWeekStart = (now.getDay() - weekStartsOn + 7) % 7;
+  const weekStart = today - daysSinceWeekStart * DAY;
+
+  if (day >= weekStart) return "Earlier this week";
+  if (day >= weekStart - 7 * DAY) return "Last week";
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+  if (sameYear && date.getMonth() === now.getMonth()) return "Earlier this month";
+
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  if (
+    date.getFullYear() === lastMonth.getFullYear() &&
+    date.getMonth() === lastMonth.getMonth()
+  ) {
+    return "Last month";
+  }
+
+  if (sameYear) return "Earlier this year";
+  if (date.getFullYear() === now.getFullYear() - 1) return "Last year";
+  return "Older";
+}
+export function groupByTime(items, getTime) {
+  const now = new Date();
+  const groups = new Map();
+
+  for (const item of items) {
+    const label = bucketLabel(getTime(item), now);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  }
+
+  return Array.from(groups, ([label, groupItems]) => ({
+    label,
+    items: groupItems,
+  }));
+}
 
 export function groupItemsByRecency(items) {
   const buckets = new Map();

@@ -8,11 +8,14 @@ import { IconGrid, IconInfo, IconList } from "../Icons/Icons";
 const sortLabels = {
   name: "Name",
   modifiedTime: "Date modified",
+  sharedTime: "Date shared",
   sharedWithMeTime: "Date shared",
+  modifiedByMeTime: "Date modified by me",
+  viewedByMeTime: "Date opened by me",
   trashedTime: "Date trashed",
 };
 
-const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView }) => {
+const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView, isSharedRoute, isDesktop }) => {
   const [open, setOpen] = useState(false);
   const { device } = useDevice();
   const menuRef = useRef(null);
@@ -104,6 +107,8 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
             setOpen={setOpen}
             sortConfig={sortConfig}
             onSortChange={handleSortChange}
+            isSharedRoute={isSharedRoute}
+            isDesktop={isDesktop}
           />
         </div>
       )}

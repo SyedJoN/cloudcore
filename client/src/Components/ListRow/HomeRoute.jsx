@@ -17,7 +17,7 @@ export default function HomeRoute({
     <>
       <div className="gd-list-row-cell md:text-[11px]">
         {myActivityTime !== null
-          ? `${myActivityTime} · ${myActivityType} by me`
+          ? `You ${myActivityType.toLowerCase()} · ${myActivityTime}  `
           : ""}
       </div>
       <div className="gd-list-row-cell md:text-[11px]">

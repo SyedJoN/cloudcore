@@ -305,6 +305,9 @@
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
+.gd-body.mobile.selection-mode {
+padding-bottom: 0;
+}
 .gd-body.mobile.animation {
   animation: scaleIn 100ms ease-in-out normal;
 }
@@ -611,7 +614,7 @@ body.gd-drag-active::before {
   flex-direction: column;
 }
 .gd-main.mobile {
-  margin-inline: 6px;
+  margin-inline: 8px;
   border-radius: 16px;
 }
 .gd-main.mobile.home {

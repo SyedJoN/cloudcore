@@ -17,6 +17,7 @@ import MobileGridItem from "./MobileGridItem";
 import SortButtonMobile from "../ListRow/SortButtonMobile";
 import { MdOutlineSelectAll, MdClose } from "react-icons/md";
 import ViewToggleMobile from "./ViewToggleMobile";
+import { sortItems } from "../../../Utils/sortItems";
 
 const DefaultView = ({
   items,
@@ -24,6 +25,7 @@ const DefaultView = ({
   setSortConfig,
   setSortedFilesForViewer,
   combinedItems,
+  isSharedRoute,
   viewMode,
   isGoogleDrive,
   dirId,
@@ -44,6 +46,7 @@ const DefaultView = ({
   onShare,
   onMove,
   onContextMenu,
+  onMultiContextMenu,
   listHeaderRow,
   isStarred,
   setIsStarred,
@@ -58,75 +61,19 @@ const DefaultView = ({
     () => applyRecentFilters(items, filters, user),
     [items, filters, user],
   );
+  const sortedItems = useMemo(
+    () => sortItems(filteredItems, sortConfig),
+    [filteredItems, sortConfig],
+  );
 
-  const sortedItems = useMemo(() => {
-    const data = [...filteredItems];
-
-    data.sort((a, b) => {
-      if (sortConfig.folders === "top") {
-        const aIsFolder = a.isDirectory === true;
-        const bIsFolder = b.isDirectory === true;
-
-        if (aIsFolder && !bIsFolder) {
-          return -1;
-        }
-
-        if (!aIsFolder && bIsFolder) {
-          return 1;
-        }
-      }
-
-      let aValue;
-      let bValue;
-
-      switch (sortConfig.key) {
-        case "name":
-          aValue = (a.sortName ?? a.name)?.toLowerCase() || "";
-          bValue = (b.sortName ?? b.name)?.toLowerCase() || "";
-          break;
-
-        case "modifiedTime":
-          aValue = new Date(
-            a.sortModifiedTime || a.modifiedTime || a.updatedAt || 0,
-          ).getTime();
-          bValue = new Date(
-            b.sortModifiedTime || b.modifiedTime || b.updatedAt || 0,
-          ).getTime();
-          break;
-
-        case "sharedWithMeTime":
-          aValue = new Date(a.sharedWithMeTime || 0).getTime();
-
-          bValue = new Date(b.sharedWithMeTime || 0).getTime();
-          break;
-
-        case "trashedTime":
-          aValue = new Date(a.trashedTime || 0).getTime();
-
-          bValue = new Date(b.trashedTime || 0).getTime();
-          break;
-
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) {
-        return sortConfig.direction === "asc" ? -1 : 1;
-      }
-
-      if (aValue > bValue) {
-        return sortConfig.direction === "asc" ? 1 : -1;
-      }
-
-      return 0;
-    });
-
-    return data;
-  }, [filteredItems, sortConfig]);
+  const sortedFiles = useMemo(
+    () => sortedItems.filter((i) => !i.isDirectory),
+    [sortedItems],
+  );
 
   useEffect(() => {
-    setSortedFilesForViewer(sortedItems.filter((i) => !i.isDirectory));
-  }, [sortedItems]);
+    setSortedFilesForViewer(sortedFiles);
+  }, [sortedFiles]);
 
   const ItemComponent = isDesktop
     ? viewMode === "grid"
@@ -142,21 +89,6 @@ const DefaultView = ({
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
   const isGoogleDriveRoute = route === "google-drive";
-  const handleMultiContextMenu = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const selectedIds = new Set([...selectedItems].map(String));
-    const getId = (i) => String(i?.id ?? i?._id);
-
-    const ids = combinedItems
-      .map(getId)
-      .filter((id) => selectedIds.has(String(id)));
-
-    if (!ids.length) return;
-
-    onContextMenu?.(e, ids);
-  };
   return (
     <div className="gd-drive">
       {isDesktop && (
@@ -174,6 +106,8 @@ const DefaultView = ({
               <SortButtonMobile
                 sortConfig={sortConfig}
                 setSortConfig={setSortConfig}
+                isSharedRoute={isSharedRoute}
+                isDesktop={isDesktop}
               />
               <ViewToggleMobile
                 viewMode={viewMode}
@@ -186,6 +120,8 @@ const DefaultView = ({
               onToggleView={onToggleView}
               sortConfig={sortConfig}
               setSortConfig={setSortConfig}
+              isDesktop={isDesktop}
+              isSharedRoute={isSharedRoute}
             />
           )}
         </div>
@@ -226,7 +162,7 @@ const DefaultView = ({
                     <MdOutlineSelectAll className="h-6 w-6" />
                   </button>
                   <button
-                    onClick={handleMultiContextMenu}
+                    onClick={onMultiContextMenu}
                     aria-label="Back"
                     className="mlr-bar-btn"
                   >
