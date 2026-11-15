@@ -72,13 +72,12 @@ export default function MobileGridItem({
   };
   const handlePressEnd = () => {
     clearTimeout(pressTimer.current);
-    // quick tap me bhi press 120ms tak dikhe
     pressTimer.current = setTimeout(() => setPressed(false), 120);
   };
 
   const handleToggle = useCallback(
     (id) => {
-    console.log('kebab')
+      console.log("kebab");
 
       setSelectedItems((prev) => {
         const next = new Set(prev);
@@ -157,7 +156,7 @@ export default function MobileGridItem({
   const isOpened = viewed > modified;
   return (
     <div
-      className={`mgi-card ${pressed ? "is-pressed" : ""} ${selected ? "selected" : ""} ${disabled ? "mgi-disabled" : ""} ${isMobile && isHomeRoute ? "mobile-home" : ""}`}
+      className={`mgi-card${pressed ? " is-pressed" : ""}${selected ? " selected" : ""}${disabled ? " mgi-disabled" : ""}${isMobile && isHomeRoute ? " mobile-home" : ""}`}
       data-id={itemId}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -218,7 +217,8 @@ export default function MobileGridItem({
           display: showActiviyBar ? "none" : "flex",
           alignItems: "center",
           marginBottom: 6,
-          padding: isMobile && isHomeRoute ? "8px 0 12px 28px" : "0px 8px 0px 12px",
+          padding:
+            isMobile && isHomeRoute ? "8px 0 12px 28px" : "0px 8px 0px 12px",
           height: 40,
           gap: 16,
           mb: 2,
