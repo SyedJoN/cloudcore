@@ -154,14 +154,7 @@ export default function GridItem({
     <div
       {...dragProps}
       data-drive-id={itemId}
-      className={`
-        gd-grid-item
-        ${selected ? "selected" : ""}
-        ${showActiviyBar ? "h-[260.5px]" : ""}
-        ${isDisabled ? "gd-drag-disabled" : ""}
-        ${isDragging && isDraggedItem ? "gd-drag-source" : ""}
-        ${isDropTarget ? "gd-drop-target" : ""}
-      `}
+      className={`gd-grid-item${selected ? " selected" : ""}${showActiviyBar ? " h-[260.5px]" : ""}${isDisabled ? " gd-drag-disabled" : ""}${isDragging && isDraggedItem ? " gd-drag-source" : ""}${isDropTarget ? " gd-drop-target" : ""}`}
       data-id={itemId}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -274,7 +267,7 @@ export default function GridItem({
           <span className="text-xs text-(--text-secondary)">You {isOpened ? "opened" : "modified"}</span>
           <span className="text-xs">•</span>
           <span className="text-xs text-(--text-secondary)">
-            {(isOpened ? item.viewedByMeTime : item.modifiedTime)}
+            {(isOpened ? formatDate(item.viewedByMeTime) : formatDate(item.modifiedTime))}
           </span>
         </span>
       </div>

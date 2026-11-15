@@ -15,7 +15,14 @@ const sortLabels = {
   trashedTime: "Date trashed",
 };
 
-const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView, isSharedRoute, isDesktop }) => {
+const SortButton = ({
+  sortConfig,
+  setSortConfig,
+  viewMode = "list",
+  onToggleView,
+  isSharedRoute,
+  isDesktop,
+}) => {
   const [open, setOpen] = useState(false);
   const { device } = useDevice();
   const menuRef = useRef(null);
@@ -42,22 +49,17 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
   };
 
   return (
-    <div ref={menuRef} className="relative ml-auto flex justify-between items-center py-2">
+    <div
+      ref={menuRef}
+      className="relative w-max flex justify-between items-center py-2"
+    >
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`
-          flex items-center gap-2
-          rounded-full ${device === "mobile" ? "px-0" : "px-4"}
-           py-2
-          text-sm
-          text-(--text-secondary)
-          hover:bg-(--surface-container-dark)
-          cursor-pointer
-        `}
+        className={`flex items-center gap-2 rounded-full ${device === "mobile" ? "px-0" : "px-4"} py-2 ${open ? "bg-(--surface-container-base)" : ""} ${open ? "hover:bg-(--surface-container-dark-hover)" : ""} text-sm text-(--text-secondary) hover:bg-(--btn-hover-secondary) cursor-pointer`}
       >
         {/* Sort icon */}
-      {viewMode === "list" && device === "windows" && (
+        {viewMode === "list" && device === "windows" && (
           <svg
             viewBox="0 0 24 24"
             className="h-5 w-5"
@@ -79,9 +81,9 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
 
               <div className="ml-1 flex h-6 w-6 items-center justify-center rounded-full bg-(--accent-blue-light)">
                 {sortConfig.direction === "asc" ? (
-                  <ArrowUpIcon className="h-5 w-5 text-[#06062f]" />
+                  <ArrowUpIcon className="h-5 w-5 text-(--monochrome-bg-mobile)" />
                 ) : (
-                  <ArrowDownIcon className="h-5 w-5 text-[#06062f]" />
+                  <ArrowDownIcon className="h-5 w-5 text-(--monochrome-bg-mobile)]" />
                 )}
               </div>
             </>
@@ -93,14 +95,7 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
 
       {open && (
         <div
-          className={`
-      absolute
-      top-full
-      z-50
-      mt-2
-      origin-top
-      animate-[sortDropdown_100ms_ease-out]
-      ${device === "mobile" ? "left-0" : viewMode === "list" ? "right-0" : "left-0"}
+          className={`absolute top-10 z-50 mt-2 origin-top animate-[sortDropdown_150ms_ease-out]${device === "mobile" ? " left-0" : viewMode === "list" ? " right-0" : "left-0"}
     `}
         >
           <SortMenu
@@ -112,19 +107,17 @@ const SortButton = ({ sortConfig, setSortConfig, viewMode = "list", onToggleView
           />
         </div>
       )}
-      {device === "mobile" && 
-         <div className="gd-toolbar-actions">
-              <button
-                className="gd-icon-btn justify-end!"
-                title={viewMode === "grid" ? "List view" : "Grid view"}
-                onClick={onToggleView}
-              >
-                {viewMode === "grid" ? <IconList /> : <IconGrid />}
-              </button>
-            
-            </div>
-      }
-     
+      {device === "mobile" && (
+        <div className="gd-toolbar-actions">
+          <button
+            className="gd-icon-btn justify-end!"
+            title={viewMode === "grid" ? "List view" : "Grid view"}
+            onClick={onToggleView}
+          >
+            {viewMode === "grid" ? <IconList /> : <IconGrid />}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

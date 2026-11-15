@@ -218,7 +218,7 @@ export default function MobileGridItem({
           display: showActiviyBar ? "none" : "flex",
           alignItems: "center",
           marginBottom: 6,
-          padding: isMobile ? "8px 0 12px 28px" : "0px 8px 0px 12px",
+          padding: isMobile && isHomeRoute ? "8px 0 12px 28px" : "0px 8px 0px 12px",
           height: 40,
           gap: 16,
           mb: 2,

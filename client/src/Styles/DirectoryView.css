@@ -186,7 +186,7 @@
   border-radius: var(--radius-full);
   height: 48px;
   padding: 0 8px 0 16px;
-  background: var(--surface-container-dark);
+  background: var(--surface-container-base);
   gap: 8px;
   transition:
     background var(--transition),
@@ -718,7 +718,7 @@ body.gd-drag-active::before {
 /* ===================== GRID VIEW ===================== */
 .gd-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(246px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 20px;
   padding-bottom: 36px;
 }

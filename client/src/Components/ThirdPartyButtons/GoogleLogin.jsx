@@ -32,7 +32,8 @@ function GoogleLoginBtn({ setServerError, priceId }) {
               window.location.href = data.url;
               return;
             }
-            navigate("/drive");
+            navigate("/home");
+            console.log('navgigate to home')
           }
         } catch (error) {
           const status = error.response?.status;

@@ -1,9 +1,11 @@
-import React from "react";
+import {Divider} from "../Divider.jsx"
 
 const SORT_KEYS = {
   drive: [
     { key: "name", label: "Name" },
     { key: "modifiedTime", label: "Date modified" },
+    { key: "modifiedByMeTime", label: "Date modified by me" },
+    { key: "viewedByMeTime", label: "Date opened by me" },
   ],
   shared: [
     { key: "sharedTime", label: "Date shared" },
@@ -28,7 +30,6 @@ const LABELS = {
       name: { asc: "A to Z", desc: "Z to A" },
       date: { asc: "Old to new", desc: "New to old" },
     },
-    // Google Drive (Shared with me) mein dates ke liye "New to old" pehle aata hai
     directionOrder: { name: ["asc", "desc"], date: ["desc", "asc"] },
     folders: { top: "On top", mixed: "Mixed with files" },
   },
@@ -46,16 +47,7 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
         onClick();
         setOpen(false);
       }}
-      className={`
-        flex h-9 w-full items-center
-        px-3
-        text-left
-        text-sm
-        text-(--text-primary)
-        hover:bg-(--btn-hover-secondary)
-        ${checked ? "bg-(--btn-hover-primary)" : ""}
-        cursor-pointer
-      `}
+      className={`flex h-9 w-full items-center px-3 text-left text-sm text-(--text-primary) hover:bg-(--btn-hover-secondary)${checked ? " bg-(--btn-bg-medium)" : ""}cursor-pointer`}
     >
       {/* Google Drive style check */}
       <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center">
@@ -87,8 +79,6 @@ const SectionLabel = ({ children }) => (
   </div>
 );
 
-const Divider = () => <div className="my-2 h-px bg-[#e8eaed]" />;
-
 const SortMenu = ({
   sortConfig,
   onSortChange,
@@ -103,9 +93,8 @@ const SortMenu = ({
   const kind = sortConfig.key === "name" ? "name" : "date";
 
   return (
-    <div className="w-65 overflow-hidden bg-(--surface-container) py-2 shadow-(--shadow-1) cursor-default">
+    <div className="w-65 overflow-hidden bg-(--surface-container-dark) py-2 shadow-(--shadow-1) cursor-default">
       {/* Title */}
-
 
       {/* Sort by */}
       <SectionLabel>Sort by</SectionLabel>
@@ -122,7 +111,7 @@ const SortMenu = ({
         ))}
       </div>
 
-      <Divider />
+      <Divider fullWidth />
 
       {/* Direction */}
 
@@ -140,7 +129,7 @@ const SortMenu = ({
         ))}
       </div>
 
-      <Divider />
+      <Divider fullWidth />
 
       {isDesktop && (
         <>

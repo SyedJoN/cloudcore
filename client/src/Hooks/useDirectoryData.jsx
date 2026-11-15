@@ -158,7 +158,7 @@ export function useDirectoryData({
           navigate("/login");
         } else {
           console.log(err);
-          navigate("/drive");
+          navigate("/home");
         }
       } finally {
         // sirf latest request loading band kare

@@ -16,7 +16,7 @@ const PublicOnlyRoute = () => {
   }
 
   if (loggedIn === true) {
-    return <Navigate to="/drive" replace />;
+    return <Navigate to="/home" replace />;
   }
 
   return <Outlet />;

@@ -345,19 +345,20 @@ export default function FileViewerMobile({
   /* ---------- viewer ---------- */
 
   const renderViewer = () => {
-    if (isGDrive) {
-      return (
-        <div className="fv-pdf-stage">
-          <iframe
-            key={item?.id}
-            className="fv-pdf-frame"
-            src={`https://drive.google.com/file/d/${item?.id}/preview`}
-            title={item?.name}
-            allow="autoplay"
-          />
-        </div>
-      );
-    }
+   if (isGDrive) {
+  return (
+    <div className="fv-gdrive-stage">
+      <iframe
+        key={item?.id}
+        className="fv-gdrive-frame"
+        src={`https://drive.google.com/file/d/${item?.id}/preview`}
+        title={item?.name}
+        allow="autoplay"
+        allowFullScreen
+      />
+    </div>
+  );
+}
 
     switch (category) {
       case "image":
@@ -475,12 +476,17 @@ export default function FileViewerMobile({
             </div>
 
             {/* current */}
-            <div
-              className={`relative ${["pdf", "office-word", "office-excel", "office-ppt"].includes(category) ? "" : "flex justify-center items-center"} h-full overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
-              style={{ flex: "0 0 33.3333%" }}
-            >
-              {renderViewer()}
-            </div>
+       <div
+  className={`relative ${
+    isGDrive ||
+    ["pdf", "office-word", "office-excel", "office-ppt"].includes(category)
+      ? ""
+      : "flex justify-center items-center"
+  } h-full min-h-0 overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
+  style={{ flex: "0 0 33.3333%" }}
+>
+  {renderViewer()}
+  </div>
 
             {/* next */}
             <div

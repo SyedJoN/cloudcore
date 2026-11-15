@@ -377,7 +377,7 @@ export default function UsersPage() {
 
             {isDropdownOpen && (
               <div className="dropdown-menu">
-                <div className="dropdown-item" onClick={() => navigate("/drive")}>
+                <div className="dropdown-item" onClick={() => navigate("/home")}>
                   Home
                 </div>
                 

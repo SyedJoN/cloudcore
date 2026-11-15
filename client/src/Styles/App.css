@@ -12,6 +12,7 @@
   --surface-container-mobile: #f6fafe;
   --surface-container-primary: #c2e7ff;
   --surface-container-dark: #e9eef6;
+  --surface-container-base: #e9eef6;
   --surface-container-mobile-dark: #f6fafe;
   --surface-container-dark-hover: #f6fafe;
   --surface-container-mobile-dark-hover: rgba(0,0,0,.2);
@@ -55,11 +56,13 @@
   --folder-color: #5f6368;
   --divider: rgba(255, 255, 255, 0.08);
   --transition: 0.15s ease;
+  --hover-primary: brightness(0.95)
 }
 .dark {
   --surface-container: #1b1b1b;
   --surface-container-mobile: #1b1b1b;
-  --surface-container-dark: #282a2c;
+  --surface-container-dark: #1E1F20;
+  --surface-container-base: #282a2c;
   --surface-container-mobile-dark: #282a2c;
   --surface-container-dark-hover: #424445;
   --surface-container-mobile-dark-hover: #424445;
@@ -82,11 +85,11 @@
   --border-inverse: #cdc9c9;
   --border: #5f6368;
   --btn-hover-primary: rgba(173, 173, 173, 0.24);
-  --btn-hover-secondary: rgba(173, 173, 173, 0.4);
-
+  --btn-hover-secondary: rgba(173, 173, 173, 0.3);
   --btn-bg-medium: #37393b;
   --monochrome-bg-mobile: #fff;
   --monochrome-text-mobile: #131314;
+  --hover-primary: brightness(1.1)
 }
 body {
   font-family: var(--font-main);

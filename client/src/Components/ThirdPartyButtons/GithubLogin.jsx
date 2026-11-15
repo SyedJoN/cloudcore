@@ -1,13 +1,70 @@
 
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../Contexts/AuthContext";
+import { createSubscription } from "../../../apis/subscriptionApi";
+import { fetchUserDetails } from "../../../apis/authApi";
+import { useEffect, useRef } from "react";
 
-function GithubLoginBtn({ setServerError }) {
-
+function GithubLoginBtn({ setServerError, priceId }) {
+  const navigate = useNavigate();
+  const { setLoggedIn } = useAuth();
+  const inFlight = useRef(false);
 
   const params = new URLSearchParams({
     client_id: import.meta.env.VITE_GITHUB_CLIENT_ID,
     redirect_uri: `${import.meta.env.VITE_BACKEND_BASE_URL}/auth/github/callback`,
     scope: "read:user user:email",
   });
+
+  useEffect(() => {
+    const handleGithubCallback = async () => {
+      const query = new URLSearchParams(window.location.search);
+      const token = query.get("token");
+
+      if (!token || inFlight.current) return;
+
+      inFlight.current = true;
+
+      try {
+        const response = await fetchUserDetails(token);
+
+        if (response.status === 200) {
+          setServerError("");
+          setLoggedIn(true);
+
+          if (priceId) {
+            const data = await createSubscription({ priceId });
+
+            if (data.message) {
+              toast({ message: data.message, type: "warning" });
+              return;
+            }
+
+            window.location.href = data.url;
+            return;
+          }
+
+          navigate("/home");
+        }
+      } catch (error) {
+        const status = error.response?.status;
+
+        if (status === 429) {
+          setServerError("Too many requests. Please slow down.");
+          return;
+        }
+
+        setServerError(
+          error.message || "Error while fetching user details"
+        );
+        setLoggedIn(false);
+      } finally {
+        inFlight.current = false;
+      }
+    };
+
+    handleGithubCallback();
+  }, []);
 
   return (
     <a

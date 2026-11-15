@@ -9,7 +9,31 @@
 .gd-filter {
   position: relative;
 }
+.gd-filter-x {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gd-filter-x:hover {
+  background: rgb(128 128 128 / 0.25);
+}
 
+.gd-filter-icon {
+  flex-shrink: 0;
+}
 .gd-filter-btn {
   height: 2rem;
   display: inline-flex;
@@ -25,15 +49,21 @@
 }
 
 .gd-filter-btn:hover {
-  background: var(--surface-container);
+    filter: var(--hover-primary);
 }
 
 .gd-filter-btn-active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #1a73e8;
+  background: var(--accent-blue-light);
+  border-color: var(--accent-blue-light);
+  padding-right: 34px;
+  color: var(--accent-blue);
 }
-
+.gd-filter-btn-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .gd-filter-caret {
   font-size: 10px;
 }
@@ -58,7 +88,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -66,9 +96,29 @@
 }
 
 .gd-filter-option:hover {
-  background: var(--surface-container-dark);
+  background: var(--surface-container-base);
 }
 
+.gd-filter-option.checked {
+  background: var(--accent-blue-light);
+}
+.gd-filter-option.checked:hover {
+  background: var(--surface-container-base);
+}
+
+.gd-tick-slot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-primary);
+}
+.gd-filter-option:has(.gd-sr-only:focus-visible) {
+  outline: 2px solid #0b57d0;
+  outline-offset: -2px;
+}
 .gd-filter-divider {
   height: 1px;
   background: #e8eaed;
@@ -90,4 +140,71 @@
 
 .gd-recency-group {
   margin-bottom: 8px;
+}
+.gd-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.gd-filter-person {
+  gap: 12px;
+  cursor: pointer;
+}
+
+.gd-filter-person.checked {
+  background: color-mix(in srgb, #a8c7fa 22%, transparent);
+}
+
+.gd-filter-person:has(.gd-sr-only:focus-visible) {
+  outline: 2px solid #0b57d0;
+  outline-offset: -2px;
+}
+
+.gd-person-avatar {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+
+.gd-person-check {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0b57d0;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--surface-container, #fff);
+}
+
+.gd-person-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.gd-person-name,
+.gd-person-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gd-person-email {
+  font-size: 12px;
+  color: var(--text-secondary);
 }

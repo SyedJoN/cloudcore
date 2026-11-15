@@ -8,7 +8,7 @@ export default function ViewToggleMobile({ viewMode, onToggleView }) {
   const viewBtn = (mode) =>
     `flex h-10 w-10 flex-1 items-center justify-center rounded-full
      text-(--text-secondary) cursor-pointer transition-colors duration-150
-     ${viewMode === mode ? "bg-(--text-primary) text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark-hover)"}`;
+     ${viewMode === mode ? "bg-(--text-primary) text-(--text-primary)" : "hover:bg-(--surface-container-dark) bg-(--surface-container-dark)"}`;
   return (
     <div className="flex items-center gap-1 w-25">
       <button

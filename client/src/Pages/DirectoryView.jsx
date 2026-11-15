@@ -143,11 +143,13 @@ export default function DirectoryView({ route }) {
   }, [location.pathname, device]);
 
   const getDefaultSort = (shared) =>
-  shared
-    ? { key: "sharedWithMeTime", direction: "desc", folders: "mixed" }
-    : { key: "name", direction: "asc", folders: "top" };
+    shared
+      ? { key: "sharedWithMeTime", direction: "desc", folders: "mixed" }
+      : { key: "name", direction: "asc", folders: "top" };
 
-const [sortConfig, setSortConfig] = useState(() => getDefaultSort(isSharedRoute));
+  const [sortConfig, setSortConfig] = useState(() =>
+    getDefaultSort(isSharedRoute),
+  );
 
   const dirContext =
     location.state?.dirContext ||
@@ -584,9 +586,9 @@ const [sortConfig, setSortConfig] = useState(() => getDefaultSort(isSharedRoute)
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
-useEffect(() => {
-  setSortConfig(getDefaultSort(isSharedRoute));
-}, [isSharedRoute]);
+  useEffect(() => {
+    setSortConfig(getDefaultSort(isSharedRoute));
+  }, [isSharedRoute]);
   const headerColumns = isHomeRoute
     ? [
         { label: "Name", key: "name" },
@@ -821,7 +823,7 @@ useEffect(() => {
       )}
 
       <div
-        className={`gd-body ${isMobile ? "mobile" : ""} ${animate ? "animation" : ""} ${selectionMode ? "selection-mode" : ""}`}
+        className={`gd-body${isMobile ? " mobile" : ""}${animate ? " animation" : ""}${selectionMode ? " selection-mode" : ""}`}
       >
         {isDesktop && user.email && (
           <DriveSidebar
@@ -844,11 +846,11 @@ useEffect(() => {
             onUploadFolders={() => folderInputRef.current?.click()}
           />
         )}
-        <div className={`gd-main-container ${isMobile ? "mobile" : ""}`}>
+        <div className={`gd-main-container${isMobile ? " mobile" : ""}`}>
           <main
             style={{ userSelect: "none" }}
             ref={mainRef}
-            className={`gd-main ${isMobile ? "mobile" : ""} ${isHomeRoute ? "home" : ""}`}
+            className={`gd-main${isMobile ? " mobile" : ""}${isHomeRoute ? " home" : ""}`}
             onMouseDown={handleMainMouseDown}
             onMouseMove={handleMainMouseMove}
             onMouseUp={handleMainMouseUp}
@@ -1009,7 +1011,7 @@ useEffect(() => {
                   />
                 ) : isHomeRoute ? (
                   <HomeView
-                  combinedItems={combinedItems}
+                    combinedItems={combinedItems}
                     files={filteredFiles}
                     folders={directoriesList}
                     setSelectedItems={setSelectedItems}
