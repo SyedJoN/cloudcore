@@ -4,7 +4,12 @@
 @custom-variant dark (&:where(.dark, .dark *));
 :root {
   --font-main: "Google Sans", "Roboto", sans-serif;
-
+  --radial-glow: radial-gradient(
+    circle closest-side,
+    rgba(0, 0, 0, 0.08) 0%,
+    rgba(0, 0, 0, 0.04) 50%,
+    rgba(0, 0, 0, 0) 100%
+  );
   --scrollbar-color: #aaa;
   --surface: #f0f4f9;
   --surface-white: #ffffff;
@@ -15,7 +20,7 @@
   --surface-container-base: #e9eef6;
   --surface-container-mobile-dark: #f6fafe;
   --surface-container-dark-hover: #f6fafe;
-  --surface-container-mobile-dark-hover: rgba(0,0,0,.2);
+  --surface-container-mobile-dark-hover: rgba(0, 0, 0, 0.2);
   --btn-bg-medium: rgba(32, 33, 36, 0.08);
   --border-inverse: #000000;
   --border: #e0e0e0;
@@ -56,12 +61,18 @@
   --folder-color: #5f6368;
   --divider: rgba(255, 255, 255, 0.08);
   --transition: 0.15s ease;
-  --hover-primary: brightness(0.95)
+  --hover-primary: brightness(0.95);
 }
 .dark {
+  --radial-glow: radial-gradient(
+    circle closest-side,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
   --surface-container: #1b1b1b;
   --surface-container-mobile: #1b1b1b;
-  --surface-container-dark: #1E1F20;
+  --surface-container-dark: #1e1f20;
   --surface-container-base: #282a2c;
   --surface-container-mobile-dark: #282a2c;
   --surface-container-dark-hover: #424445;
@@ -89,7 +100,7 @@
   --btn-bg-medium: #37393b;
   --monochrome-bg-mobile: #fff;
   --monochrome-text-mobile: #131314;
-  --hover-primary: brightness(1.1)
+  --hover-primary: brightness(1.1);
 }
 body {
   font-family: var(--font-main);

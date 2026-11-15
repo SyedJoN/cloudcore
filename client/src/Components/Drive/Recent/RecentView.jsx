@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from "react";
 import RecentFilters from "./RecentFilters";
 import { groupByTime, groupItemsByRecency } from "./RecencyBuckets.js";
@@ -35,7 +34,10 @@ export default function RecentView({
   viewMode,
   isMobile,
   isDesktop,
+  isGoogleDriveRoute,
+  isDriveRoute,
   isRecentRoute,
+  isTrashRoute,
   onToggleView,
   setSelectedItems,
   selectionMode,
@@ -69,16 +71,18 @@ export default function RecentView({
   // Apply filters
   const filteredItems = useMemo(
     () => applyRecentFilters(items, filters, user),
-    [items, filters, user]
+    [items, filters, user],
   );
 
-  // Sort and group items
   const groups = useMemo(() => {
     const isNameSort = sortConfig.key === "name";
 
-    // Name sorting: no recency grouping
     if (isNameSort) {
       const sorted = sortItems(filteredItems, sortConfig);
+
+      if (isRecentRoute) {
+        return groupItemsByRecency(sorted);
+      }
 
       if (sortConfig.folders === "top") {
         return [
@@ -101,15 +105,10 @@ export default function RecentView({
       folders: "mixed",
     });
 
-    // Shared route uses selected sort date
-    // Recent route uses its normal recency grouping
     const grouped = isSharedRoute
-      ? groupByTime(sorted, (item) =>
-          getSortTime(item, sortConfig.key)
-        )
+      ? groupByTime(sorted, (item) => getSortTime(item, sortConfig.key))
       : groupItemsByRecency(sorted);
 
-    // Folders on top: apply to BOTH Recent and Shared routes
     if (sortConfig.folders === "top") {
       return grouped.map((group) => ({
         ...group,
@@ -125,9 +124,7 @@ export default function RecentView({
 
   // Separate folder and file components
   const FoldersOnTop =
-    isDesktop &&
-    viewMode === "grid" &&
-    sortConfig.folders === "top";
+    isDesktop && viewMode === "grid" && sortConfig.folders === "top";
 
   const ItemComponent = isDesktop
     ? viewMode === "grid"
@@ -144,12 +141,8 @@ export default function RecentView({
     item,
     dirId,
     avatar: item.userId?.avatar || item.owners?.[0]?.photoLink,
-    owner:
-      item.userId?.name ||
-      item.owners?.[0]?.displayName,
-    email:
-      item.userId?.email ||
-      item.owners?.[0]?.emailAddress,
+    owner: item.userId?.name || item.owners?.[0]?.displayName,
+    email: item.userId?.email || item.owners?.[0]?.emailAddress,
     selected: selectedItems.has(item.id ?? item._id),
     selectedItems,
     selectionMode,
@@ -159,6 +152,11 @@ export default function RecentView({
     onSelect,
     onRowClick,
     onDoubleClick,
+    isSharedRoute,
+    isTrashRoute,
+    isDriveRoute,
+    isGoogleDriveRoute,
+    isRecentRoute,
     onContextMenu,
     onDownload,
     onRename,
@@ -177,10 +175,7 @@ export default function RecentView({
   });
 
   const renderItem = (item) => (
-    <ItemComponent
-      key={item._id ?? item.id}
-      {...getItemProps(item)}
-    />
+    <ItemComponent key={item._id ?? item.id} {...getItemProps(item)} />
   );
 
   return (
@@ -195,8 +190,7 @@ export default function RecentView({
         />
       )}
 
-      {(isDesktop && viewMode === "grid" && !isRecentRoute) ||
-      (isMobile && !isRecentRoute) ? (
+      {(isDesktop && viewMode === "grid" && !isRecentRoute) || isMobile ? (
         <>
           {selectionMode && (
             <div className="mlr-selection-bar">
@@ -216,9 +210,7 @@ export default function RecentView({
               </button>
 
               <div className="flex items-center justify-between flex-1">
-                <p className="mlr-bar-count">
-                  {selectedItems.size} selected
-                </p>
+                <p className="mlr-bar-count">{selectedItems.size} selected</p>
 
                 <div className="flex">
                   <button
@@ -241,7 +233,7 @@ export default function RecentView({
             </div>
           )}
 
-          <div className="sort-btn pl-1">
+          <div className="sort-btn pb-2 -mx-1.5 py-2">
             {isMobile ? (
               <div className="flex items-center">
                 <SortButtonMobile
@@ -249,6 +241,7 @@ export default function RecentView({
                   setSortConfig={setSortConfig}
                   isSharedRoute={isSharedRoute}
                   isDesktop={isDesktop}
+                  isRecentRoute={isRecentRoute}
                 />
 
                 <ViewToggleMobile
@@ -258,12 +251,12 @@ export default function RecentView({
               </div>
             ) : (
               <SortButton
-              viewMode={viewMode}
-              onToggleView={onToggleView}
-              sortConfig={sortConfig}
-              setSortConfig={setSortConfig}
-              isSharedRoute={isSharedRoute}
-              isDesktop={isDesktop}
+                viewMode={viewMode}
+                onToggleView={onToggleView}
+                sortConfig={sortConfig}
+                setSortConfig={setSortConfig}
+                isSharedRoute={isSharedRoute}
+                isDesktop={isDesktop}
               />
             )}
           </div>
@@ -280,13 +273,9 @@ export default function RecentView({
         </div>
       ) : (
         groups.map(({ label, items: groupItems }, groupIndex) => {
-          const folders = groupItems.filter(
-            (item) => item.isDirectory
-          );
+          const folders = groupItems.filter((item) => item.isDirectory);
 
-          const files = groupItems.filter(
-            (item) => !item.isDirectory
-          );
+          const files = groupItems.filter((item) => !item.isDirectory);
 
           return (
             <div
@@ -294,19 +283,19 @@ export default function RecentView({
               className="gd-recency-group"
             >
               {label && (
-                <div className="gd-section-label">
+                <div
+                  className={`gd-section-label ${isRecentRoute && isMobile ? "recent mobile" : ""}`}
+                >
                   {label}
                 </div>
               )}
 
-              {/* Folders on top - same grid rendering style as DefaultView */}
               {FoldersOnTop && folders.length > 0 && (
                 <div className="gd-grid gd-grid-on-top">
                   {folders.map(renderItem)}
                 </div>
               )}
 
-              {/* Remaining files */}
               <div
                 className={
                   viewMode === "grid"

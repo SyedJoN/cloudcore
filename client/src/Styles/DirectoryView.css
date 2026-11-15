@@ -614,7 +614,8 @@ body.gd-drag-active::before {
   flex-direction: column;
 }
 .gd-main.mobile {
-  margin-inline: 8px;
+  margin-inline: 6px;
+  padding: 0 12px 18px 12px;
   border-radius: 16px;
 }
 .gd-main.mobile.home {
@@ -714,6 +715,13 @@ body.gd-drag-active::before {
   padding: 12px 4px 8px;
   letter-spacing: 0.1px;
 }
+.gd-section-label.mobile.recent {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0 0 12px 0;
+  letter-spacing: 0.1px;
+}
 
 /* ===================== GRID VIEW ===================== */
 .gd-grid {
@@ -725,6 +733,9 @@ body.gd-drag-active::before {
 
 .gd-grid-on-top > .gd-grid-item {
   height: 50px;
+}
+.gd-grid-on-top  .gd-grid-item-preview{
+  display: none!important;
 }
 .gd-grid-item {
   background: var(--surface-container-dark);

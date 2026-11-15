@@ -955,8 +955,12 @@ export default function DirectoryView({ route }) {
                     selectionMode={selectionMode}
                     setSelectionMode={setSelectionMode}
                     setSelectedItems={setSelectedItems}
+                     isGoogleDriveRoute={isGoogleDriveRoute}
+                         isHomeRoute={isHomeRoute}
+                    isDriveRoute={isDriveRoute}
                     isSharedRoute={isSharedRoute}
                     isRecentRoute={isRecentRoute}
+                    isTrashRoute={isTrashRoute}
                     isDesktop={isDesktop}
                     isMobile={isMobile}
                     viewMode={viewMode}
@@ -1086,9 +1090,12 @@ export default function DirectoryView({ route }) {
                 ) : (
                   <DefaultView
                     setSelectedItems={setSelectedItems}
-                    isGoogleDrive={isGoogleDrive}
-                    isHomeRoute={isHomeRoute}
+                    isGoogleDriveRoute={isGoogleDriveRoute}
+                         isHomeRoute={isHomeRoute}
+                    isDriveRoute={isDriveRoute}
                     isSharedRoute={isSharedRoute}
+                    isRecentRoute={isRecentRoute}
+                    isTrashRoute={isTrashRoute}
                     items={combinedItems}
                     isDesktop={isDesktop}
                     isMobile={isMobile}

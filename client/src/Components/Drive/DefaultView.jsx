@@ -26,8 +26,11 @@ const DefaultView = ({
   setSortedFilesForViewer,
   combinedItems,
   isSharedRoute,
+  isTrashRoute,
+  isDriveRoute,
+  isGoogleDriveRoute,
+  isRecentRoute,
   viewMode,
-  isGoogleDrive,
   dirId,
   isDesktop,
   isMobile,
@@ -88,7 +91,6 @@ const DefaultView = ({
 
   const containsDirectory = sortedItems.some((item) => item.isDirectory);
 
-  const isGoogleDriveRoute = route === "google-drive";
   return (
     <div className="gd-drive">
       {isDesktop && (
@@ -184,12 +186,17 @@ const DefaultView = ({
                     combinedItems={combinedItems}
                     dirId={dirId}
                     avatar={
-                      isGoogleDrive
+                      isGoogleDriveRoute
                         ? user.avatar
                         : item.userId?.avatar || item.owners?.[0]?.photoLink
                     }
                     owner={item.userId?.name || item.owners?.[0]?.displayName}
                     email={item.userId?.email || item.owners?.[0]?.emailAddress}
+                    isDriveRoute={isDriveRoute}
+                    isGoogleDriveRoute={isGoogleDriveRoute}
+                    isTrashRoute={isTrashRoute}
+                    isSharedRoute={isSharedRoute}
+                    isRecentRoute={isRecentRoute}
                     selected={selectedItems.has(item.id ?? item._id)}
                     setSelectedItems={setSelectedItems}
                     selectedItemsSize={selectedItems.size}
@@ -242,6 +249,11 @@ const DefaultView = ({
                       ? user.avatar
                       : item.userId?.avatar || item.owners?.[0]?.photoLink
                   }
+                      isDriveRoute={isDriveRoute}
+                    isGoogleDriveRoute={isGoogleDriveRoute}
+                    isTrashRoute={isTrashRoute}
+                    isSharedRoute={isSharedRoute}
+                    isRecentRoute={isRecentRoute}
                   owner={item.userId?.name || item.owners?.[0]?.displayName}
                   email={item.userId?.email || item.owners?.[0]?.emailAddress}
                   selected={selectedItems.has(item.id ?? item._id)}
@@ -252,6 +264,7 @@ const DefaultView = ({
                   handleDropOnTrash={handleDropOnTrash}
                   selectionMode={selectionMode}
                   setSelectionMode={setSelectionMode}
+              
                   onMove={(ids, destinationId, destinationName) => {
                     onMove?.(ids, destinationId, destinationName);
                   }}

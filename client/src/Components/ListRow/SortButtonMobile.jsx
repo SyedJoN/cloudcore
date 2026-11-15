@@ -17,7 +17,8 @@ const SortButtonMobile = ({
   isSharedRoute,
   sortConfig,
   setSortConfig,
-  isDesktop
+  isDesktop,
+  isRecentRoute=false
 }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -48,7 +49,7 @@ const SortButtonMobile = ({
       ref={menuRef}
       className="relative flex w-full items-center justify-between py-1"
     >
-   
+   {!isRecentRoute && 
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -64,6 +65,7 @@ const SortButtonMobile = ({
           )}
         </span>
       </button>
+}
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 origin-top animate-[sortDropdown_100ms_ease-out]">

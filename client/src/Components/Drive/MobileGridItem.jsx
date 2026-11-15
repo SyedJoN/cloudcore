@@ -14,6 +14,11 @@ export default function MobileGridItem({
   item,
   avatar,
   owner,
+  isDriveRoute,
+  isRecentRoute,
+  isSharedRoute,
+  isTrashRoute,
+  isGoogleDrive,
   selected,
   isHomeRoute,
   setSelectedItems = () => {},
@@ -28,19 +33,9 @@ export default function MobileGridItem({
   onOpen,
 }) {
   const { user } = useAuth();
-  const { isGoogleDrive } = useGDrive();
-  const location = useLocation();
   const [hasImgError, setHasImgError] = useState(false);
   const { device } = useDevice();
-  const isDesktop = device === "windows";
   const isMobile = device === "mobile";
-  const lastTap = useRef(0);
-
-  const isDriveRoute = location.pathname.endsWith("/drive");
-  const isRecentRoute = location.pathname.endsWith("/recent");
-  const isSharedRoute = location.pathname.endsWith("/shared");
-  const isTrashRoute = location.pathname.endsWith("/trash");
-
   const showActiviyBar =
     isDriveRoute || isRecentRoute || isSharedRoute || isTrashRoute;
 
@@ -48,14 +43,11 @@ export default function MobileGridItem({
   const [pressed, setPressed] = useState(false);
   const pressTimer = useRef(null);
 
-  const path = location.pathname;
-  const isGoogleDriveRoute = path.endsWith("/google-drive");
-
   const type = item.isDirectory
-    ? isGoogleDrive && isGoogleDriveRoute
+    ? isGoogleDrive 
       ? "google-directory"
       : "directory"
-    : isGoogleDrive && isGoogleDriveRoute
+    : isGoogleDrive
       ? "google-file"
       : "file";
 
@@ -214,7 +206,7 @@ export default function MobileGridItem({
       </div>
       <div
         style={{
-          display: showActiviyBar ? "none" : "flex",
+          display: showActiviyBar || isGoogleDrive ? "none" : "flex",
           alignItems: "center",
           marginBottom: 6,
           padding:
