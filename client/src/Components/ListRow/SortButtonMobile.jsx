@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import SortMenu from "./SortMenu";
 import { ArrowDownIcon, ArrowUpIcon } from "@heroicons/react/24/solid";
+import { useDevice } from "../../Contexts/DeviceContext";
 
 
 const sortLabels = {
@@ -17,11 +18,13 @@ const SortButtonMobile = ({
   isSharedRoute,
   sortConfig,
   setSortConfig,
-  isDesktop,
   isRecentRoute=false
 }) => {
+   const { device } = useDevice();
+    const isDesktop = device === "windows";
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
+  
 
   useEffect(() => {
     const handleClickOutside = (event) => {

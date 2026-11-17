@@ -109,7 +109,6 @@ const DefaultView = ({
                 sortConfig={sortConfig}
                 setSortConfig={setSortConfig}
                 isSharedRoute={isSharedRoute}
-                isDesktop={isDesktop}
               />
               <ViewToggleMobile
                 viewMode={viewMode}
@@ -122,7 +121,6 @@ const DefaultView = ({
               onToggleView={onToggleView}
               sortConfig={sortConfig}
               setSortConfig={setSortConfig}
-              isDesktop={isDesktop}
               isSharedRoute={isSharedRoute}
             />
           )}

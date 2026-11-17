@@ -1,6 +1,4 @@
-import {
-  StarIcon,
-} from "@heroicons/react/24/solid";
+import { StarIcon } from "@heroicons/react/24/solid";
 import { IconDots, IconFolder } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import { useAuth, useGDrive } from "../../Contexts";
@@ -37,7 +35,10 @@ const formatDateToUS = (value) => {
 
 export default function MobileListRow({
   item,
-  route,
+  isGoogleDriveRoute,
+  isSharedRoute,
+  isRecentRoute,
+  isTrashRoute,
   owner,
   isStarred = {},
   selected,
@@ -53,7 +54,6 @@ export default function MobileListRow({
   const { user } = useAuth();
 
   const itemId = item.id ?? item._id;
-  const isGoogleDriveRoute = route === "google-drive";
   const lastTap = useRef(0);
 
   // add / remove, baqi selection ko nahi chherta
@@ -97,15 +97,15 @@ export default function MobileListRow({
 
   let subtitle = "";
 
-  if (route === "recent" && myActivity) {
+  if (isRecentRoute && myActivity) {
     const label = viewedTime > modifiedByMeTime ? "You opened" : "You modified";
     subtitle = `${label} · ${formatDateToUS(myActivity)}`;
-  } else if (route === "shared") {
+  } else if (isSharedRoute) {
     const when = formatDateToUS(item.sharedWithMeTime);
     subtitle = [owner ? `Shared by ${owner}` : "Shared", when]
       .filter(Boolean)
       .join(" · ");
-  } else if (route === "trash") {
+  } else if (isTrashRoute) {
     const when = formatDateToUS(item.trashedTime);
     subtitle = ["Deleted", when].filter(Boolean).join(" · ");
   } else {
@@ -114,18 +114,6 @@ export default function MobileListRow({
     subtitle = when ? `${who} · ${when}` : "";
   }
 
-  // for mobile double click
-  const handleTouchEnd = () => {
-    if (selectionMode) return;
-    const now = Date.now();
-
-    if (now - lastTap.current < 300) {
-      onDoubleClick?.(type, itemId, item.name);
-      lastTap.current = 0;
-    } else {
-      lastTap.current = now;
-    }
-  };
   return (
     <>
       <div
@@ -133,7 +121,7 @@ export default function MobileListRow({
         data-id={itemId}
         onClick={() => {
           if (selectionMode) {
-            handleToggle(itemId); // selection mode: parent call nahi hoga
+            handleToggle(itemId);
             return;
           }
           onDoubleClick?.(type, itemId, item.name);
@@ -142,7 +130,7 @@ export default function MobileListRow({
           if (selectionMode) return;
           e.preventDefault();
           e.stopPropagation();
-          setSelectedItems(new Set([itemId])); // long press: sirf yeh file select
+          setSelectedItems(new Set([itemId]));
           setSelectionMode(true);
         }}
       >

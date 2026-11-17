@@ -734,8 +734,8 @@ body.gd-drag-active::before {
 .gd-grid-on-top > .gd-grid-item {
   height: 50px;
 }
-.gd-grid-on-top  .gd-grid-item-preview{
-  display: none!important;
+.gd-grid-on-top .gd-grid-item-preview {
+  display: none !important;
 }
 .gd-grid-item {
   background: var(--surface-container-dark);
@@ -2128,8 +2128,9 @@ body.gd-overlay-open {
 .mv-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 4px 16px 16px;
+  row-gap: 24px;
+  column-gap: 16px;
+  padding: 16px 16px 16px;
   align-items: start;
 }
 
@@ -2656,7 +2657,9 @@ body.gd-overlay-open {
   cursor: default;
 }
 
-.mv-sort-btn {
+.mv-toolbar {
+  display: flex;
+  align-items: center;
   border-bottom: 1px solid var(--divider);
 }
 

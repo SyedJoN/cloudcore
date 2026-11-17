@@ -199,6 +199,7 @@ export default function DirectoryView({ route }) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
+
   useEffect(() => {
     previousDirContext.current = dirContext;
   }, [dirContext]);
@@ -586,6 +587,7 @@ export default function DirectoryView({ route }) {
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
     }));
   };
+
   useEffect(() => {
     setSortConfig(getDefaultSort(isSharedRoute));
   }, [isSharedRoute]);
@@ -658,7 +660,14 @@ export default function DirectoryView({ route }) {
       ))}
 
       {!isRecentRoute && !isHomeRoute && (
-        <SortButton sortConfig={sortConfig} setSortConfig={setSortConfig} />
+        <SortButton
+          sortConfig={sortConfig}
+          setSortConfig={setSortConfig}
+          onToggleView={() =>
+            setViewMode((v) => (v === "grid" ? "list" : "grid"))
+          }
+          isSharedRoute={isSharedRoute}
+        />
       )}
     </div>
   );
@@ -910,7 +919,8 @@ export default function DirectoryView({ route }) {
                   currentDirId={dirId}
                   item={Array.isArray(moveItem) ? moveItem[0] : moveItem}
                   items={Array.isArray(moveItem) ? moveItem : [moveItem]}
-                  route={route}
+                  isStarredRoute={isStarredRoute}
+                  isRecentRoute={isRecentRoute}
                   viewMode={viewMode}
                   onToggleView={() =>
                     setViewMode((v) => (v === "grid" ? "list" : "grid"))
@@ -955,8 +965,8 @@ export default function DirectoryView({ route }) {
                     selectionMode={selectionMode}
                     setSelectionMode={setSelectionMode}
                     setSelectedItems={setSelectedItems}
-                     isGoogleDriveRoute={isGoogleDriveRoute}
-                         isHomeRoute={isHomeRoute}
+                    isGoogleDriveRoute={isGoogleDriveRoute}
+                    isHomeRoute={isHomeRoute}
                     isDriveRoute={isDriveRoute}
                     isSharedRoute={isSharedRoute}
                     isRecentRoute={isRecentRoute}
@@ -1091,7 +1101,7 @@ export default function DirectoryView({ route }) {
                   <DefaultView
                     setSelectedItems={setSelectedItems}
                     isGoogleDriveRoute={isGoogleDriveRoute}
-                         isHomeRoute={isHomeRoute}
+                    isHomeRoute={isHomeRoute}
                     isDriveRoute={isDriveRoute}
                     isSharedRoute={isSharedRoute}
                     isRecentRoute={isRecentRoute}

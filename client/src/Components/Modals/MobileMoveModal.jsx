@@ -12,9 +12,14 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon, UsersIcon } from "@heroicons/react/16/solid";
 import SortButton from "../ListRow/SortButton";
-import { applyRecentFilters, DEFAULT_RECENT_FILTERS } from "../Drive/Recent/ApplyRecentFilters";
+import {
+  applyRecentFilters,
+  DEFAULT_RECENT_FILTERS,
+} from "../Drive/Recent/ApplyRecentFilters";
 import SortButtonMobile from "../ListRow/SortButtonMobile";
 import MobileGridItem from "../Drive/MobileGridItem";
+import AuthContext, { useAuth } from "../../Contexts/AuthContext";
+import ViewToggleMobile from "../Drive/ViewToggleMobile";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL;
 
@@ -58,7 +63,8 @@ function RowMeta({ entry }) {
 export default function MobileMoveModal({
   item,
   items,
-  route,
+  isStarredRoute,
+  isRecentRoute,
   currentDirId: viewedDirId,
   setDirectoriesList,
   setFilesList,
@@ -66,11 +72,10 @@ export default function MobileMoveModal({
   onToggleView,
   sortConfig: sortConfigProp,
   setSortConfig,
-  user,
   onClose,
 }) {
-
   const { toast } = useToast();
+  const { user } = useAuth();
   const searchRef = useRef(null);
   const tabsRef = useRef(null);
 
@@ -111,8 +116,6 @@ export default function MobileMoveModal({
   const [isCreating, setIsCreating] = useState(false);
   const [filters] = useState(DEFAULT_RECENT_FILTERS);
 
-  const isStarredRoute = route === "starred";
-  const isRecentRoute = route === "recent";
   const isDriveTab = activeTab === "drive";
 
   // Move logic
@@ -120,12 +123,12 @@ export default function MobileMoveModal({
   const destId = norm(currentCrumb.id) ?? rootId;
   const currentDirId = destId;
 
-const sourceOf = (s) => {
-  const own = norm(
-    s.parentDirId ?? s.parentId ?? s.parent ?? s.directoryId ?? s.dirId,
-  );
-  return own ?? norm(viewedDirId) ?? rootId;
-};
+  const sourceOf = (s) => {
+    const own = norm(
+      s.parentDirId ?? s.parentId ?? s.parent ?? s.directoryId ?? s.dirId,
+    );
+    return own ?? norm(viewedDirId) ?? rootId;
+  };
   const isSameLocation =
     selectedItems.length > 0 &&
     selectedItems.every((s) => sourceOf(s) === destId);
@@ -260,7 +263,6 @@ const sourceOf = (s) => {
       );
       setFiles(data.files || []);
     } catch (error) {
-      
       toast({
         message: error.message || "Failed to load folders",
         type: "error",
@@ -279,12 +281,15 @@ const sourceOf = (s) => {
     setActiveTab(id);
   }
 
-function navigateInto(folder) {
-  setDirection("forward");
-  setSearchQuery("");
-  setIsSearching(false);
-  setBreadcrumbs((prev) => [...prev, { id: folder._id ?? folder.id, name: folder.name }]);
-}
+  function navigateInto(folder) {
+    setDirection("forward");
+    setSearchQuery("");
+    setIsSearching(false);
+    setBreadcrumbs((prev) => [
+      ...prev,
+      { id: folder._id ?? folder.id, name: folder.name },
+    ]);
+  }
   function goBack() {
     if (isSearching) {
       setIsSearching(false);
@@ -368,42 +373,52 @@ function navigateInto(folder) {
       setIsMoving(false);
     }
   }
-console.log({ destId, sources: selectedItems.map(sourceOf), selectedItems });
+  console.log({ destId, sources: selectedItems.map(sourceOf), selectedItems });
   // Renders one folder/file in list or grid
-function renderEntry(entry) {
-  const id = entry._id ?? entry.id;
+  function renderEntry(entry) {
+    const id = entry._id ?? entry.id;
 
-  if (viewMode === "grid") {
-    return (
-      <MobileGridItem
+    if (viewMode === "grid") {
+      return (
+        <MobileGridItem
+          key={id}
+          item={entry}
+          pickerMode
+          disabled={!entry.isDirectory}
+          move={true}
+          onOpen={entry.isDirectory ? navigateInto : undefined}
+        />
+      );
+    }
+
+    // list view stays as before
+    return entry.isDirectory ? (
+      <button
         key={id}
-        item={entry}
-        pickerMode
-        disabled={!entry.isDirectory}
-        onOpen={entry.isDirectory ? navigateInto : undefined}
-      />
+        type="button"
+        className="mv-row"
+        onClick={() => navigateInto(entry)}
+      >
+        <span className="mv-row-icon">
+          <IconFolder size={32} color="#c4c7c5" />
+        </span>
+        <span className="mv-row-text">
+          <span className="mv-row-name">{entry.name}</span>
+          <RowMeta entry={entry} />
+        </span>
+      </button>
+    ) : (
+      <div key={id} className="mv-row disabled" aria-disabled>
+        <span className="mv-row-icon mv-file-tile">
+          <FileBadge type={getFileIcon(entry.name)} />
+        </span>
+        <span className="mv-row-text">
+          <span className="mv-row-name">{entry.name}</span>
+          <RowMeta entry={entry} />
+        </span>
+      </div>
     );
   }
-
-  // list view stays as before
-  return entry.isDirectory ? (
-    <button key={id} type="button" className="mv-row" onClick={() => navigateInto(entry)}>
-      <span className="mv-row-icon"><IconFolder size={32} color="#c4c7c5" /></span>
-      <span className="mv-row-text">
-        <span className="mv-row-name">{entry.name}</span>
-        <RowMeta entry={entry} />
-      </span>
-    </button>
-  ) : (
-    <div key={id} className="mv-row disabled" aria-disabled>
-      <span className="mv-row-icon mv-file-tile"><FileBadge type={getFileIcon(entry.name)} /></span>
-      <span className="mv-row-text">
-        <span className="mv-row-name">{entry.name}</span>
-        <RowMeta entry={entry} />
-      </span>
-    </div>
-  );
-}
 
   return (
     <div className={`mv-screen ${isClosing ? "closing" : ""}`}>
@@ -431,7 +446,10 @@ function renderEntry(entry) {
             placeholder="Search in Drive"
           />
         ) : (
-          <div className="mv-title-mobile" key={isRoot ? "root" : currentCrumb.id}>
+          <div
+            className="mv-title-mobile"
+            key={isRoot ? "root" : currentCrumb.id}
+          >
             {isRoot ? "Select destination" : currentCrumb.name}
           </div>
         )}
@@ -497,13 +515,14 @@ function renderEntry(entry) {
 
       {/* LIST */}
       <main className="mv-content">
-        <div className="mv-sort-btn py-2 px-5">
+        <div className="mv-toolbar py-2 px-5">
           <SortButtonMobile
             viewMode={viewMode}
             onToggleView={onToggleView}
             sortConfig={sortConfig}
             setSortConfig={setSortConfig}
           />
+          <ViewToggleMobile viewMode={viewMode} onToggleView={onToggleView} />
         </div>
 
         {isLoading ? (
@@ -531,13 +550,14 @@ function renderEntry(entry) {
                 {containsDirectory && (
                   <>
                     <div className="mv-grid">
-                      {sortedItems.filter((i) => i.isDirectory).map(renderEntry)}
+                      {sortedItems
+                        .filter((i) => i.isDirectory)
+                        .map(renderEntry)}
                     </div>
                   </>
                 )}
                 {sortedItems.some((i) => !i.isDirectory) && (
                   <>
-        
                     <div className="mv-grid">
                       {sortedItems
                         .filter((i) => !i.isDirectory)

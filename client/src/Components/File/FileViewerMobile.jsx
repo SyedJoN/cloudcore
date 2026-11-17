@@ -435,7 +435,7 @@ export default function FileViewerMobile({
           <button
             onClick={() => setSheetOpen(true)}
             aria-label="More actions"
-            className="flex h-11 w-11 items-center justify-end rounded-full text-(--text-primary) active:bg-black/10"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-(--text-primary) active:bg-black/10"
           >
             <EllipsisVerticalIcon className="h-6 w-6" />
           </button>

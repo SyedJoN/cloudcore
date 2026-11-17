@@ -47,6 +47,12 @@ const formatDateToUS = (value) => {
 };
 export default function ListRow({
   item,
+  isGoogleDriveRoute,
+  isHomeRoute,
+  isDriveRoute,
+  isSharedRoute,
+  isRecentRoute,
+  isTrashRoute,
   sortConfig,
   setSortConfig,
   onStar,
@@ -73,18 +79,6 @@ export default function ListRow({
     email === (user.email || user.owners?.[0].emailAddress) ? "Me" : owner;
 
   const navigate = useNavigate();
-
-  const isGoogleDriveRoute = route === "google-drive";
-
-  const isDriveRoute = route === "drive";
-
-  const isHomeRoute = route === "home";
-
-  const isSharedRoute = route === "shared";
-
-  const isTrashRoute = route === "trash";
-
-  const isRecentRoute = route === "recent";
 
   const [isListHovered, setIsListHovered] = useState(false);
 

@@ -240,7 +240,6 @@ export default function RecentView({
                   sortConfig={sortConfig}
                   setSortConfig={setSortConfig}
                   isSharedRoute={isSharedRoute}
-                  isDesktop={isDesktop}
                   isRecentRoute={isRecentRoute}
                 />
 
@@ -256,7 +255,6 @@ export default function RecentView({
                 sortConfig={sortConfig}
                 setSortConfig={setSortConfig}
                 isSharedRoute={isSharedRoute}
-                isDesktop={isDesktop}
               />
             )}
           </div>

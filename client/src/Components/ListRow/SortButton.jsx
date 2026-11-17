@@ -21,10 +21,11 @@ const SortButton = ({
   viewMode = "list",
   onToggleView,
   isSharedRoute,
-  isDesktop,
 }) => {
   const [open, setOpen] = useState(false);
   const { device } = useDevice();
+  const isDesktop = device === "windows";
+  const isMobile = device === "mobile";
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -56,10 +57,10 @@ const SortButton = ({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex items-center gap-2 rounded-full ${device === "mobile" ? "px-0" : "px-4"} py-2 ${open ? "bg-(--surface-container-base)" : ""} ${open ? "hover:bg-(--surface-container-dark-hover)" : ""} text-sm text-(--text-secondary) hover:bg-(--btn-hover-secondary) cursor-pointer`}
+        className={`flex items-center gap-2 rounded-full ${isMobile ? "px-0" : "px-4"} py-2 ${open ? "bg-(--surface-container-base)" : ""} ${open ? "hover:bg-(--surface-container-dark-hover)" : ""} text-sm text-(--text-secondary) hover:bg-(--btn-hover-secondary) cursor-pointer`}
       >
         {/* Sort icon */}
-        {viewMode === "list" && device === "windows" && (
+        {viewMode === "list" && isDesktop && (
           <svg
             viewBox="0 0 24 24"
             className="h-5 w-5"
@@ -95,7 +96,7 @@ const SortButton = ({
 
       {open && (
         <div
-          className={`absolute top-10 z-50 mt-2 origin-top animate-[sortDropdown_150ms_ease-out]${device === "mobile" ? " left-0" : viewMode === "list" ? " right-0" : "left-0"}
+          className={`absolute top-10 z-50 mt-2 origin-top animate-[sortDropdown_150ms_ease-out]${isMobile ? " left-0" : viewMode === "list" ? " right-0" : "left-0"}
     `}
         >
           <SortMenu
@@ -103,11 +104,11 @@ const SortButton = ({
             sortConfig={sortConfig}
             onSortChange={handleSortChange}
             isSharedRoute={isSharedRoute}
-            isDesktop={isDesktop}
           />
         </div>
       )}
-      {device === "mobile" && (
+
+      {isMobile && (
         <div className="gd-toolbar-actions">
           <button
             className="gd-icon-btn justify-end!"

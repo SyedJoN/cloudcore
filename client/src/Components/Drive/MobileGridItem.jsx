@@ -3,8 +3,7 @@ import { IconFolder, IconDots } from "../Icons/Icons";
 import FileBadge from "../File/FileBadge";
 import FilePreview from "../File/FilePreview";
 import { getColor } from "../../../Utils/getProfileColor";
-import { useLocation } from "react-router-dom";
-import { useAuth, useGDrive } from "../../Contexts";
+import { useAuth } from "../../Contexts";
 import "./MobileGridItem.css";
 import { getFileKind } from "../../../Utils/fileKind";
 import { useDevice } from "../../Contexts/DeviceContext";
@@ -14,11 +13,7 @@ export default function MobileGridItem({
   item,
   avatar,
   owner,
-  isDriveRoute,
-  isRecentRoute,
-  isSharedRoute,
-  isTrashRoute,
-  isGoogleDrive,
+  isGoogleDriveRoute,
   selected,
   isHomeRoute,
   setSelectedItems = () => {},
@@ -27,27 +22,25 @@ export default function MobileGridItem({
   onSelect,
   onDoubleClick,
   onContextMenu,
-  // NEW
   pickerMode = false,
   disabled = false,
+  move = false,
   onOpen,
 }) {
   const { user } = useAuth();
   const [hasImgError, setHasImgError] = useState(false);
   const { device } = useDevice();
   const isMobile = device === "mobile";
-  const showActiviyBar =
-    isDriveRoute || isRecentRoute || isSharedRoute || isTrashRoute;
-
+  const showActiviyBar = (isHomeRoute || isGoogleDriveRoute) && !move;
   // press state (scale + state layer)
   const [pressed, setPressed] = useState(false);
   const pressTimer = useRef(null);
 
   const type = item.isDirectory
-    ? isGoogleDrive 
+    ? isGoogleDriveRoute
       ? "google-directory"
       : "directory"
-    : isGoogleDrive
+    : isGoogleDriveRoute
       ? "google-file"
       : "file";
 
@@ -206,7 +199,7 @@ export default function MobileGridItem({
       </div>
       <div
         style={{
-          display: showActiviyBar || isGoogleDrive ? "none" : "flex",
+          display: showActiviyBar ? "flex" : "none",
           alignItems: "center",
           marginBottom: 6,
           padding:

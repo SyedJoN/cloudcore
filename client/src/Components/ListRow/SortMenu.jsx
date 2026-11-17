@@ -1,3 +1,4 @@
+import { useDevice } from "../../Contexts/DeviceContext.jsx";
 import {Divider} from "../Divider.jsx"
 
 const SORT_KEYS = {
@@ -47,9 +48,9 @@ const SortOption = ({ checked, children, onClick, setOpen }) => {
         onClick();
         setOpen(false);
       }}
-      className={`flex h-9 w-full items-center px-3 text-left text-sm text-(--text-primary) hover:bg-(--btn-hover-secondary)${checked ? " bg-(--btn-bg-medium)" : ""}cursor-pointer`}
+      className={`flex h-9 w-full items-center px-3 text-left text-sm text-(--text-primary) hover:bg-(--btn-hover-secondary)${checked ? " bg-(--btn-bg-medium) " : " "}cursor-pointer`}
     >
-      {/* Google Drive style check */}
+      {/* check svg */}
       <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center">
         {checked && (
           <svg
@@ -83,18 +84,17 @@ const SortMenu = ({
   sortConfig,
   onSortChange,
   setOpen,
-  isDesktop = true,
   isSharedRoute = false,
 }) => {
   const variant = isSharedRoute ? "shared" : "drive";
   const labels = LABELS[variant];
+  const { device } = useDevice();
+  const isDesktop = device === "windows";
 
-  // direction ke labels: name ke liye A→Z, baaki sab dates hain
   const kind = sortConfig.key === "name" ? "name" : "date";
 
   return (
     <div className="w-65 overflow-hidden bg-(--surface-container-dark) py-2 shadow-(--shadow-1) cursor-default">
-      {/* Title */}
 
       {/* Sort by */}
       <SectionLabel>Sort by</SectionLabel>
