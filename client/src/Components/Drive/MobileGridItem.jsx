@@ -31,7 +31,7 @@ export default function MobileGridItem({
   const [hasImgError, setHasImgError] = useState(false);
   const { device } = useDevice();
   const isMobile = device === "mobile";
-  const showActiviyBar = (isHomeRoute || isGoogleDriveRoute) && !move;
+  const showActiviyBar = isHomeRoute && !move;
   // press state (scale + state layer)
   const [pressed, setPressed] = useState(false);
   const pressTimer = useRef(null);
