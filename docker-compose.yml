@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: postgres
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - cloudcore_postgres_data_recovered:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -44,4 +44,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  cloudcore_postgres_data_recovered:
+    external: true

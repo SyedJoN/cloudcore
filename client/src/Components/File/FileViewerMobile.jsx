@@ -104,9 +104,11 @@ export default function FileViewerMobile({
   const isDeleted = Boolean(item?.isDeleted);
   const isGDrive = route && isGoogle;
   const category = getItemCategory(item);
-  const fileUrl = isGDrive
-    ? item?.webContentLink || item?.webViewLink
-    : `${BASE_URL}/file/${item?._id}`;
+const fileUrl = isGDrive
+  ? category === "video"
+    ? `${BASE_URL}/file/gdrive/stream/${item?.id}`
+    : item?.webContentLink || item?.webViewLink
+  : `${BASE_URL}/file/${item?._id}`;
 
 
   /* ---------- capabilities (same rules as MobileContextMenu) ---------- */
@@ -345,20 +347,20 @@ export default function FileViewerMobile({
   /* ---------- viewer ---------- */
 
   const renderViewer = () => {
-   if (isGDrive) {
-  return (
-    <div className="fv-gdrive-stage">
-      <iframe
-        key={item?.id}
-        className="fv-gdrive-frame"
-        src={`https://drive.google.com/file/d/${item?.id}/preview`}
-        title={item?.name}
-        allow="autoplay"
-        allowFullScreen
-      />
-    </div>
-  );
-}
+    if (isGDrive && category !== "video") {
+    return (
+      <div className="fv-gdrive-stage">
+        <iframe
+          key={item?.id}
+          className="fv-gdrive-frame"
+          src={`https://drive.google.com/file/d/${item?.id}/preview`}
+          title={item?.name}
+          allow="autoplay"
+          allowFullScreen
+        />
+      </div>
+    );
+  }
 
     switch (category) {
       case "image":

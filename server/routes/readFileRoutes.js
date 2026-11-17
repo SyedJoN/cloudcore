@@ -6,6 +6,7 @@ import {
   getFileMetaById,
   getRecentFiles,
   getSuggestions,
+  streamDriveFile,
 } from "../controllers/file.controller.js";
 import { validateSuperAdmin } from "../middlewares/validateRoleMiddleware.js";
 import { checkAuth } from "../middlewares/authMiddleware.js";
@@ -18,6 +19,7 @@ router.param("id", validateIdMiddleware);
 
 
 // GET 
+router.get("/gdrive/stream/:id", streamDriveFile);
 router.get("/get-suggestions", checkAuth, getSuggestions)
 router.get("/user-files", checkAuth, validateSuperAdmin, fetchUserWithFiles)
 router.get("/recent-files", checkAuth, getRecentFiles)
