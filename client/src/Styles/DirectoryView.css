@@ -2252,6 +2252,7 @@ body.gd-overlay-open {
 /* ---------- App bar ---------- */
 .mv-appbar {
   display: flex;
+  background: var(--surface-white);
   align-items: center;
   height: 64px;
   padding: env(safe-area-inset-top) 4px 0 4px;
@@ -2273,7 +2274,7 @@ body.gd-overlay-open {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--text);
+  color: var(--text-primary);
   cursor: pointer;
   flex-shrink: 0;
   transition:
@@ -2300,6 +2301,7 @@ body.gd-overlay-open {
   font-weight: 400;
   line-height: 28px;
   white-space: nowrap;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   animation: mv-fade 200ms ease both;
@@ -2337,6 +2339,7 @@ body.gd-overlay-open {
 .mv-tabs-wrap {
   display: grid;
   grid-template-rows: 0fr;
+  background: var(--surface-white);
   opacity: 0;
   flex-shrink: 0;
   transition:
@@ -2367,7 +2370,7 @@ body.gd-overlay-open {
   padding: 0 32px;
   border: 0;
   background: transparent;
-  color: var(--text-2);
+  color: var(--text-primary);
   font: inherit;
   font-size: 14px;
   font-weight: 500;
@@ -2381,7 +2384,7 @@ body.gd-overlay-open {
   background: var(--ripple);
 }
 .mv-tab.active {
-  color: var(--text);
+  color: var(--text-primary);
 }
 .mv-tab-indicator {
   position: absolute;
@@ -2389,7 +2392,7 @@ body.gd-overlay-open {
   bottom: 0;
   height: 3px;
   border-radius: 3px 3px 0 0;
-  background: var(--text);
+  background: var(--text-primary);
   transition:
     transform 280ms cubic-bezier(0.2, 0, 0, 1),
     width 280ms cubic-bezier(0.2, 0, 0, 1);
@@ -2398,6 +2401,7 @@ body.gd-overlay-open {
 /* ---------- List ---------- */
 .mv-content {
   flex: 1;
+  background: var(--surface-white);
   position: relative;
   overflow: hidden auto;
   overscroll-behavior: contain;
@@ -2572,8 +2576,8 @@ body.gd-overlay-open {
 }
 .mv-btn-move {
   padding: 0 24px;
-  background: var(--text-primary);
-  color: var(--accent-on);
+  background: var(--accent-blue);
+  color: var(--accent-blue-light);
 }
 .mv-btn-move:active:not(:disabled) {
   transform: scale(0.96);
