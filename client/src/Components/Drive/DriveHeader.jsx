@@ -53,7 +53,7 @@ export default function DriveHeader({ searchQuery, onSearchChange }) {
           {windowWidth < 768 ? (
             <a
               onClick={handleSearchToggle}
-              className="hover:bg-[var(--btn-bg-medium)] flex items-center p-2 decoration-0 gd-search-icon cursor-pointer rounded-full"
+              className="hover:bg-(--btn-bg-medium) flex items-center p-2 decoration-0 gd-search-icon cursor-pointer rounded-full"
             >
               <IconSearch size={"25"} />
             </a>
@@ -69,7 +69,7 @@ export default function DriveHeader({ searchQuery, onSearchChange }) {
           <div className="gd-header-actions">
             {!isGoogleDrive && (
               <div className="hidden sm:flex" title="gdrive-btn">
-                <GoogleDriveBtn classNames="bg-[var(--surface-container-dark)] hover:bg-[var(--surface-container-dark-hover)] px-2 py-3 gap-2 shadow-[var(--shadow-1)]" />
+                <GoogleDriveBtn classNames="bg-(--surface-container-base) hover:bg-(--surface-container-dark-hover) px-2 py-3 gap-2 shadow-(--shadow-1)" />
               </div>
             )}
 

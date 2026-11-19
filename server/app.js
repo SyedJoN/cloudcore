@@ -29,6 +29,7 @@ import {
   ownershipAction,
   copyItems,
   moveItems,
+  searchDrive,
 } from "./controllers/directory.controller.js";
 import { startSubscriptionCron } from "./cron/subscription.cron.js";
 import { rateLimitMiddleware } from "./middlewares/rateLimitMiddleware.js";
@@ -120,6 +121,7 @@ app.patch("/item/:type/:id/toggle-star", checkAuth, itemLimiter, toggleItemStar)
 app.post("/item/send-link", checkAuth, emailLimiter, sendLink);
 app.post("/item/sendMail/transfer-ownership", checkAuth, emailLimiter, sendOwnershipMail);
 app.post("/item/cancel-pending-ownership", checkAuth, itemLimiter, cancelOwnershipMail);
+app.get("/items/search", checkAuth, itemLimiter, searchDrive);
 app.get(
   "/item/ownership-transfer/:transferId/:action",
   checkAuth,

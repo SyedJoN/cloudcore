@@ -1,5 +1,22 @@
 import { axiosWithCreds } from "./axiosInstances";
 
+export async function searchDrive(
+  { q = "", types = [], people = [], modified = "anytime" },
+  config = {}, 
+) {
+  const { data } = await axiosWithCreds.get("/items/search", {
+    params: {
+      q: q || undefined,
+      types: types.length ? types.join(",") : undefined,
+      people: people.length ? people.join(",") : undefined,
+      modified: modified !== "anytime" ? modified : undefined,
+    },
+    ...config,
+  });
+
+  return data; 
+}
+
 export async function sendOwnershipMail({ newOwner, itemId, type }) {
   const { data } = await axiosWithCreds.post(
     "/item/sendMail/transfer-ownership",

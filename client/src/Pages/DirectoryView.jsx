@@ -59,6 +59,7 @@ import ShareModalMobile from "../Components/Modals/ShareModalMobile";
 import useDriveActions from "../Hooks/useDriveActions";
 import { redirectToGoogleDriveAuth } from "../Hooks/useGoogleDriveAuth";
 import HomeView from "../Components/Drive/HomeView";
+import { updateFileViewTime } from "../../apis/fileApi";
 
 export default function DirectoryView({ route }) {
   const { breadcrumbs, setBreadcrumbs } = useBreadcrumb();
@@ -405,7 +406,10 @@ export default function DirectoryView({ route }) {
     setError,
     showError,
   });
-
+const handleOpenSearchItem = (item) => {
+  setViewItem([item]);
+  updateFileViewTime(item._id).catch(() => {});
+};
   const handleMove = async (ids, destinationId, destinationName) => {
     const targetId = destinationId ?? user?.parentDirId;
 
@@ -774,6 +778,7 @@ export default function DirectoryView({ route }) {
         <DriveTopBarMobile
           dirId={dirId}
           dirContext={dirContext}
+          onOpenItem={handleOpenSearchItem}
           crumbs={crumbs}
           setCrumbs={setCrumbs}
           dirName={mobileHeaderDirName}

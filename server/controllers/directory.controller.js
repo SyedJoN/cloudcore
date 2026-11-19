@@ -3587,3 +3587,205 @@ export const moveItems = async (req, res, next) => {
     });
   }
 };
+
+
+const DAY = 86400000;
+
+// resolveRole limit
+const LIMIT = { file: 30, folder: 10 };
+
+const CATEGORY_RULES = {
+  document: {
+    mime: /^(application\/(msword|rtf|vnd\.openxmlformats-officedocument\.wordprocessingml\..+|vnd\.oasis\.opendocument\.text)|text\/(plain|rtf|markdown))$/,
+    ext: ["doc", "docx", "txt", "rtf", "odt", "md"],
+  },
+  spreadsheet: {
+    mime: /^(application\/(vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\..+|vnd\.oasis\.opendocument\.spreadsheet)|text\/csv)$/,
+    ext: ["xls", "xlsx", "csv", "ods"],
+  },
+  presentation: {
+    mime: /^application\/(vnd\.ms-powerpoint|vnd\.openxmlformats-officedocument\.presentationml\..+|vnd\.oasis\.opendocument\.presentation)$/,
+    ext: ["ppt", "pptx", "odp"],
+  },
+  pdf: { mime: /^application\/pdf$/, ext: ["pdf"] },
+  image: {
+    mime: /^image\//,
+    ext: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "heic", "avif"],
+  },
+  video: { mime: /^video\//, ext: ["mp4", "mov", "avi", "mkv", "webm"] },
+  audio: { mime: /^audio\//, ext: ["mp3", "wav", "flac", "m4a", "ogg"] },
+  archive: {
+    mime: /^application\/(zip|x-zip-compressed|x-rar-compressed|vnd\.rar|x-7z-compressed|x-tar|gzip|x-gzip|x-bzip2)$/,
+    ext: ["zip", "rar", "7z", "tar", "gz"],
+  },
+};
+
+const VALID_TYPES = new Set([...Object.keys(CATEGORY_RULES), "folder", "other"]);
+
+const categoryCondition = (key) => {
+  const { mime, ext } = CATEGORY_RULES[key];
+  return {
+    $or: [
+      { mimeType: mime },
+      { extension: new RegExp(`^\\.(${ext.join("|")})$`, "i") },
+    ],
+  };
+};
+
+// only for files
+const buildFileTypeFilter = (types) => {
+  const fileTypes = types.filter((t) => t !== "folder");
+  if (!fileTypes.length) return null;
+
+  return {
+    $or: fileTypes.map((t) =>
+      t === "other"
+        ? { $nor: Object.keys(CATEGORY_RULES).map(categoryCondition) }
+        : categoryCondition(t),
+    ),
+  };
+};
+
+
+// Helpers
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const parseList = (value) =>
+  String(value ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const modifiedRange = (key, now = new Date()) => {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (key) {
+    case "today":
+      return { $gte: startOfToday };
+    case "last7":
+      return { $gte: new Date(now.getTime() - 7 * DAY) };
+    case "last30":
+      return { $gte: new Date(now.getTime() - 30 * DAY) };
+    case "thisYear":
+      return { $gte: new Date(now.getFullYear(), 0, 1) };
+    case "lastYear":
+      return {
+        $gte: new Date(now.getFullYear() - 1, 0, 1),
+        $lt: new Date(now.getFullYear(), 0, 1),
+      };
+    default:
+      return null; // anytime
+  }
+};
+
+const POPULATE = [
+  { path: "userId", select: "name email avatar" },
+  { path: "path", select: "name" },
+  { path: "parentDirId" },
+  { path: "lastModifyingUser" },
+];
+
+
+// GET /search?q=&types=pdf,image&people=me,others,<userId>&modified=
+
+export const searchDrive = async (req, res, next) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const q = String(req.query.q ?? "").trim().slice(0, 100);
+    const types = parseList(req.query.types).filter((t) => VALID_TYPES.has(t));
+    const people = parseList(req.query.people);
+    const range = modifiedRange(String(req.query.modified ?? "anytime"));
+
+    if (!q && !types.length && !people.length && !range) {
+      return res.json({ files: [], directories: [] });
+    }
+
+    const wantFolders = !types.length || types.includes("folder");
+    const wantFiles = !types.length || types.some((t) => t !== "folder");
+
+    const [fileIds, folderIds] = await Promise.all([
+      wantFiles ? listObjects("file", userId) : [],
+      wantFolders ? listObjects("folder", userId) : [],
+    ]);
+
+
+    const common = [{ isDeleted: false }];
+
+    if (q) common.push({ name: { $regex: escapeRegex(q), $options: "i" } });
+    if (range) common.push({ modifiedTime: range });
+
+
+    const ownerClauses = [];
+    if (people.includes("me")) ownerClauses.push({ userId });
+    if (people.includes("others")) ownerClauses.push({ userId: { $ne: userId } });
+    const ownerIds = people.filter((p) => mongoose.isValidObjectId(p));
+    if (ownerIds.length) ownerClauses.push({ userId: { $in: ownerIds } });
+    if (ownerClauses.length) common.push({ $or: ownerClauses });
+
+    const fileTypeFilter = buildFileTypeFilter(types);
+
+    const find = (Model, extra, limit) =>
+      Model.find({ $and: [...common, ...extra] })
+        .sort({ modifiedTime: -1 })
+        .limit(limit)
+        .populate(POPULATE)
+        .lean();
+
+    const [files, folders] = await Promise.all([
+      wantFiles
+        ? find(
+            File,
+            [
+              { _id: { $in: fileIds } },
+              ...(fileTypeFilter ? [fileTypeFilter] : []),
+            ],
+            LIMIT.file,
+          )
+        : [],
+      wantFolders
+        ? find(
+            Directory,
+            [
+              { _id: { $in: folderIds } },
+              { parentDirId: { $ne: null } },
+            ],
+            LIMIT.folder,
+          )
+        : [],
+    ]);
+
+    const lowerQ = q.toLowerCase();
+    const byRelevance = (a, b) => {
+      const ra = lowerQ && a.name.toLowerCase().startsWith(lowerQ) ? 0 : 1;
+      const rb = lowerQ && b.name.toLowerCase().startsWith(lowerQ) ? 0 : 1;
+      return ra - rb || new Date(b.modifiedTime) - new Date(a.modifiedTime);
+    };
+
+    const hydrate = (docs, type) =>
+      Promise.all(
+        [...docs].sort(byRelevance).map(async (d) => {
+          const role = await resolveRole(d, type, userId, d.parentDirId);
+          const isMine = String(d.userId?._id ?? d.userId) === String(userId);
+
+          return {
+            ...d, // mimeType, extension, populated userId/parentDirId sab saath
+            ...role,
+            isDirectory: type === "folder",
+            rootType: isMine ? "mine" : "shared",
+            locationLabel: isMine ? "" : "Shared with me",
+          };
+        }),
+      );
+
+    const [fileItems, folderItems] = await Promise.all([
+      hydrate(files, "file"),
+      hydrate(folders, "folder"),
+    ]);
+
+    return res.json({ files: fileItems, directories: folderItems });
+  } catch (err) {
+    return next(err);
+  }
+};

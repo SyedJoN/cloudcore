@@ -10,6 +10,7 @@ import UserAccountDrawerMobile from "../UserAccountDrawerBar";
 import { UseAvatar } from "../../Hooks/useAvatar";
 import { Divider } from "../Divider";
 import { ThemeToggleBtnMobile } from "../Buttons/ThemeToggleBtn";
+import MobileSearchOverlay, { useSearchOverlay } from "../MobileSearchOverlay";
 
 
 // Slide-in drawer   
@@ -125,9 +126,10 @@ export default function DriveHeaderMobile({
   dirId,
   dirContext,
   searchPlaceholder = "Search in Drive",
-  onSearch
+  onOpenItem
 }) {
   const { user } = useAuth();
+  const { openSearch } = useSearchOverlay();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [accountOpen, setAccountOpen] = useState(false);
@@ -153,16 +155,17 @@ export default function DriveHeaderMobile({
           <div className="gd-msearch">
             <form
               className="gd-msearch-form"
-              onSubmit={handleSubmit}
+              onSubmit={(e) => e.preventDefault()}
               role="search"
             >
               <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={searchPlaceholder}
-                aria-label="Search"
-                enterKeyHint="search"
+            type="search"
+    readOnly
+    inputMode="none"
+    value=""
+    onClick={openSearch}
+    placeholder={searchPlaceholder}
+    aria-label="Search"
               />
             </form>
           </div>
@@ -176,7 +179,7 @@ export default function DriveHeaderMobile({
           </button>
         </div>
       </header>
-
+<MobileSearchOverlay onOpenItem={onOpenItem} />
       <MobileDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
