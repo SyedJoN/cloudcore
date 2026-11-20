@@ -666,6 +666,13 @@ export const getFileById = async (req, res, next) => {
     const { id } = req.params;
     const userId = req.user?._id;
 
+    // Only accept MongoDB ObjectIds
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid local file ID",
+      });
+    }
+
     const file = await File.findById(id);
 
     if (!file) {
@@ -710,10 +717,11 @@ export const getFileById = async (req, res, next) => {
 
     res.setHeader(
       "Content-Type",
-      response.headers.get("content-type") || "application/octet-stream",
+      response.headers.get("content-type") || "application/octet-stream"
     );
 
     const contentLength = response.headers.get("content-length");
+
     if (contentLength) {
       res.setHeader("Content-Length", contentLength);
     }
@@ -721,11 +729,12 @@ export const getFileById = async (req, res, next) => {
     if (req.query.action === "download") {
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${file.name.replace(/["\\]/g, "_")}"`,
+        `attachment; filename="${file.name.replace(/["\\]/g, "_")}"`
       );
     }
 
     return Readable.fromWeb(response.body).pipe(res);
+
   } catch (error) {
     next(error);
   }

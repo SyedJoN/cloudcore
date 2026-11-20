@@ -262,12 +262,15 @@ export default function GridItem({
         }}
       >
         {avatarEl}
-
         <span className="gd-grid-item-last-action">
-          <span className="text-xs text-(--text-secondary)">You {isOpened ? "opened" : "modified"}</span>
+          <span className="text-xs text-(--text-secondary)">
+            You {isOpened ? "opened" : "modified"}
+          </span>
           <span className="text-xs">•</span>
           <span className="text-xs text-(--text-secondary)">
-            {(isOpened ? formatDate(item.viewedByMeTime) : formatDate(item.modifiedTime))}
+            {isOpened
+              ? formatDate(item.viewedByMeTime)
+              : formatDate(item.modifiedTime)}
           </span>
         </span>
       </div>

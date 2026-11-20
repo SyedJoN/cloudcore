@@ -100,17 +100,39 @@ export default function FileViewerMobile({
 
   const iconType = item?.isDirectory ? null : getFileKind(item);
 
-  const isGoogle = Boolean(item?.webViewLink);
+const isGDrive = Boolean(
+  item?.id &&
+  !item?._id &&
+  (
+    item?.webViewLink ||
+    item?.mimeType?.startsWith("application/vnd.google-apps.") ||
+    item?.webContentLink
+  )
+);
+
+const isGoogle = isGDrive;
   const isDeleted = Boolean(item?.isDeleted);
-  const isGDrive = route && isGoogle;
   const category = getItemCategory(item);
+  const itemId = item?.id ?? item?._id;
+console.log("FILE DEBUG:", {
+  id: item?.id,
+  mongoId: item?._id,
+  mimeType: item?.mimeType,
+  isGoogle,
+  isGDrive,
+  route,
+  category,
+});
+  console.log("Item:", item);
+  console.log("Item ID:", itemId);
 const fileUrl = isGDrive
-  ? category === "video"
-    ? `${BASE_URL}/file/gdrive/stream/${item?.id}`
-    : item?.webContentLink || item?.webViewLink
+  ? item?.webViewLink || item?.webContentLink
   : `${BASE_URL}/file/${item?._id}`;
 
-
+const previewUrl =
+  item?.mimeType === "application/vnd.google-apps.document"
+    ? `https://docs.google.com/document/d/${itemId}/preview`
+    : `https://drive.google.com/file/d/${itemId}/preview`;
   /* ---------- capabilities (same rules as MobileContextMenu) ---------- */
 
   const capabilities = item?.capabilities ?? {};
@@ -340,7 +362,7 @@ const fileUrl = isGDrive
   }
 
   async function handleTrash(target) {
-    await onTrash?.(target)
+    await onTrash?.(target);
     onClose?.();
   }
 
@@ -348,19 +370,19 @@ const fileUrl = isGDrive
 
   const renderViewer = () => {
     if (isGDrive && category !== "video") {
-    return (
-      <div className="fv-gdrive-stage">
-        <iframe
-          key={item?.id}
-          className="fv-gdrive-frame"
-          src={`https://drive.google.com/file/d/${item?.id}/preview`}
-          title={item?.name}
-          allow="autoplay"
-          allowFullScreen
-        />
-      </div>
-    );
-  }
+      return (
+        <div className="fv-gdrive-stage">
+          <iframe
+            key={itemId}
+            className="fv-gdrive-frame"
+            src={previewUrl}
+            title={item?.name}
+            allow="autoplay"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
 
     switch (category) {
       case "image":
@@ -478,17 +500,19 @@ const fileUrl = isGDrive
             </div>
 
             {/* current */}
-       <div
-  className={`relative ${
-    isGDrive ||
-    ["pdf", "office-word", "office-excel", "office-ppt"].includes(category)
-      ? ""
-      : "flex justify-center items-center"
-  } h-full min-h-0 overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
-  style={{ flex: "0 0 33.3333%" }}
->
-  {renderViewer()}
-  </div>
+            <div
+              className={`relative ${
+                isGDrive ||
+                ["pdf", "office-word", "office-excel", "office-ppt"].includes(
+                  category,
+                )
+                  ? ""
+                  : "flex justify-center items-center"
+              } h-full min-h-0 overflow-hidden bg-(--surface-white) ${paneClass(category, isGDrive)}`}
+              style={{ flex: "0 0 33.3333%" }}
+            >
+              {renderViewer()}
+            </div>
 
             {/* next */}
             <div

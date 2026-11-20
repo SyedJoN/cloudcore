@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import CircularLoader from "../Loaders/CircularLoader.jsx";
 export default function DocxViewer({ url }) {
+  console.log('url', url)
   const ref = useRef(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);

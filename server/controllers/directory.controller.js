@@ -3588,10 +3588,9 @@ export const moveItems = async (req, res, next) => {
   }
 };
 
-
 const DAY = 86400000;
 
-// resolveRole limit
+
 const LIMIT = { file: 30, folder: 10 };
 
 const CATEGORY_RULES = {
@@ -3622,6 +3621,98 @@ const CATEGORY_RULES = {
 
 const VALID_TYPES = new Set([...Object.keys(CATEGORY_RULES), "folder", "other"]);
 
+
+const GOOGLE_FOLDER = "application/vnd.google-apps.folder";
+
+const GOOGLE_MIMES = {
+  document: [
+    "application/vnd.google-apps.document",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.oasis.opendocument.text",
+    "application/rtf",
+    "text/plain",
+  ],
+  spreadsheet: [
+    "application/vnd.google-apps.spreadsheet",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "text/csv",
+  ],
+  presentation: [
+    "application/vnd.google-apps.presentation",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.oasis.opendocument.presentation",
+  ],
+  pdf: ["application/pdf"],
+  archive: [
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/vnd.rar",
+    "application/x-7z-compressed",
+    "application/x-tar",
+    "application/gzip",
+  ],
+};
+
+const GOOGLE_MIME_PREFIX = { image: "image/", video: "video/", audio: "audio/" };
+
+const googleEscape = (s) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+const buildGoogleQuery = ({ q, types, people, range }) => {
+  const clauses = ["trashed = false"];
+
+  if (q) clauses.push(`name contains '${googleEscape(q)}'`);
+  if (range?.$gte) clauses.push(`modifiedTime > '${range.$gte.toISOString()}'`);
+  if (range?.$lt) clauses.push(`modifiedTime < '${range.$lt.toISOString()}'`);
+
+  const me = people.includes("me");
+  const others = people.includes("others");
+  if (me && !others) clauses.push("'me' in owners");
+  if (others && !me) clauses.push("not 'me' in owners");
+
+  if (types.length) {
+    const parts = [];
+    for (const t of types) {
+      if (t === "folder") parts.push(`mimeType = '${GOOGLE_FOLDER}'`);
+      else if (GOOGLE_MIME_PREFIX[t]) parts.push(`mimeType contains '${GOOGLE_MIME_PREFIX[t]}'`);
+      else if (GOOGLE_MIMES[t]) GOOGLE_MIMES[t].forEach((m) => parts.push(`mimeType = '${m}'`));
+ 
+    }
+    if (!parts.length) return null;
+    clauses.push(`(${parts.join(" or ")})`);
+  }
+
+  return clauses.join(" and ");
+};
+
+const GOOGLE_FIELDS =
+  "files(id,name,webViewLink,parents,webContentLink,mimeType,thumbnailLink,hasThumbnail,createdTime,modifiedTime,viewedByMeTime,size,owners,lastModifyingUser,capabilities(canReadDrive,canEdit,canDelete,canShare,canCopy,canDownload,canRename,canAddChildren,canMoveItemWithinDrive,canDisableInheritedPermissions),permissions(id,type,role,photoLink,emailAddress,displayName,allowFileDiscovery,pendingOwner))";
+
+const searchGoogleDrive = async (token, filters) => {
+  const query = buildGoogleQuery(filters);
+  if (!query) return [];
+
+  const drive = getDriveClient(token);
+  const { data } = await drive.files.list({
+    q: query,
+    pageSize: 20,
+    orderBy: "modifiedTime desc",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    fields: GOOGLE_FIELDS,
+  });
+
+  return (data.files ?? []).map((f) => ({
+    ...f,
+    provider: "google",
+    rootType: "google",
+    isDirectory: f.mimeType === GOOGLE_FOLDER,
+  }));
+};
+
 const categoryCondition = (key) => {
   const { mime, ext } = CATEGORY_RULES[key];
   return {
@@ -3632,7 +3723,6 @@ const categoryCondition = (key) => {
   };
 };
 
-// only for files
 const buildFileTypeFilter = (types) => {
   const fileTypes = types.filter((t) => t !== "folder");
   if (!fileTypes.length) return null;
@@ -3647,7 +3737,9 @@ const buildFileTypeFilter = (types) => {
 };
 
 
-// Helpers
+//  Helpers                                                
+
+
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const parseList = (value) =>
@@ -3674,7 +3766,7 @@ const modifiedRange = (key, now = new Date()) => {
         $lt: new Date(now.getFullYear(), 0, 1),
       };
     default:
-      return null; // anytime
+      return null; // "anytime"
   }
 };
 
@@ -3687,7 +3779,6 @@ const POPULATE = [
 
 
 // GET /search?q=&types=pdf,image&people=me,others,<userId>&modified=
-
 export const searchDrive = async (req, res, next) => {
   try {
     const userId = req.user?._id;
@@ -3698,6 +3789,7 @@ export const searchDrive = async (req, res, next) => {
     const people = parseList(req.query.people);
     const range = modifiedRange(String(req.query.modified ?? "anytime"));
 
+ 
     if (!q && !types.length && !people.length && !range) {
       return res.json({ files: [], directories: [] });
     }
@@ -3705,11 +3797,11 @@ export const searchDrive = async (req, res, next) => {
     const wantFolders = !types.length || types.includes("folder");
     const wantFiles = !types.length || types.some((t) => t !== "folder");
 
+
     const [fileIds, folderIds] = await Promise.all([
       wantFiles ? listObjects("file", userId) : [],
       wantFolders ? listObjects("folder", userId) : [],
     ]);
-
 
     const common = [{ isDeleted: false }];
 
@@ -3725,6 +3817,15 @@ export const searchDrive = async (req, res, next) => {
     if (ownerClauses.length) common.push({ $or: ownerClauses });
 
     const fileTypeFilter = buildFileTypeFilter(types);
+
+    const googleToken = req.signedCookies?.drive_access_token;
+    const onlySpecificOwners =
+      ownerIds.length > 0 && !people.includes("me") && !people.includes("others");
+
+    const googlePromise =
+      googleToken && !onlySpecificOwners
+        ? searchGoogleDrive(googleToken, { q, types, people, range }).catch(() => [])
+        : Promise.resolve([]);
 
     const find = (Model, extra, limit) =>
       Model.find({ $and: [...common, ...extra] })
@@ -3749,13 +3850,14 @@ export const searchDrive = async (req, res, next) => {
             Directory,
             [
               { _id: { $in: folderIds } },
-              { parentDirId: { $ne: null } },
+              { parentDirId: { $ne: null } }, // user root folder search mein nahi
             ],
             LIMIT.folder,
           )
         : [],
     ]);
 
+   
     const lowerQ = q.toLowerCase();
     const byRelevance = (a, b) => {
       const ra = lowerQ && a.name.toLowerCase().startsWith(lowerQ) ? 0 : 1;
@@ -3770,7 +3872,7 @@ export const searchDrive = async (req, res, next) => {
           const isMine = String(d.userId?._id ?? d.userId) === String(userId);
 
           return {
-            ...d, // mimeType, extension, populated userId/parentDirId sab saath
+            ...d, // mimeType, extension, populated userId/parentDirId alotgether
             ...role,
             isDirectory: type === "folder",
             rootType: isMine ? "mine" : "shared",
@@ -3784,7 +3886,12 @@ export const searchDrive = async (req, res, next) => {
       hydrate(folders, "folder"),
     ]);
 
-    return res.json({ files: fileItems, directories: folderItems });
+    const googleItems = await googlePromise;
+
+    return res.json({
+      files: [...fileItems, ...googleItems.filter((i) => !i.isDirectory)],
+      directories: [...folderItems, ...googleItems.filter((i) => i.isDirectory)],
+    });
   } catch (err) {
     return next(err);
   }
